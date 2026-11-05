@@ -27,7 +27,8 @@
   --accent: #ffab40;
   color-scheme: dark;
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+img, svg { -webkit-user-drag: none; }
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -117,8 +118,7 @@ body {
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
-<main class="app">
-  <h1 class="sr">Складка</h1>
+<main class="app" role="application" aria-label="Складка">
 
   <section class="stage">
     <div class="dial">
@@ -601,6 +601,8 @@ body {
   surface.addEventListener('pointercancel', up);
   surface.addEventListener('lostpointercapture', up);
   surface.addEventListener('contextmenu', e => e.preventDefault());
+  // no text, no selection, no loupe: block the long-press magnifier and selection on iOS
+  ['selectstart', 'dragstart', 'gesturestart'].forEach(n => document.addEventListener(n, e => e.preventDefault()));
   addEventListener('blur', up);
   // iOS only unlocks audio inside click/touchend, so retry the pending trigger there
   surface.addEventListener('click', () => {
