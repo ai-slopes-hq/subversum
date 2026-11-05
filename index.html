@@ -97,26 +97,13 @@ body {
 .go.pulse::after { animation: glow .42s ease-out; }
 @keyframes glow { 0% { opacity: 1; } 100% { opacity: 0; } }
 
-/* the arpeggio ring inside the button: a soft gradient ring shows the pattern, a bold comet follows the rhythm like a cursor */
-.go .arp { position: absolute; inset: 0; width: auto; height: auto; border-radius: 50%; pointer-events: none;
-  -webkit-mask: radial-gradient(circle closest-side, transparent 57%, #000 62%, #000 86%, transparent 90%);
-  mask: radial-gradient(circle closest-side, transparent 57%, #000 62%, #000 86%, transparent 90%); }
-.go .arp.head {
-  background: conic-gradient(from calc(var(--ha, 0deg) - 110deg),
-    transparent 0deg, color-mix(in srgb, var(--accent) 22%, transparent) 55deg,
-    color-mix(in srgb, var(--accent) 70%, transparent) 95deg, var(--accent) 107deg, transparent 112deg, transparent 360deg);
-  opacity: 0; transition: opacity .35s;
-}
-.go .arp.head.on { opacity: 1; }
-.go .arp.head.hit { animation: headhit .4s ease-out; }
-/* rounded leading edge: a soft cap as wide as the ring covers the straight cut of the comet */
-.go .cap { position: absolute; inset: 0; pointer-events: none; transform: rotate(calc(var(--ha, 0deg) - 1deg)); opacity: 0; transition: opacity .35s; }
-.go .cap.on { opacity: 1; }
-.go .cap::before { content: ""; position: absolute; left: 44%; top: 7%; width: 12%; height: 12%; border-radius: 50%;
-  background: radial-gradient(circle, var(--accent) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 0%, transparent) 100%);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent); }
-.go .cap.hit { animation: headhit .4s ease-out; }
-@keyframes headhit { 0% { filter: brightness(1.8) saturate(1.2); } 100% { filter: none; } }
+/* the 16 steps live inside the button as flat wedges: pattern filled in by loudness, the playing step flashes */
+.go .steps { position: absolute; inset: 0; width: 100%; height: 100%; }
+.w { fill: transparent; stroke: var(--tick); stroke-width: .7; stroke-linejoin: round; transition: stroke .25s; }
+.w.n { fill: var(--tick-hi); fill-opacity: var(--o, .3); stroke: var(--tick-hi); }
+.wh { fill: var(--accent); stroke: var(--accent); stroke-width: .7; stroke-linejoin: round; opacity: 0; pointer-events: none; }
+.wh.hit { animation: wedge .8s ease-out; }
+@keyframes wedge { 0% { opacity: 1; } 100% { opacity: 0; } }
 
 /* living background: two soft blobs in the patch colour, steered by the hidden LFOs and kicked by every beat */
 .bg {
@@ -140,7 +127,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .go.hit { animation: none; }
   .go.pulse::after { animation: none; opacity: .5; }
-  .go .arp.head.hit, .go .cap.hit { animation: none; }
+  .wh.hit { animation: none; opacity: .6; }
   .bg.beat { animation: none; }
   .dial.beat { animation: none; }
 }
@@ -158,7 +145,7 @@ body {
   <section class="stage">
     <div class="dial">
       <svg id="ring" class="ring" viewBox="0 0 200 200" aria-hidden="true"></svg>
-      <button id="go" class="go" type="button" aria-label="Нажать: случайный арпеджиатор"><span id="arpbase" class="arp base"></span><span id="arphead" class="arp head"></span><span id="arpcap" class="cap"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></button>
+      <button id="go" class="go" type="button" aria-label="Нажать: случайный арпеджиатор"><svg id="steps" class="steps" viewBox="-70 -70 140 140" aria-hidden="true"></svg><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></button>
     </div>
   </section>
 </main>
@@ -503,14 +490,12 @@ body {
     const now = ctx.currentTime;
     stepNote(seq, now);           // step 0 plays at once
     seq.next = now + seq.dur;
-    startHead(now, seq.dur);
     if (holding) {
       go.classList.add('live');
       seq.timer = setInterval(tick, 25);
       tick();
     } else {
       seq = null;                 // released before the audio woke up: one hit only
-      if (head) head.stop = now;
     }
   }
 
@@ -518,7 +503,6 @@ body {
     if (!seq) return;
     clearInterval(seq.timer);
     seq = null;
-    if (head) head.stop = ctx.currentTime;
     go.classList.remove('live');
     // notes already scheduled but not yet started are cancelled, so a quick tap is exactly one hit
     const now = ctx.currentTime;
@@ -561,40 +545,42 @@ body {
   setLit(0);
 
   /* ---------- steps inside the button, beat, patch colour, drifting glow ---------- */
-  const dial = $('.dial'), root = document.documentElement;
-  const bg = $('#bg'), arpBase = $('#arpbase'), arpHead = $('#arphead'), arpCap = $('#arpcap');
-  // soft ring for this press: brightness at each step follows the pattern, blended smoothly between steps
-  function renderPattern(sq) {
-    const stops = [];
-    for (let i = 0; i <= STEPS; i++) {
-      const st = sq.steps[i % STEPS];
-      const a = st ? 0.1 + 0.28 * st.vel : 0.025;
-      stops.push('rgba(120,112,98,' + a.toFixed(2) + ') ' + ((i + 0.5) / STEPS * 360 - 11.25).toFixed(1) + 'deg');
+  const stepsSvg = $('#steps'), dial = $('.dial'), root = document.documentElement;
+  const wedges = [], wedgesHi = [];
+  const bg = $('#bg');
+  (function () {
+    const R1 = 40, R2 = 63, gap = 2.2 * Math.PI / 180, w = 2 * Math.PI / STEPS;
+    const pt = (r, a) => (Math.sin(a) * r).toFixed(2) + ' ' + (-Math.cos(a) * r).toFixed(2);
+    for (let i = 0; i < STEPS; i++) {
+      const a1 = i * w + gap / 2, a2 = (i + 1) * w - gap / 2;
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', 'M' + pt(R1, a1) + ' L' + pt(R2, a1) + ' A' + R2 + ' ' + R2 + ' 0 0 1 ' + pt(R2, a2) +
+        ' L' + pt(R1, a2) + ' A' + R1 + ' ' + R1 + ' 0 0 0 ' + pt(R1, a1) + 'Z');
+      p.setAttribute('class', 'w');
+      stepsSvg.appendChild(p);
+      wedges.push(p);
+      const h = p.cloneNode(false);
+      h.setAttribute('class', 'wh');
+      stepsSvg.appendChild(h);
+      wedgesHi.push(h);
     }
-    arpBase.style.background = 'conic-gradient(' + stops.join(',') + ')';
-  }
-  // the comet: its angle comes straight from the sequencer clock, so it glides over rests too
-  let head = null, headRaf = 0;
-  function headFrame() {
-    headRaf = 0;
-    if (!head || !ctx) return;
-    const now = Math.min(ctx.currentTime, head.stop === null ? Infinity : head.stop);
-    const pos = Math.max(0, (now - head.t0) / head.dur) % STEPS;
-    const ha = (pos / STEPS * 360).toFixed(2) + 'deg';
-    arpHead.style.setProperty('--ha', ha);
-    arpCap.style.setProperty('--ha', ha);
-    if (!seq && !cur) { arpHead.classList.remove('on'); arpCap.classList.remove('on'); head = null; return; }
-    headRaf = requestAnimationFrame(headFrame);
-  }
-  function startHead(t0, dur) {
-    head = { t0: t0 + 0.012, dur, stop: null };
-    arpHead.classList.add('on'); arpCap.classList.add('on');
-    if (!headRaf) headRaf = requestAnimationFrame(headFrame);
+  })();
+  // pattern of this press: rests stay empty, notes are filled the more the louder they are
+  function renderPattern(sq) {
+    sq.steps.forEach((st, i) => {
+      const e = wedges[i];
+      wedgesHi[i].classList.remove('hit');
+      if (st) { e.classList.add('n'); e.style.setProperty('--o', (0.12 + 0.5 * st.vel).toFixed(2)); }
+      else { e.classList.remove('n'); e.style.removeProperty('--o'); }
+    });
   }
   function flashStep(i) {
-    arpHead.classList.remove('hit'); arpCap.classList.remove('hit');
-    void arpHead.offsetWidth;
-    arpHead.classList.add('hit'); arpCap.classList.add('hit');
+    const e = wedgesHi[i];
+    e.classList.remove('hit');
+    void e.getBoundingClientRect();
+    e.classList.add('hit');
+    clearTimeout(e._t);
+    e._t = setTimeout(() => e.classList.remove('hit'), 850);
     if (i % 4 === 0) {
       dial.classList.remove('beat'); bg.classList.remove('beat');
       void dial.offsetWidth;
