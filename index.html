@@ -180,8 +180,9 @@ body {
   const STEPS = 16;
   const LOW = 24, HIGH = 47; // MIDI C1..B2, so every melody note stays in octave 1 or 2
   const LFO_RATE_MIN = 0.02; // Hz, one cycle in 50 s
-  const LFO_RATE_MAX = 8;    // Hz, a 1/16 note at 120 BPM
-  const LFO_SHAPES = ['sine', 'sine', 'triangle', 'triangle', 'saw', 'square'];
+  const LFO_RATE_MAX = 3;    // Hz, gentle movement only, nothing that turns into tremolo or FM noise
+  const LFO_CHANCE = 0.5;    // share of patches that get any LFO at all
+  const LFO_SHAPES = ['sine', 'sine', 'sine', 'triangle'];
   const LFO_TARGETS = ['pitch', 'ratio', 'index', 'fold', 'sym', 'cut', 'res'];
 
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -236,20 +237,22 @@ body {
       res: rnd(0, RES_MAX),
       vel: 1,
       lfo: rollLfo(),
+      vis: [{ shape: 'sine', rate: lrnd(0.03, 0.3), depth: 1, phase: rnd(0, Math.PI * 2) }], // silent twin that only drives the background when there is no audio LFO
       lfoNodes: null
     };
   }
 
   // 1 to 3 hidden LFOs, each with its own target, shape, rate, depth and starting phase
   function rollLfo() {
-    const n = 1 + (Math.random() < 0.6 ? 1 : 0) + (Math.random() < 0.25 ? 1 : 0);
+    if (Math.random() >= LFO_CHANCE) return [];
+    const n = 1 + (Math.random() < 0.2 ? 1 : 0);
     const out = [];
     for (let i = 0; i < n; i++) {
       out.push({
         target: pick(LFO_TARGETS),
         shape: pick(LFO_SHAPES),
         rate: lrnd(LFO_RATE_MIN, LFO_RATE_MAX),
-        depth: rnd(0.15, 1),
+        depth: rnd(0.15, 0.6),
         phase: rnd(0, Math.PI * 2)
       });
     }
@@ -358,13 +361,13 @@ body {
       const d = l.def.depth;
       let params = null, amount = 0;
       switch (l.def.target) {
-        case 'pitch': params = [osc.detune, mod.detune]; amount = 35 * d; break;            // cents, vibrato
-        case 'ratio': params = [mod.detune]; amount = 600 * d; break;                       // cents, FM ratio drift
-        case 'index': params = [modG.gain]; amount = 0.5 * FM_MAX * p.freq * p.fmRatio * d; break; // Hz of deviation
-        case 'fold':  params = [pre.gain]; amount = 0.35 * d; break;                        // fold depth
-        case 'sym':   if (off) { params = [off.offset]; amount = 1.5 * SYM_MAX * d; } break; // fold symmetry
-        case 'cut':   params = [lpf.detune]; amount = 2400 * d; break;                      // cents, up to 2 octaves
-        case 'res':   params = [lpf.Q]; amount = 6 * d; break;                              // dB
+        case 'pitch': params = [osc.detune, mod.detune]; amount = 14 * d; break;            // cents, vibrato
+        case 'ratio': params = [mod.detune]; amount = 120 * d; break;                       // cents, FM ratio drift
+        case 'index': params = [modG.gain]; amount = 0.25 * FM_MAX * p.freq * p.fmRatio * d; break; // Hz of deviation
+        case 'fold':  params = [pre.gain]; amount = 0.18 * d; break;                        // fold depth
+        case 'sym':   if (off) { params = [off.offset]; amount = 0.8 * SYM_MAX * d; } break; // fold symmetry
+        case 'cut':   params = [lpf.detune]; amount = 1100 * d; break;                      // cents, up to 2 octaves
+        case 'res':   params = [lpf.Q]; amount = 3 * d; break;                              // dB
       }
       if (!params) return;
       const tg = ctx.createGain();
@@ -614,10 +617,11 @@ body {
     if (!p || !ctx) return;
     const t = ctx.currentTime - (p.lfoT0 || 0);
     let v = 0, n = 0;
-    p.lfo.forEach(d => { v += lfoVal(d, t) * d.depth; n += d.depth; });
+    const L = p.lfo.length ? p.lfo : p.vis;
+    L.forEach(d => { v += lfoVal(d, t) * d.depth; n += d.depth; });
     v = n ? v / n : 0;
     root.style.setProperty('--bg-a', (0.14 + 0.1 * v).toFixed(3));
-    const a = p.lfo[0], b = p.lfo[1] || p.lfo[0];
+    const a = L[0], b = L[1] || L[0];
     const x = lfoVal(a, t), y = lfoVal(b, t + 0.37 / Math.max(b.rate, 0.02));
     root.style.setProperty('--bx1', (30 + 22 * x).toFixed(1) + '%');
     root.style.setProperty('--by1', (35 + 22 * y).toFixed(1) + '%');
