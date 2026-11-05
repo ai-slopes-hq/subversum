@@ -12,20 +12,14 @@
 [hidden]{display:none!important}
 </style>
 <title>Складка</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400&family=IBM+Plex+Sans+Condensed:wght@400;500&display=swap">
 <style>
-/* Layout: one-screen instrument. Scope strip on top, tick-ring dial with a single button in the middle, signal-chain readout (VCO > FOLD > LPG) below. Black ground and one amber accent, same family as the watch-style worlds in the project. */
+/* Layout: black screen, the waveform on top, one huge button below it. The whole screen is the touch target; the tick ring around the button shows the gate level. */
 :root {
   --bg: #000000;
-  --ink: #f1ece4;
-  --dim: #8a847a;
   --tick: #2a2621;
   --tick-hi: #5d574d;
+  --ink: #f1ece4;
   --accent: #ffab40;
-  --display: 'Oswald', 'Arial Narrow', sans-serif;
-  --body: 'IBM Plex Sans Condensed', 'Arial Narrow', sans-serif;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -34,7 +28,6 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--body);
   padding-block: 12px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -42,36 +35,26 @@ body {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+  touch-action: none;
 }
 .app {
   height: 100%;
-  max-width: 440px;
+  max-width: 520px;
   margin: 0 auto;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
 }
-
-.top { display: flex; justify-content: space-between; align-items: baseline; min-height: 24px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; margin: 0; }
-.info {
-  font: 500 13px/1.35 var(--body);
-  letter-spacing: .14em;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-.oct { display: flex; align-items: baseline; gap: 12px; }
-.oct b { font: 400 20px var(--display); color: var(--tick-hi); transition: color .12s; }
-.oct b[data-on] { color: var(--accent); }
 
-#scope { display: block; width: 100%; height: clamp(72px, 13vh, 120px); }
+#scope { display: block; width: 100%; height: clamp(90px, 18vh, 160px); }
 
 .stage { container-type: size; display: grid; place-items: center; min-height: 0; }
 .dial {
   position: relative;
-  width: min(78vw, 300px);
+  width: min(92vw, 360px);
   aspect-ratio: 1;
-  width: min(100cqw, 100cqh, 340px);
+  width: min(100cqw, 100cqh);
 }
 .ring { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ring line { stroke-linecap: round; transition: stroke .05s; }
@@ -80,7 +63,7 @@ body {
 .ring .on { stroke: var(--accent); }
 
 .go {
-  position: absolute; inset: 17%;
+  position: absolute; inset: 15%;
   border-radius: 50%;
   border: 1px solid var(--tick-hi);
   background: radial-gradient(circle at 50% 35%, #1a1612, #060504 72%);
@@ -88,15 +71,15 @@ body {
   display: grid; place-items: center;
   padding: 0;
   cursor: pointer;
-  touch-action: manipulation;
+  touch-action: none;
   -webkit-touch-callout: none;
   transition: transform .06s, border-color .1s, color .1s;
 }
 .go svg {
-  width: 34%; height: 34%;
-  fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+  width: 32%; height: 32%;
+  fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round;
 }
-.go:active, .go.down, .go.live { transform: scale(.97); border-color: var(--accent); color: var(--accent); }
+.go.down, .go.live { transform: scale(.97); border-color: var(--accent); color: var(--accent); }
 .go:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .go.hit { animation: hit .55s ease-out; }
 @keyframes hit {
@@ -104,33 +87,6 @@ body {
   100% { box-shadow: 0 0 0 18px transparent, inset 0 0 0 transparent; }
 }
 @media (prefers-reduced-motion: reduce) { .go.hit { animation: none; } }
-
-.chain { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.blk { min-width: 0; display: grid; gap: 3px; align-content: start; }
-.name { display: flex; align-items: center; height: 8px; }
-.wire { flex: 1; height: 8px; position: relative; }
-.wire::before { content: ""; position: absolute; left: 0; right: 2px; top: 50%; height: 1px; background: var(--tick-hi); }
-.wire::after {
-  content: ""; position: absolute; right: 1px; top: 50%;
-  width: 5px; height: 5px;
-  border-top: 1px solid var(--tick-hi); border-right: 1px solid var(--tick-hi);
-  transform: translateY(-50%) rotate(45deg);
-}
-.big {
-  margin-top: 4px;
-  font: 300 clamp(28px, 9vw, 38px)/1 var(--display);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.big small { font: 500 10px var(--body); letter-spacing: .14em; color: var(--dim); margin-left: 3px; }
-.sub {
-  font: 400 13px var(--body);
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.chain.idle .big, .chain.idle .sub { color: var(--tick-hi); }
-.chain.idle small { visibility: hidden; }
 </style>
 
 <script>
@@ -140,11 +96,7 @@ body {
 </head>
 <body>
 <main class="app">
-  <header class="top">
-    <h1 class="sr">Складка</h1>
-    <div class="info" id="info"></div>
-    <div class="oct" aria-label="Октава, 1 или 2"><b id="o1">1</b><b id="o2">2</b></div>
-  </header>
+  <h1 class="sr">Складка</h1>
 
   <canvas id="scope" aria-hidden="true"></canvas>
 
@@ -152,28 +104,6 @@ body {
     <div class="dial">
       <svg id="ring" class="ring" viewBox="0 0 200 200" aria-hidden="true"></svg>
       <button id="go" class="go" type="button" aria-label="Тап: случайный звук. Зажать: случайная мелодия"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></button>
-    </div>
-  </section>
-
-  <section class="chain idle" id="chain">
-    <div class="blk">
-      <div class="name"><span class="wire"></span></div>
-      <div class="big" id="v-note">—</div>
-      <div class="sub" id="v-hz">—</div>
-      <div class="sub" id="v-wave">—</div>
-      <div class="sub" id="v-fm">—</div>
-    </div>
-    <div class="blk">
-      <div class="name"><span class="wire"></span></div>
-      <div class="big"><span id="f-depth">—</span><small>%</small></div>
-      <div class="sub" id="f-sym">—</div>
-      <div class="sub" id="f-sweep">—</div>
-    </div>
-    <div class="blk">
-      <div class="name"></div>
-      <div class="big"><span id="l-cut">—</span><small>kHz</small></div>
-      <div class="sub" id="l-dec">—</div>
-      <div class="sub" id="l-res">—</div>
     </div>
   </section>
 </main>
@@ -205,14 +135,13 @@ body {
   const RES_MAX = 18;     // LPG resonance ceiling, dB (Web Audio lowpass Q is in dB)
   const MASTER = 0.85;
   const BPM_MIN = 110, BPM_MAX = 135;
-  const HOLD_MS = 380;    // how long TRIG is held before the melody starts
+  const HOLD_MS = 380;    // how long the screen is held before the melody starts
   const STEPS = 16;
   const LOW = 24, HIGH = 47; // MIDI C1..B2, so every melody note stays in octave 1 or 2
 
   const rnd = (a, b) => a + Math.random() * (b - a);
   const lrnd = (a, b) => Math.exp(rnd(Math.log(a), Math.log(b)));
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
-  const sgn = n => (n < 0 ? '−' : n > 0 ? '+' : '') + Math.abs(n);
 
   /* ---------- audio ---------- */
   let ctx = null, master = null, analyser = null, foldCurve = null, voice = null, pending = false;
@@ -356,7 +285,6 @@ body {
 
     atTime(t0, () => {
       cur = { t0, a: p.attack, tau };
-      show(p);
       if (!raf) raf = requestAnimationFrame(loop);
     });
   }
@@ -395,14 +323,14 @@ body {
     for (let m = LOW; m <= HIGH; m++) {
       if (sc.iv.indexOf(((m - root) % 12 + 12) % 12) !== -1) pool.push(m);
     }
-    const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, bar: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0 };
+    const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0 };
     for (let k = 0; k < STEPS; k++) s.steps.push(makeStep(s));
     if (!s.steps.some(Boolean)) s.steps[0] = { midi: pool[s.idx], vel: 1 };
     return s;
   }
 
   function stepNote(s, t) {
-    // nothing is re-rolled while the button is held: same patch, same 16 steps, looped
+    // nothing is re-rolled while the screen is held: same patch, same 16 steps, looped
     const st = s.steps[s.i];
     s.i = (s.i + 1) % STEPS;
     if (!st) return;
@@ -430,7 +358,6 @@ body {
       if (!holding || seq) return;
       seq = makeSeq();
       seq.next = ctx.currentTime + 0.03;
-      info.textContent = NOTES[seq.root] + ' ' + seq.sc.name + '  ·  ' + seq.bpm + ' BPM';
       go.classList.add('live');
       tick();
       seq.timer = setInterval(tick, 25);
@@ -442,27 +369,7 @@ body {
     if (!seq) return;
     clearInterval(seq.timer);
     seq = null;
-    info.textContent = '';
     go.classList.remove('live');
-  }
-
-  /* ---------- readout ---------- */
-  const chain = $('#chain');
-  const info = $('#info');
-  function show(p) {
-    chain.classList.remove('idle');
-    $('#v-note').textContent = NOTES[p.semi] + p.oct;
-    $('#v-hz').textContent = p.freq.toFixed(1) + ' Hz';
-    $('#v-wave').textContent = p.wave[1];
-    $('#v-fm').textContent = '×' + Number(p.fmRatio.toFixed(2)) + ' i' + p.fmIdx.toFixed(1);
-    $('#f-depth').textContent = Math.round(p.depth / DEPTH_MAX * 100);
-    $('#f-sym').textContent = sgn(Math.round(p.sym / SYM_MAX * 100));
-    $('#f-sweep').textContent = '−' + Math.round((1 - p.sweep) * 100) + '%';
-    $('#l-cut').textContent = (p.cutoff / 1000).toFixed(2);
-    $('#l-dec').textContent = Math.round(p.decay * 1000) + ' ms';
-    $('#l-res').textContent = Math.round(p.res) + ' dB';
-    $('#o1').toggleAttribute('data-on', p.oct === 1);
-    $('#o2').toggleAttribute('data-on', p.oct === 2);
   }
 
   /* ---------- tick ring: lit ticks follow the gate level ---------- */
@@ -519,7 +426,7 @@ body {
     g.stroke();
 
     g.strokeStyle = C.accent;
-    g.lineWidth = 1.6 * dpr;
+    g.lineWidth = 1.8 * dpr;
     g.lineJoin = 'round';
     g.beginPath();
     if (!data) {
@@ -561,45 +468,48 @@ body {
     raf = requestAnimationFrame(loop);
   }
 
-  /* ---------- input: tap = one note, hold = melody ---------- */
+  /* ---------- input: the whole screen is the button. Tap = one note, hold = melody ---------- */
   const go = $('#go');
   let holding = false, holdTimer = 0;
 
   function down() {
     if (holding) return;
     holding = true;
+    go.classList.add('down');
     press();
     holdTimer = setTimeout(startMelody, HOLD_MS);
   }
   function up() {
     if (!holding) return;
     holding = false;
+    go.classList.remove('down');
     clearTimeout(holdTimer);
     stopMelody();
   }
 
-  go.addEventListener('pointerdown', e => {
+  const surface = document.body;
+  surface.addEventListener('pointerdown', e => {
     e.preventDefault();
-    try { go.setPointerCapture(e.pointerId); } catch (err) {}
+    try { surface.setPointerCapture(e.pointerId); } catch (err) {}
     down();
   });
-  go.addEventListener('pointerup', up);
-  go.addEventListener('pointercancel', up);
-  go.addEventListener('lostpointercapture', up);
-  go.addEventListener('contextmenu', e => e.preventDefault());
+  surface.addEventListener('pointerup', up);
+  surface.addEventListener('pointercancel', up);
+  surface.addEventListener('lostpointercapture', up);
+  surface.addEventListener('contextmenu', e => e.preventDefault());
   addEventListener('blur', up);
   // iOS only unlocks audio inside click/touchend, so retry the pending trigger there
-  go.addEventListener('click', () => {
+  surface.addEventListener('click', () => {
     if (ctx && ctx.state !== 'running') {
       ctx.resume().then(() => { if (pending) { pending = false; fire(); } }).catch(() => {});
     }
   });
   addEventListener('keydown', e => {
     if (e.repeat) return;
-    if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); go.classList.add('down'); down(); }
+    if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); down(); }
   });
   addEventListener('keyup', e => {
-    if (e.code === 'Space' || e.code === 'Enter') { go.classList.remove('down'); up(); }
+    if (e.code === 'Space' || e.code === 'Enter') up();
   });
 })();
 </script>
