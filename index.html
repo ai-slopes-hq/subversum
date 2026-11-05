@@ -99,13 +99,24 @@ body {
 
 /* the 16 steps live inside the button as wedges: pattern filled in by loudness, the playing step flashes */
 .go .steps { position: absolute; inset: 0; width: 100%; height: 100%; }
-.w { fill: transparent; stroke: var(--tick); stroke-width: .7; stroke-linejoin: round; transition: fill .25s, stroke .25s; }
-.w.n { fill: var(--tick-hi); fill-opacity: var(--o, .3); stroke: var(--tick-hi); }
-.w.hit { animation: wedge .7s ease-out; }
-@keyframes wedge {
-  0% { fill: var(--accent); fill-opacity: 1; stroke: var(--accent); }
-  100% { fill: var(--tick-hi); fill-opacity: var(--o, .3); stroke: var(--tick-hi); }
+.w { fill: transparent; stroke: var(--tick); stroke-width: .7; stroke-linejoin: round; transition: stroke .25s; }
+.w.n { fill: url(#wg); fill-opacity: var(--o, .6); stroke: var(--tick-hi); }
+.wh { fill: url(#wga); stroke: var(--accent); stroke-width: .7; stroke-linejoin: round; opacity: 0; pointer-events: none; }
+.wh.hit { animation: wedge .8s ease-out; }
+@keyframes wedge { 0% { opacity: 1; } 100% { opacity: 0; } }
+.steps stop.a { stop-color: var(--accent); }
+.steps stop.t { stop-color: var(--tick-hi); }
+
+/* living background: two soft blobs in the patch colour, steered by the hidden LFOs and kicked by every beat */
+.bg {
+  position: fixed; inset: -10%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(circle at var(--bx1, 30%) var(--by1, 35%), color-mix(in srgb, var(--accent) 34%, transparent), transparent 46%),
+    radial-gradient(circle at var(--bx2, 72%) var(--by2, 68%), color-mix(in srgb, var(--accent) 22%, transparent), transparent 52%);
+  opacity: var(--bg-b, 0); transition: opacity .8s;
 }
+.bg.beat { animation: bgbeat .5s ease-out; }
+@keyframes bgbeat { 0% { filter: brightness(1.9); } 100% { filter: brightness(1); } }
 
 /* the dial breathes on every beat; a soft glow behind it drifts with the patch's hidden LFOs */
 .dial::before {
@@ -118,7 +129,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .go.hit { animation: none; }
   .go.pulse::after { animation: none; opacity: .5; }
-  .w.hit { animation: none; fill: var(--accent); }
+  .wh.hit { animation: none; opacity: .6; }
+  .bg.beat { animation: none; }
   .dial.beat { animation: none; }
 }
 </style>
@@ -129,6 +141,7 @@ body {
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
+<div class="bg" id="bg" aria-hidden="true"></div>
 <main class="app" role="application" aria-label="Складка">
 
   <section class="stage">
@@ -535,7 +548,23 @@ body {
 
   /* ---------- steps inside the button, beat, patch colour, drifting glow ---------- */
   const stepsSvg = $('#steps'), dial = $('.dial'), root = document.documentElement;
-  const wedges = [];
+  const wedges = [], wedgesHi = [];
+  const bg = $('#bg');
+  (function () {
+    const defs = document.createElementNS(NS, 'defs');
+    [['wg', 't', 0.08, 'a', 0.9], ['wga', 'a', 0.25, 'a', 1]].forEach(g => {
+      const rg = document.createElementNS(NS, 'radialGradient');
+      rg.setAttribute('id', g[0]); rg.setAttribute('gradientUnits', 'userSpaceOnUse');
+      rg.setAttribute('cx', '0'); rg.setAttribute('cy', '0'); rg.setAttribute('r', '63');
+      [[0.63, g[1], g[2]], [1, g[3], g[4]]].forEach(st => {
+        const e = document.createElementNS(NS, 'stop');
+        e.setAttribute('offset', st[0]); e.setAttribute('class', st[1]); e.setAttribute('stop-opacity', st[2]);
+        rg.appendChild(e);
+      });
+      defs.appendChild(rg);
+    });
+    stepsSvg.appendChild(defs);
+  })();
   (function () {
     const R1 = 40, R2 = 63, gap = 2.2 * Math.PI / 180, w = 2 * Math.PI / STEPS;
     const pt = (r, a) => (Math.sin(a) * r).toFixed(2) + ' ' + (-Math.cos(a) * r).toFixed(2);
@@ -547,28 +576,32 @@ body {
       p.setAttribute('class', 'w');
       stepsSvg.appendChild(p);
       wedges.push(p);
+      const h = p.cloneNode(false);
+      h.setAttribute('class', 'wh');
+      stepsSvg.appendChild(h);
+      wedgesHi.push(h);
     }
   })();
   // pattern of this press: rests stay empty, notes are filled the more the louder they are
   function renderPattern(sq) {
     sq.steps.forEach((st, i) => {
       const e = wedges[i];
-      e.classList.remove('hit');
+      wedgesHi[i].classList.remove('hit');
       if (st) { e.classList.add('n'); e.style.setProperty('--o', (0.12 + 0.5 * st.vel).toFixed(2)); }
       else { e.classList.remove('n'); e.style.removeProperty('--o'); }
     });
   }
   function flashStep(i) {
-    const e = wedges[i];
+    const e = wedgesHi[i];
     e.classList.remove('hit');
     void e.getBoundingClientRect();
     e.classList.add('hit');
     clearTimeout(e._t);
-    e._t = setTimeout(() => e.classList.remove('hit'), 750);
+    e._t = setTimeout(() => e.classList.remove('hit'), 850);
     if (i % 4 === 0) {
-      dial.classList.remove('beat');
+      dial.classList.remove('beat'); bg.classList.remove('beat');
       void dial.offsetWidth;
-      dial.classList.add('beat');
+      dial.classList.add('beat'); bg.classList.add('beat');
     }
   }
   function pulse(vel) {
@@ -601,6 +634,13 @@ body {
     p.lfo.forEach(d => { v += lfoVal(d, t) * d.depth; n += d.depth; });
     v = n ? v / n : 0;
     root.style.setProperty('--bg-a', (0.14 + 0.1 * v).toFixed(3));
+    const a = p.lfo[0], b = p.lfo[1] || p.lfo[0];
+    const x = lfoVal(a, t), y = lfoVal(b, t + 0.37 / Math.max(b.rate, 0.02));
+    root.style.setProperty('--bx1', (30 + 22 * x).toFixed(1) + '%');
+    root.style.setProperty('--by1', (35 + 22 * y).toFixed(1) + '%');
+    root.style.setProperty('--bx2', (72 - 22 * y).toFixed(1) + '%');
+    root.style.setProperty('--by2', (68 - 22 * x).toFixed(1) + '%');
+    root.style.setProperty('--bg-b', (0.45 + 0.35 * v).toFixed(3));
   }
 
   /* ---------- frame loop ---------- */
@@ -612,7 +652,7 @@ body {
     const env = t <= 0 ? 0 : (t < cur.a ? t / cur.a : Math.exp(-(t - cur.a) / cur.tau));
     setLit(Math.ceil(env * 60 - 1e-6));
     driftGlow();
-    if (t > cur.a + cur.tau * 7 && !seq) { setLit(0); cur = null; root.style.setProperty('--bg-a', 0); return; }
+    if (t > cur.a + cur.tau * 7 && !seq) { setLit(0); cur = null; root.style.setProperty('--bg-a', 0); root.style.setProperty('--bg-b', 0); return; }
     raf = requestAnimationFrame(loop);
   }
 
