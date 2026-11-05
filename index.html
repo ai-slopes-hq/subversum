@@ -182,6 +182,37 @@ html[data-skin="riso"] body::after {
   content: ""; position: fixed; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: .3; z-index: 5;
   background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 .9 0 0 0 0 .85 0 0 0 0 .8 0 0 0 1.1 -.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
 }
+
+/* ---------- skin motion ---------- */
+.ring .ink { display: none; transform-box: fill-box; transform-origin: center; }
+.ring .ink.a { fill: #FF4F8B; }
+.ring .ink.b { fill: #3D7BFF; }
+.ring .ink.rest { opacity: .35; }
+.ring .ink.hit { animation: ink .65s cubic-bezier(.2, .9, .3, 1.3); }
+@keyframes ink { 0% { fill: #F2EBDC; transform: scale(2.6); } 100% { transform: scale(1); } }
+html[data-skin="riso"] .ring .ink { display: block; }
+html[data-skin="riso"] .dial::before { transform: scale(calc(.97 + var(--env, 0) * .03 + var(--kick, 0) * .05)); }
+html[data-skin="riso"] .dial::after {
+  transform: translate(calc(4.5% + var(--jx, 0) * 1%), calc(4.5% + var(--jy, 0) * 1%));
+  background-image: radial-gradient(circle, #3D7BFF calc(1.1px + var(--env, 0) * 1.4px), transparent calc(1.4px + var(--env, 0) * 1.4px));
+}
+html[data-skin="riso"] body::after { animation: grain .5s steps(1) infinite; }
+@keyframes grain {
+  0% { background-position: 0 0; } 25% { background-position: -30px 40px; }
+  50% { background-position: 50px -20px; } 75% { background-position: -40px -40px; }
+}
+html[data-skin="scope"] .ring .wave { stroke-width: calc(1.1 + var(--kick, 0) * 1.6); }
+html[data-skin="scope"] body::before {
+  content: ""; position: fixed; left: 0; right: 0; top: -140px; height: 140px; pointer-events: none; z-index: 4;
+  background: linear-gradient(transparent, rgba(77, 255, 138, .07), transparent);
+  animation: roll 7s linear infinite;
+}
+@keyframes roll { to { transform: translateY(calc(100vh + 280px)); } }
+html[data-skin="scope"] .app { animation: flick 5s steps(1) infinite; }
+@keyframes flick { 0%, 100% { opacity: 1; } 47% { opacity: .96; } 48% { opacity: 1; } 91% { opacity: .97; } 92% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin="riso"] body::after, html[data-skin="scope"] body::before, html[data-skin="scope"] .app, .ring .ink.hit { animation: none; }
+}
 </style>
 
 <script>
@@ -464,7 +495,7 @@ html[data-skin="riso"] body::after {
     atTime(t0, () => {
       if (v.cancelled) return;
       cur = { t0, a: p.attack, tau };
-      if (p.step !== undefined) flashStep(p.step);
+      if (p.step !== undefined) flashStep(p.step, p.vel);
       pulse(p.vel);
       if (!raf) raf = requestAnimationFrame(loop);
     });
@@ -544,12 +575,15 @@ html[data-skin="riso"] body::after {
     const now = ctx.currentTime;
     stepNote(seq, now);           // step 0 plays at once
     seq.next = now + seq.dur;
+    headT0 = now + 0.012; headDur = seq.dur; headStop = null;
+    wakeFx();
     if (holding) {
       go.classList.add('live');
       seq.timer = setInterval(tick, 25);
       tick();
     } else {
       seq = null;                 // released before the audio woke up: one hit only
+      headStop = now;
     }
   }
 
@@ -557,6 +591,7 @@ html[data-skin="riso"] body::after {
     if (!seq) return;
     clearInterval(seq.timer);
     seq = null;
+    headStop = ctx.currentTime;
     go.classList.remove('live');
     // notes already scheduled but not yet started are cancelled, so a quick tap is exactly one hit
     const now = ctx.currentTime;
@@ -603,15 +638,39 @@ html[data-skin="riso"] body::after {
   const wave = document.createElementNS(NS, 'path');
   wave.setAttribute('class', 'wave');
   ring.appendChild(wave);
+  const wp = { k1: 6, k2: 10, amp: 4.5 };
   function renderWave(p) {
-    const k1 = 3 + Math.round(p.fmRatio * 2), k2 = 7 + Math.round(p.fmIdx * 3), amp = 2.5 + 5 * p.depth;
+    wp.k1 = 3 + Math.round(p.fmRatio * 2);
+    wp.k2 = 7 + Math.round(p.fmIdx * 3);
+    wp.amp = 2.5 + 5 * p.depth;
+    drawWave(0, 0, 0, -1);
+  }
+  // the trace breathes with the envelope, scrolls with time, and a bump runs around it with the sequencer
+  function drawWave(t, env, kick, head) {
+    const amp = wp.amp * (0.4 + 1.3 * env + 0.8 * kick);
+    const ha = head >= 0 ? head / STEPS * 2 * Math.PI : null;
     let d = '';
-    for (let i = 0; i <= 240; i++) {
-      const a = i / 240 * 2 * Math.PI;
-      const r = 90 + amp * Math.sin(k1 * a) * (0.6 + 0.4 * Math.cos(2 * a)) + 1.6 * Math.sin(k2 * a);
+    for (let i = 0; i <= 180; i++) {
+      const a = i / 180 * 2 * Math.PI;
+      let r = 90 + amp * Math.sin(wp.k1 * a + t * 2.2) * (0.6 + 0.4 * Math.cos(2 * a - t * 0.7)) + 1.4 * Math.sin(wp.k2 * a - t * 3);
+      if (ha !== null) {
+        let da = a - ha; da -= 2 * Math.PI * Math.round(da / (2 * Math.PI));
+        r += (4 + 5 * kick) * Math.exp(-da * da / (2 * 0.14 * 0.14));
+      }
       d += (i ? 'L' : 'M') + (100 + Math.sin(a) * r).toFixed(1) + ' ' + (100 - Math.cos(a) * r).toFixed(1);
     }
     wave.setAttribute('d', d);
+  }
+  // riso skin: ink dots around the pink circle, one per step
+  const inks = [];
+  for (let i = 0; i < STEPS; i++) {
+    const a = i * 2 * Math.PI / STEPS, c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', (100 + Math.sin(a) * 93).toFixed(2));
+    c.setAttribute('cy', (100 - Math.cos(a) * 93).toFixed(2));
+    c.setAttribute('r', '1.5');
+    c.setAttribute('class', 'ink ' + (i % 2 ? 'b' : 'a'));
+    ring.appendChild(c);
+    inks.push(c);
   }
   renderWave({ fmRatio: 1.5, fmIdx: 1.2, depth: 0.4 });
 
@@ -640,12 +699,15 @@ html[data-skin="riso"] body::after {
   function renderPattern(sq) {
     sq.steps.forEach((st, i) => {
       const e = wedges[i];
+      inks[i].setAttribute('r', (st ? 1.8 + 2.4 * st.vel : 1.1).toFixed(2));
+      inks[i].classList.toggle('rest', !st);
       wedgesHi[i].classList.remove('hit');
       if (st) { e.classList.add('n'); e.style.setProperty('--o', (0.12 + 0.5 * st.vel).toFixed(2)); }
       else { e.classList.remove('n'); e.style.removeProperty('--o'); }
     });
   }
-  function flashStep(i) {
+  function flashStep(i, vel) {
+    noteFx(i, vel === undefined ? 1 : vel);
     const e = wedgesHi[i];
     e.classList.remove('hit');
     void e.getBoundingClientRect();
@@ -698,6 +760,56 @@ html[data-skin="riso"] body::after {
     root.style.setProperty('--bx2', (72 - 22 * y).toFixed(1) + '%');
     root.style.setProperty('--by2', (68 - 22 * x).toFixed(1) + '%');
     root.style.setProperty('--bg-b', (0.45 + 0.35 * v).toFixed(3));
+  }
+
+  /* ---------- motion for the riso and scope skins ---------- */
+  const skin = root.dataset.skin;
+  let kick = 0, rx = 0, ry = 0, fxRaf = 0, lastFx = 0, headT0 = 0, headDur = 1, headStop = null;
+  function headPos() {
+    if (!headT0 || !ctx) return -1;
+    if (headStop !== null && ctx.currentTime - headStop > 0.6) return -1;
+    const now = Math.min(ctx.currentTime, headStop === null ? Infinity : headStop);
+    return Math.max(0, (now - headT0) / headDur) % STEPS;
+  }
+  function noteFx(i, vel) {
+    kick = Math.min(1.4, 0.5 + 0.8 * vel);
+    rx = (Math.random() * 2 - 1) * 9 * vel;
+    ry = (Math.random() * 2 - 1) * 9 * vel;
+    const k = inks[i];
+    k.classList.remove('hit');
+    void k.getBoundingClientRect();
+    k.classList.add('hit');
+    clearTimeout(k._t);
+    k._t = setTimeout(() => k.classList.remove('hit'), 650);
+    wakeFx();
+  }
+  function wakeFx() {
+    if (skin === 'amber' || fxRaf) return;
+    lastFx = performance.now();
+    fxRaf = requestAnimationFrame(fxFrame);
+  }
+  function fxFrame() {
+    fxRaf = 0;
+    const now = performance.now(), dt = Math.min(0.05, (now - lastFx) / 1000);
+    lastFx = now;
+    kick *= Math.exp(-dt / 0.2);
+    const env = Math.max(0, litN) / 60, head = headPos();
+    root.style.setProperty('--kick', kick.toFixed(3));
+    if (skin === 'riso') {
+      root.style.setProperty('--jx', (rx * kick).toFixed(2));
+      root.style.setProperty('--jy', (ry * kick).toFixed(2));
+    } else if (ctx) {
+      drawWave(ctx.currentTime, env, kick, head);
+    }
+    if (seq || cur || kick > 0.01 || head >= 0) {
+      fxRaf = requestAnimationFrame(fxFrame);
+    } else {
+      kick = 0;
+      root.style.setProperty('--kick', 0);
+      root.style.setProperty('--jx', 0);
+      root.style.setProperty('--jy', 0);
+      if (skin === 'scope') drawWave(0, 0, 0, -1);
+    }
   }
 
   /* ---------- frame loop ---------- */
