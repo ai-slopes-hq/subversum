@@ -97,18 +97,29 @@ body {
 .go.pulse::after { animation: glow .42s ease-out; }
 @keyframes glow { 0% { opacity: 1; } 100% { opacity: 0; } }
 
-.dot { fill: var(--tick); transform-box: fill-box; transform-origin: center; transition: transform .2s, fill .2s; }
-.dot.n { fill: var(--tick-hi); transform: scale(var(--s, 1)); }
-.dot.rest { transform: scale(.45); }
-.dot.hit { animation: dot .55s ease-out; }
-@keyframes dot {
-  0% { fill: var(--accent); transform: scale(calc(var(--s, 1) * 1.8)); }
-  100% { fill: var(--tick-hi); transform: scale(var(--s, 1)); }
+/* the 16 steps live inside the button as wedges: pattern filled in by loudness, the playing step flashes */
+.go .steps { position: absolute; inset: 0; width: 100%; height: 100%; }
+.w { fill: transparent; stroke: var(--tick); stroke-width: .7; stroke-linejoin: round; transition: fill .25s, stroke .25s; }
+.w.n { fill: var(--tick-hi); fill-opacity: var(--o, .3); stroke: var(--tick-hi); }
+.w.hit { animation: wedge .7s ease-out; }
+@keyframes wedge {
+  0% { fill: var(--accent); fill-opacity: 1; stroke: var(--accent); }
+  100% { fill: var(--tick-hi); fill-opacity: var(--o, .3); stroke: var(--tick-hi); }
 }
+
+/* the dial breathes on every beat; a soft glow behind it drifts with the patch's hidden LFOs */
+.dial::before {
+  content: ""; position: absolute; inset: -22%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 100%, transparent) 0%, transparent 62%);
+  opacity: var(--bg-a, 0); transition: opacity .5s;
+}
+.dial.beat { animation: beat .32s ease-out; }
+@keyframes beat { 0% { transform: scale(1.018); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) {
   .go.hit { animation: none; }
   .go.pulse::after { animation: none; opacity: .5; }
-  .dot.hit { animation: none; fill: var(--accent); }
+  .w.hit { animation: none; fill: var(--accent); }
+  .dial.beat { animation: none; }
 }
 </style>
 
@@ -123,7 +134,7 @@ body {
   <section class="stage">
     <div class="dial">
       <svg id="ring" class="ring" viewBox="0 0 200 200" aria-hidden="true"></svg>
-      <button id="go" class="go" type="button" aria-label="Тап: случайный звук. Зажать: случайная мелодия"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></button>
+      <button id="go" class="go" type="button" aria-label="Нажать: случайный арпеджиатор"><svg id="steps" class="steps" viewBox="-70 -70 140 140" aria-hidden="true"></svg><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></button>
     </div>
   </section>
 </main>
@@ -254,6 +265,7 @@ body {
   // The LFOs belong to a patch: every note of a held melody shares them, so slow ones really drift
   function ensureLfo(p) {
     if (p.lfoNodes) return p.lfoNodes;
+    p.lfoT0 = ctx.currentTime;
     p.lfoNodes = p.lfo.map(def => {
       const o = ctx.createOscillator();
       o.setPeriodicWave(lfoWave(def.shape, def.phase));
@@ -458,7 +470,9 @@ body {
 
   function startSeq() {
     const prev = tapPatch;
-    tapPatch = roll();            // every press rolls a new patch, scale, tempo and pattern
+    tapPatch = roll();
+    setAccent(tapPatch);
+    // every press rolls a new patch, scale, tempo and pattern
     seq = makeSeq();
     renderPattern(seq);
     retireLfo(prev);
@@ -519,39 +533,43 @@ body {
   }
   setLit(0);
 
-  /* ---------- step ring and note glow ---------- */
-  const dots = [];
-  for (let i = 0; i < STEPS; i++) {
-    const a = i * 2 * Math.PI / STEPS;
-    const c = document.createElementNS(NS, 'circle');
-    c.setAttribute('cx', (100 + Math.sin(a) * 76).toFixed(2));
-    c.setAttribute('cy', (100 - Math.cos(a) * 76).toFixed(2));
-    c.setAttribute('r', '2.6');
-    c.setAttribute('class', 'dot');
-    ring.appendChild(c);
-    dots.push(c);
-  }
-  // shows the pattern of this press: rests are small, notes grow with their loudness
+  /* ---------- steps inside the button, beat, patch colour, drifting glow ---------- */
+  const stepsSvg = $('#steps'), dial = $('.dial'), root = document.documentElement;
+  const wedges = [];
+  (function () {
+    const R1 = 40, R2 = 63, gap = 2.2 * Math.PI / 180, w = 2 * Math.PI / STEPS;
+    const pt = (r, a) => (Math.sin(a) * r).toFixed(2) + ' ' + (-Math.cos(a) * r).toFixed(2);
+    for (let i = 0; i < STEPS; i++) {
+      const a1 = i * w + gap / 2, a2 = (i + 1) * w - gap / 2;
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', 'M' + pt(R1, a1) + ' L' + pt(R2, a1) + ' A' + R2 + ' ' + R2 + ' 0 0 1 ' + pt(R2, a2) +
+        ' L' + pt(R1, a2) + ' A' + R1 + ' ' + R1 + ' 0 0 0 ' + pt(R1, a1) + 'Z');
+      p.setAttribute('class', 'w');
+      stepsSvg.appendChild(p);
+      wedges.push(p);
+    }
+  })();
+  // pattern of this press: rests stay empty, notes are filled the more the louder they are
   function renderPattern(sq) {
     sq.steps.forEach((st, i) => {
-      const dt = dots[i];
-      dt.classList.remove('hit');
-      if (st) {
-        dt.classList.remove('rest'); dt.classList.add('n');
-        dt.style.setProperty('--s', (0.6 + 0.65 * st.vel).toFixed(2));
-      } else {
-        dt.classList.remove('n'); dt.classList.add('rest');
-        dt.style.removeProperty('--s');
-      }
+      const e = wedges[i];
+      e.classList.remove('hit');
+      if (st) { e.classList.add('n'); e.style.setProperty('--o', (0.12 + 0.5 * st.vel).toFixed(2)); }
+      else { e.classList.remove('n'); e.style.removeProperty('--o'); }
     });
   }
   function flashStep(i) {
-    const dt = dots[i];
-    dt.classList.remove('hit');
-    void dt.getBoundingClientRect();
-    dt.classList.add('hit');
-    clearTimeout(dt._t);
-    dt._t = setTimeout(() => dt.classList.remove('hit'), 600);
+    const e = wedges[i];
+    e.classList.remove('hit');
+    void e.getBoundingClientRect();
+    e.classList.add('hit');
+    clearTimeout(e._t);
+    e._t = setTimeout(() => e.classList.remove('hit'), 750);
+    if (i % 4 === 0) {
+      dial.classList.remove('beat');
+      void dial.offsetWidth;
+      dial.classList.add('beat');
+    }
   }
   function pulse(vel) {
     go.style.setProperty('--ga', Math.round(25 + 45 * vel) + '%');
@@ -560,6 +578,29 @@ body {
     go.classList.add('pulse');
     clearTimeout(go._pt);
     go._pt = setTimeout(() => go.classList.remove('pulse'), 450);
+  }
+  // every patch gets its own colour: sine is cold, triangle amber, saw hot; FM pushes it further
+  function setAccent(p) {
+    const base = { sine: 192, triangle: 38, sawtooth: 6 }[p.wave[0]];
+    const h = (base + (p.fmIdx / FM_MAX) * 36 + 360) % 360;
+    root.style.setProperty('--accent', 'hsl(' + h.toFixed(0) + ' 100% ' + (60 + p.depth * 8).toFixed(0) + '%)');
+  }
+  // the glow follows the patch's LFOs, computed here from their definitions (rate, shape, phase)
+  function lfoVal(d, t) {
+    const u = (((d.rate * t + d.phase / (2 * Math.PI)) % 1) + 1) % 1;
+    if (d.shape === 'sine') return Math.sin(2 * Math.PI * u);
+    if (d.shape === 'triangle') return 1 - 4 * Math.abs(((u + 0.25) % 1) - 0.5);
+    if (d.shape === 'saw') return 2 * u - 1;
+    return u < 0.5 ? 1 : -1;
+  }
+  function driftGlow() {
+    const p = tapPatch;
+    if (!p || !ctx) return;
+    const t = ctx.currentTime - (p.lfoT0 || 0);
+    let v = 0, n = 0;
+    p.lfo.forEach(d => { v += lfoVal(d, t) * d.depth; n += d.depth; });
+    v = n ? v / n : 0;
+    root.style.setProperty('--bg-a', (0.14 + 0.1 * v).toFixed(3));
   }
 
   /* ---------- frame loop ---------- */
@@ -570,7 +611,8 @@ body {
     const t = ctx.currentTime - cur.t0;
     const env = t <= 0 ? 0 : (t < cur.a ? t / cur.a : Math.exp(-(t - cur.a) / cur.tau));
     setLit(Math.ceil(env * 60 - 1e-6));
-    if (t > cur.a + cur.tau * 7 && !seq) { setLit(0); cur = null; return; }
+    driftGlow();
+    if (t > cur.a + cur.tau * 7 && !seq) { setLit(0); cur = null; root.style.setProperty('--bg-a', 0); return; }
     raf = requestAnimationFrame(loop);
   }
 
