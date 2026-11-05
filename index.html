@@ -298,7 +298,10 @@ html[data-skin="donut"] .go, html[data-skin="donut"] .go.down, html[data-skin="d
 .dn-s.rest { stroke: #FFF0F6; stroke-width: 4; opacity: .7; }
 .dn-s.hit { animation: dnhit .65s cubic-bezier(.2, .9, .3, 1.4); }
 @keyframes dnhit { 0% { stroke: #fff; stroke-width: 22; transform: scale(1.6); } 100% { transform: scale(1); } }
+html.swap .stage, html.swap .skinsvg { animation: swapin .38s ease-out; }
+@keyframes swapin { from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 28px)); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
+  html.swap .stage, html.swap .skinsvg { animation: none; }
   .tp-spin, .dn-sugar, .tp-step.hit, .mx-dot.hit, .pp-b.hit, .dn-s.hit { animation: none; }
 }
 </style>
@@ -785,7 +788,9 @@ html[data-skin="donut"] .go, html[data-skin="donut"] .go.down, html[data-skin="d
     }
   })();
   // pattern of this press: rests stay empty, notes are filled the more the louder they are
+  let lastSq = null, accentL = 64;
   function renderPattern(sq) {
+    lastSq = sq;
     sq.steps.forEach((st, i) => {
       const e = wedges[i];
       inks[i].setAttribute('r', (st ? 1.8 + 2.4 * st.vel : 1.1).toFixed(2));
@@ -824,7 +829,8 @@ html[data-skin="donut"] .go, html[data-skin="donut"] .go.down, html[data-skin="d
     const base = { sine: 192, triangle: 38, sawtooth: 6 }[p.wave[0]];
     const h = (base + (p.fmIdx / FM_MAX) * 36 + 360) % 360;
     root.style.setProperty('--hue', h.toFixed(0));   // every skin builds its palette from this
-    if (root.dataset.skin === 'amber') root.style.setProperty('--accent', 'hsl(' + h.toFixed(0) + ' 100% ' + (60 + p.depth * 8).toFixed(0) + '%)');
+    accentL = 60 + p.depth * 8;
+    if (root.dataset.skin === 'amber') root.style.setProperty('--accent', 'hsl(' + h.toFixed(0) + ' 100% ' + accentL.toFixed(0) + '%)');
   }
   // the glow follows the patch's LFOs, computed here from their definitions (rate, shape, phase)
   function lfoVal(d, t) {
@@ -853,7 +859,7 @@ html[data-skin="donut"] .go, html[data-skin="donut"] .go.down, html[data-skin="d
   }
 
   /* ---------- motion for the riso and scope skins ---------- */
-  const skin = root.dataset.skin;
+  let skin = root.dataset.skin;
   const SK = {};   // per-skin hooks: pattern(sq), note(i, vel), frame(t, env, kick, head), idle()
   let kick = 0, rx = 0, ry = 0, fxRaf = 0, lastFx = 0, headT0 = 0, headDur = 1, headStop = null;
   function headPos() {
@@ -1066,9 +1072,34 @@ html[data-skin="donut"] .go, html[data-skin="donut"] .go.down, html[data-skin="d
     hole.remove();
   }
 
-  ({ topo: buildTopo, matrix: buildMatrix, paper: buildPaper, donut: buildDonut }[skin] || (() => {}))();
-  if (SK.pattern) SK.pattern({ steps: DEMO });
-  if (SK.idle) SK.idle();
+  // skins can be swapped at any time: clear the old full-screen layer, build the new one, redraw the current pattern
+  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'paper', 'donut'];
+  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6' };
+  function applySkin(name) {
+    skin = name;
+    root.setAttribute('data-skin', name);
+    const m = document.querySelector('meta[name=theme-color]');
+    if (m) m.setAttribute('content', THEME[name]);
+    while (skinSvg.firstChild) skinSvg.removeChild(skinSvg.firstChild);
+    Object.keys(SK).forEach(k => { delete SK[k]; });
+    // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
+    if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
+    else root.style.removeProperty('--accent');
+    ({ topo: buildTopo, matrix: buildMatrix, paper: buildPaper, donut: buildDonut }[name] || (() => {}))();
+    if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
+    if (SK.idle) SK.idle();
+  }
+  function switchSkin(dir) {
+    const i = (SKINS.indexOf(skin) + dir + SKINS.length) % SKINS.length;
+    applySkin(SKINS[i]);
+    root.style.setProperty('--dir', dir);
+    root.classList.remove('swap');
+    void root.offsetWidth;
+    root.classList.add('swap');
+    setTimeout(() => root.classList.remove('swap'), 420);
+    wakeFx();
+  }
+  applySkin(skin);
 
   /* ---------- frame loop ---------- */
   let raf = 0;
@@ -1101,10 +1132,22 @@ html[data-skin="donut"] .go, html[data-skin="donut"] .go.down, html[data-skin="d
   }
 
   const surface = document.body;
+  // a horizontal swipe changes the skin instead of playing: left = next, right = previous
+  let sx = 0, sy = 0, swiped = false;
   surface.addEventListener('pointerdown', e => {
     e.preventDefault();
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
+    sx = e.clientX; sy = e.clientY; swiped = false;
     down();
+  });
+  surface.addEventListener('pointermove', e => {
+    if (!holding || swiped) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) > 56 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+      swiped = true;
+      up();
+      switchSkin(dx < 0 ? 1 : -1);
+    }
   });
   surface.addEventListener('pointerup', up);
   surface.addEventListener('pointercancel', up);
