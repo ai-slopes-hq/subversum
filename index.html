@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<script>
+// the look is picked at random on every launch; ?skin=riso|scope|amber forces one
+(function () {
+  var all = ['amber', 'riso', 'scope'], k = all[Math.floor(Math.random() * all.length)];
+  try { var q = /[?&]skin=(amber|riso|scope)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
+  document.documentElement.setAttribute('data-skin', k);
+  var m = document.querySelector('meta[name=theme-color]');
+  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805' }[k]);
+})();
+</script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -130,6 +140,47 @@ body {
   .wh.hit { animation: none; opacity: .6; }
   .bg.beat { animation: none; }
   .dial.beat { animation: none; }
+}
+
+/* ---------- skins: amber is the base look above; riso and scope override it ---------- */
+html[data-skin="scope"] { --bg: #020805; --tick: #0f3a1f; --tick-hi: #2fbf64; --ink: #7dffab; --accent: #4dff8a; }
+html[data-skin="scope"] body {
+  background:
+    linear-gradient(#0f2d19 1px, transparent 1px) 0 0 / 39px 39px,
+    linear-gradient(90deg, #0f2d19 1px, transparent 1px) 0 0 / 39px 39px,
+    radial-gradient(circle at 50% 50%, #07160c 0%, #020805 70%, #010403 100%);
+}
+html[data-skin="scope"] body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,.3) 0, rgba(0,0,0,.3) 1px, transparent 1px, transparent 3px);
+  box-shadow: inset 0 0 90px 20px rgba(0,0,0,.75);
+}
+html[data-skin="scope"] .ring line { display: none; }
+html[data-skin="scope"] .ring .wave { display: block; }
+html[data-skin="scope"] .go { background: #02100a; border-color: #4dff8a; }
+html[data-skin="scope"] .go > svg:not(.steps) { filter: drop-shadow(0 0 3px rgba(77,255,138,.85)); }
+html[data-skin="scope"] .bg { opacity: calc(var(--bg-b, 0) * .5); }
+.ring .wave { display: none; fill: none; stroke: var(--accent); stroke-width: 1.1; stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px var(--accent)); opacity: calc(.4 + .6 * var(--env, 0)); }
+
+html[data-skin="riso"] { --bg: #14121C; --tick: rgba(20,18,28,.22); --tick-hi: #FF4F8B; --ink: #14121C; --accent: #14121C; }
+html[data-skin="riso"] .ring line, html[data-skin="riso"] .bg { display: none; }
+html[data-skin="riso"] .go { background: #F2EBDC; border: 2px solid transparent; }
+html[data-skin="riso"] .go::after { background: radial-gradient(circle, rgba(255,79,139,.55) 0%, transparent 72%); }
+html[data-skin="riso"] .dial .ring, html[data-skin="riso"] .dial .go { z-index: 1; }
+html[data-skin="riso"] .dial::before {
+  inset: 7%; border-radius: 50%; background: #FF3D86; mix-blend-mode: screen; z-index: 0;
+  opacity: calc(.6 + .4 * var(--env, 0)); transition: none;
+}
+html[data-skin="riso"] .dial::after {
+  content: ""; position: absolute; inset: 12%; border-radius: 50%; pointer-events: none; z-index: 0;
+  transform: translate(4.5%, 4.5%); mix-blend-mode: screen;
+  background-image: radial-gradient(circle, #3D7BFF 1.5px, transparent 1.8px); background-size: 7px 7px;
+  box-shadow: inset 0 0 0 2px #3D7BFF;
+}
+html[data-skin="riso"] body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: .3; z-index: 5;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 .9 0 0 0 0 .85 0 0 0 0 .8 0 0 0 1.1 -.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
 }
 </style>
 
@@ -541,11 +592,28 @@ body {
   function setLit(n) {
     if (n === litN) return;
     litN = n;
+    document.documentElement.style.setProperty('--env', (n / 60).toFixed(2));
     for (let i = 0; i < 60; i++) {
       ticks[i].setAttribute('class', i < n ? 'on' : (ticks[i].dataset.major === '1' ? 'hi' : 'off'));
     }
   }
   setLit(0);
+
+  // scope skin: the ring is an oscilloscope trace whose shape comes from the patch (FM ratio, FM index, fold depth)
+  const wave = document.createElementNS(NS, 'path');
+  wave.setAttribute('class', 'wave');
+  ring.appendChild(wave);
+  function renderWave(p) {
+    const k1 = 3 + Math.round(p.fmRatio * 2), k2 = 7 + Math.round(p.fmIdx * 3), amp = 2.5 + 5 * p.depth;
+    let d = '';
+    for (let i = 0; i <= 240; i++) {
+      const a = i / 240 * 2 * Math.PI;
+      const r = 90 + amp * Math.sin(k1 * a) * (0.6 + 0.4 * Math.cos(2 * a)) + 1.6 * Math.sin(k2 * a);
+      d += (i ? 'L' : 'M') + (100 + Math.sin(a) * r).toFixed(1) + ' ' + (100 - Math.cos(a) * r).toFixed(1);
+    }
+    wave.setAttribute('d', d);
+  }
+  renderWave({ fmRatio: 1.5, fmIdx: 1.2, depth: 0.4 });
 
   /* ---------- steps inside the button, beat, patch colour, drifting glow ---------- */
   const stepsSvg = $('#steps'), dial = $('.dial'), root = document.documentElement;
@@ -600,6 +668,8 @@ body {
   }
   // every patch gets its own colour: sine is cold, triangle amber, saw hot; FM pushes it further
   function setAccent(p) {
+    renderWave(p);
+    if (root.dataset.skin !== 'amber') return; // riso and scope keep their own inks
     const base = { sine: 192, triangle: 38, sawtooth: 6 }[p.wave[0]];
     const h = (base + (p.fmIdx / FM_MAX) * 36 + 360) % 360;
     root.style.setProperty('--accent', 'hsl(' + h.toFixed(0) + ' 100% ' + (60 + p.depth * 8).toFixed(0) + '%)');
