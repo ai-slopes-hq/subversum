@@ -138,6 +138,10 @@ body {
   const HOLD_MS = 380;    // how long the screen is held before the melody starts
   const STEPS = 16;
   const LOW = 24, HIGH = 47; // MIDI C1..B2, so every melody note stays in octave 1 or 2
+  const LFO_RATE_MIN = 0.02; // Hz, one cycle in 50 s
+  const LFO_RATE_MAX = 8;    // Hz, a 1/16 note at 120 BPM
+  const LFO_SHAPES = ['sine', 'sine', 'triangle', 'triangle', 'saw', 'square'];
+  const LFO_TARGETS = ['pitch', 'ratio', 'index', 'fold', 'sym', 'cut', 'res'];
 
   const rnd = (a, b) => a + Math.random() * (b - a);
   const lrnd = (a, b) => Math.exp(rnd(Math.log(a), Math.log(b)));
@@ -189,11 +193,63 @@ body {
       attack: rnd(0.001, 0.014),
       cutoff: lrnd(900, 9000),
       res: rnd(0, RES_MAX),
-      vel: 1
+      vel: 1,
+      lfo: rollLfo(),
+      lfoNodes: null
     };
   }
 
+  // 1 to 3 hidden LFOs, each with its own target, shape, rate, depth and starting phase
+  function rollLfo() {
+    const n = 1 + (Math.random() < 0.6 ? 1 : 0) + (Math.random() < 0.25 ? 1 : 0);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      out.push({
+        target: pick(LFO_TARGETS),
+        shape: pick(LFO_SHAPES),
+        rate: lrnd(LFO_RATE_MIN, LFO_RATE_MAX),
+        depth: rnd(0.15, 1),
+        phase: rnd(0, Math.PI * 2)
+      });
+    }
+    return out;
+  }
+
   let cur = null; // envelope info for the ring
+
+  // LFO waveform as a band-limited periodic wave, rotated to the LFO's starting phase
+  function lfoWave(shape, phase) {
+    const H = 32, re = new Float32Array(H + 1), im = new Float32Array(H + 1);
+    for (let k = 1; k <= H; k++) {
+      let a = 0;
+      if (shape === 'sine') a = k === 1 ? 1 : 0;
+      else if (shape === 'triangle') a = k % 2 ? (((k - 1) / 2) % 2 ? -1 : 1) / (k * k) : 0;
+      else if (shape === 'saw') a = (k % 2 ? 1 : -1) / k;
+      else a = k % 2 ? 1 / k : 0; // square
+      im[k] = a * Math.cos(k * phase);
+      re[k] = a * Math.sin(k * phase);
+    }
+    return ctx.createPeriodicWave(re, im);
+  }
+
+  // The LFOs belong to a patch: every note of a held melody shares them, so slow ones really drift
+  function ensureLfo(p) {
+    if (p.lfoNodes) return p.lfoNodes;
+    p.lfoNodes = p.lfo.map(def => {
+      const o = ctx.createOscillator();
+      o.setPeriodicWave(lfoWave(def.shape, def.phase));
+      o.frequency.value = def.rate;
+      o.start();
+      return { osc: o, def };
+    });
+    return p.lfoNodes;
+  }
+
+  function retireLfo(p) {
+    if (!p || !p.lfoNodes) return;
+    const t = ctx.currentTime + 0.1;
+    p.lfoNodes.forEach(l => { try { l.osc.stop(t); } catch (e) {} });
+  }
 
   function atTime(when, fn) {
     const d = (when - ctx.currentTime) * 1000;
@@ -254,6 +310,28 @@ body {
     vca.connect(kill);
     kill.connect(master);
 
+    // LFOs: each one feeds a gain that scales it into the units of its target parameter
+    const taps = [];
+    ensureLfo(p).forEach(l => {
+      const d = l.def.depth;
+      let params = null, amount = 0;
+      switch (l.def.target) {
+        case 'pitch': params = [osc.detune, mod.detune]; amount = 35 * d; break;            // cents, vibrato
+        case 'ratio': params = [mod.detune]; amount = 600 * d; break;                       // cents, FM ratio drift
+        case 'index': params = [modG.gain]; amount = 0.5 * FM_MAX * p.freq * p.fmRatio * d; break; // Hz of deviation
+        case 'fold':  params = [pre.gain]; amount = 0.35 * d; break;                        // fold depth
+        case 'sym':   if (off) { params = [off.offset]; amount = 1.5 * SYM_MAX * d; } break; // fold symmetry
+        case 'cut':   params = [lpf.detune]; amount = 2400 * d; break;                      // cents, up to 2 octaves
+        case 'res':   params = [lpf.Q]; amount = 6 * d; break;                              // dB
+      }
+      if (!params) return;
+      const tg = ctx.createGain();
+      tg.gain.value = amount;
+      l.osc.connect(tg);
+      params.forEach(pm => tg.connect(pm));
+      taps.push({ l, tg });
+    });
+
     // fold depth sweeps down while the gate closes
     pre.gain.setValueAtTime(p.depth, t0);
     pre.gain.setTargetAtTime(p.depth * p.sweep, t0, tau * 0.9);
@@ -275,6 +353,10 @@ body {
     osc.onended = () => {
       [osc, mod, modG, pre, shaper, hp, lpf, vca, kill].forEach(n => { try { n.disconnect(); } catch (e) {} });
       if (off) { try { off.disconnect(); } catch (e) {} }
+      taps.forEach(t => {
+        try { t.l.osc.disconnect(t.tg); } catch (e) {}
+        try { t.tg.disconnect(); } catch (e) {}
+      });
       if (voice && voice.osc === osc) voice = null;
     };
     voice = { osc, mod, kill };
@@ -287,8 +369,10 @@ body {
 
   let tapPatch = null; // the patch of the last tap; a held melody keeps playing it
   function fire() {
+    const prev = tapPatch;
     tapPatch = roll();
     play(tapPatch);
+    retireLfo(prev);
   }
 
   function press() {
@@ -321,6 +405,7 @@ body {
     }
     const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0 };
     for (let k = 0; k < STEPS; k++) s.steps.push(makeStep(s));
+    ensureLfo(s.timbre);
     if (!s.steps.some(Boolean)) s.steps[0] = { midi: pool[s.idx], vel: 1 };
     return s;
   }
