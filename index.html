@@ -88,7 +88,27 @@ body {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent), inset 0 0 40px color-mix(in srgb, var(--accent) 35%, transparent); }
   100% { box-shadow: 0 0 0 18px transparent, inset 0 0 0 transparent; }
 }
-@media (prefers-reduced-motion: reduce) { .go.hit { animation: none; } }
+.go::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) var(--ga, 40%), transparent) 0%, transparent 72%);
+}
+.go.pulse::after { animation: glow .42s ease-out; }
+@keyframes glow { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+.dot { fill: var(--tick); transform-box: fill-box; transform-origin: center; transition: transform .2s, fill .2s; }
+.dot.n { fill: var(--tick-hi); transform: scale(var(--s, 1)); }
+.dot.rest { transform: scale(.45); }
+.dot.hit { animation: dot .55s ease-out; }
+@keyframes dot {
+  0% { fill: var(--accent); transform: scale(calc(var(--s, 1) * 1.8)); }
+  100% { fill: var(--tick-hi); transform: scale(var(--s, 1)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .go.hit { animation: none; }
+  .go.pulse::after { animation: none; opacity: .5; }
+  .dot.hit { animation: none; fill: var(--accent); }
+}
 </style>
 
 <script>
@@ -135,7 +155,6 @@ body {
   const RES_MAX = 18;     // LPG resonance ceiling, dB (Web Audio lowpass Q is in dB)
   const MASTER = 0.85;
   const BPM_MIN = 110, BPM_MAX = 135;
-  const HOLD_MS = 380;    // how long the screen is held before the melody starts
   const STEPS = 16;
   const LOW = 24, HIGH = 47; // MIDI C1..B2, so every melody note stays in octave 1 or 2
   const LFO_RATE_MIN = 0.02; // Hz, one cycle in 50 s
@@ -148,7 +167,7 @@ body {
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
   /* ---------- audio ---------- */
-  let ctx = null, master = null, foldCurve = null, voice = null, pending = false;
+  let ctx = null, master = null, foldCurve = null, voice = null, pending = false, queued = [];
 
   function build() {
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
@@ -357,32 +376,32 @@ body {
         try { t.l.osc.disconnect(t.tg); } catch (e) {}
         try { t.tg.disconnect(); } catch (e) {}
       });
+      const qi = queued.indexOf(v);
+      if (qi >= 0) queued.splice(qi, 1);
       if (voice && voice.osc === osc) voice = null;
     };
-    voice = { osc, mod, kill };
+    const v = { osc, mod, kill, t0, cancelled: false };
+    voice = v;
+    queued.push(v);
 
     atTime(t0, () => {
+      if (v.cancelled) return;
       cur = { t0, a: p.attack, tau };
+      if (p.step !== undefined) flashStep(p.step);
+      pulse(p.vel);
       if (!raf) raf = requestAnimationFrame(loop);
     });
   }
 
   let tapPatch = null; // the patch of the last tap; a held melody keeps playing it
-  function fire() {
-    const prev = tapPatch;
-    tapPatch = roll();
-    play(tapPatch);
-    retireLfo(prev);
-  }
-
   function press() {
     go.classList.remove('hit');
     void go.offsetWidth;
     go.classList.add('hit');
     if (!ctx) build();
-    if (ctx.state === 'running') { fire(); return; }
+    if (ctx.state === 'running') { startSeq(); return; }
     pending = true;
-    ctx.resume().then(() => { if (pending) { pending = false; fire(); } }).catch(() => {});
+    ctx.resume().then(() => { if (pending) { pending = false; startSeq(); } }).catch(() => {});
   }
 
   /* ---------- melody generator ---------- */
@@ -406,13 +425,16 @@ body {
     const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0 };
     for (let k = 0; k < STEPS; k++) s.steps.push(makeStep(s));
     ensureLfo(s.timbre);
-    if (!s.steps.some(Boolean)) s.steps[0] = { midi: pool[s.idx], vel: 1 };
+    // the first step is always a clear note, so a quick tap catches exactly one good hit
+    if (!s.steps[0]) s.steps[0] = { midi: pool[s.idx], vel: 1 };
+    s.steps[0].vel = 1;
     return s;
   }
 
   function stepNote(s, t) {
     // nothing is re-rolled while the screen is held: same patch, same 16 steps, looped
-    const st = s.steps[s.i];
+    const idx = s.i;
+    const st = s.steps[idx];
     s.i = (s.i + 1) % STEPS;
     if (!st) return;
     const midi = st.midi;
@@ -420,7 +442,8 @@ body {
       oct: midi < 36 ? 1 : 2,
       semi: midi % 12,
       freq: 440 * Math.pow(2, (midi - 69) / 12),
-      vel: st.vel
+      vel: st.vel,
+      step: idx
     }), t);
   }
 
@@ -433,17 +456,22 @@ body {
     }
   }
 
-  function startMelody() {
-    if (!holding || seq || !ctx) return;
-    const begin = () => {
-      if (!holding || seq) return;
-      seq = makeSeq();
-      seq.next = ctx.currentTime + 0.03;
+  function startSeq() {
+    const prev = tapPatch;
+    tapPatch = roll();            // every press rolls a new patch, scale, tempo and pattern
+    seq = makeSeq();
+    renderPattern(seq);
+    retireLfo(prev);
+    const now = ctx.currentTime;
+    stepNote(seq, now);           // step 0 plays at once
+    seq.next = now + seq.dur;
+    if (holding) {
       go.classList.add('live');
-      tick();
       seq.timer = setInterval(tick, 25);
-    };
-    if (ctx.state === 'running') begin(); else ctx.resume().then(begin).catch(() => {});
+      tick();
+    } else {
+      seq = null;                 // released before the audio woke up: one hit only
+    }
   }
 
   function stopMelody() {
@@ -451,6 +479,16 @@ body {
     clearInterval(seq.timer);
     seq = null;
     go.classList.remove('live');
+    // notes already scheduled but not yet started are cancelled, so a quick tap is exactly one hit
+    const now = ctx.currentTime;
+    queued.slice().forEach(v => {
+      if (v.t0 > now + 0.002 && !v.cancelled) {
+        v.cancelled = true;
+        v.kill.gain.setValueAtTime(0, now);
+        try { v.osc.stop(now); } catch (e) {}
+        try { v.mod.stop(now); } catch (e) {}
+      }
+    });
   }
 
   /* ---------- tick ring: lit ticks follow the gate level ---------- */
@@ -481,6 +519,49 @@ body {
   }
   setLit(0);
 
+  /* ---------- step ring and note glow ---------- */
+  const dots = [];
+  for (let i = 0; i < STEPS; i++) {
+    const a = i * 2 * Math.PI / STEPS;
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', (100 + Math.sin(a) * 76).toFixed(2));
+    c.setAttribute('cy', (100 - Math.cos(a) * 76).toFixed(2));
+    c.setAttribute('r', '2.6');
+    c.setAttribute('class', 'dot');
+    ring.appendChild(c);
+    dots.push(c);
+  }
+  // shows the pattern of this press: rests are small, notes grow with their loudness
+  function renderPattern(sq) {
+    sq.steps.forEach((st, i) => {
+      const dt = dots[i];
+      dt.classList.remove('hit');
+      if (st) {
+        dt.classList.remove('rest'); dt.classList.add('n');
+        dt.style.setProperty('--s', (0.6 + 0.65 * st.vel).toFixed(2));
+      } else {
+        dt.classList.remove('n'); dt.classList.add('rest');
+        dt.style.removeProperty('--s');
+      }
+    });
+  }
+  function flashStep(i) {
+    const dt = dots[i];
+    dt.classList.remove('hit');
+    void dt.getBoundingClientRect();
+    dt.classList.add('hit');
+    clearTimeout(dt._t);
+    dt._t = setTimeout(() => dt.classList.remove('hit'), 600);
+  }
+  function pulse(vel) {
+    go.style.setProperty('--ga', Math.round(25 + 45 * vel) + '%');
+    go.classList.remove('pulse');
+    void go.offsetWidth;
+    go.classList.add('pulse');
+    clearTimeout(go._pt);
+    go._pt = setTimeout(() => go.classList.remove('pulse'), 450);
+  }
+
   /* ---------- frame loop ---------- */
   let raf = 0;
   function loop() {
@@ -493,22 +574,20 @@ body {
     raf = requestAnimationFrame(loop);
   }
 
-  /* ---------- input: the whole screen is the button. Tap = one note, hold = melody ---------- */
+  /* ---------- input: the whole screen is the button. every press starts the arpeggiator, a quick tap catches one hit ---------- */
   const go = $('#go');
-  let holding = false, holdTimer = 0;
+  let holding = false;
 
   function down() {
     if (holding) return;
     holding = true;
     go.classList.add('down');
     press();
-    holdTimer = setTimeout(startMelody, HOLD_MS);
   }
   function up() {
     if (!holding) return;
     holding = false;
     go.classList.remove('down');
-    clearTimeout(holdTimer);
     stopMelody();
   }
 
@@ -526,7 +605,7 @@ body {
   // iOS only unlocks audio inside click/touchend, so retry the pending trigger there
   surface.addEventListener('click', () => {
     if (ctx && ctx.state !== 'running') {
-      ctx.resume().then(() => { if (pending) { pending = false; fire(); } }).catch(() => {});
+      ctx.resume().then(() => { if (pending) { pending = false; startSeq(); } }).catch(() => {});
     }
   });
   addEventListener('keydown', e => {
