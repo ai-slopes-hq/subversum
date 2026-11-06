@@ -25,6 +25,7 @@ precision highp float;
 uniform vec2 uRes, uF;
 uniform float uT, uDown, uKick, uGrain, uGlow, uVig, uLevels, uWarpAmt, uScale, uSpeed, uSoft, uA, uB, uC, uSeedF;
 uniform int uField, uMode;
+uniform sampler2D uTex;
 uniform vec3 c0, c1, c2, c3;
 #define TAU 6.2831853
 float h11(float n){ return fract(sin(n * 127.1) * 43758.5453); }
@@ -37,7 +38,7 @@ mat2 rot(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 float sstep(float a, float b, float x){ return smoothstep(a, b, x); }
 
 // each field returns (v, w): v is the main 0..1 value, w a secondary one
-vec2 fVoronoi(vec2 p, float t){
+vec3 vor(vec2 p, float t){
   vec2 g = floor(p), f = fract(p); float d1 = 8., d2 = 8.; float id = 0.;
   for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
     vec2 o = vec2(float(i), float(j)), r = h22(g + o);
@@ -45,8 +46,12 @@ vec2 fVoronoi(vec2 p, float t){
     float d = length(o + r - f);
     if (d < d1) { d2 = d1; d1 = d; id = h21(g + o); } else if (d < d2) d2 = d;
   }
-  return vec2(clamp(d1 * 1.2, 0., 1.), clamp((d2 - d1) * 2.2, 0., 1.) * .6 + id * .4);
+  return vec3(d1, d2, id);
 }
+vec2 fVoronoi(vec2 p, float t){ vec3 c = vor(p, t); return vec2(clamp(c.x * 1.2, 0., 1.), clamp((c.y - c.x) * 2.2, 0., 1.) * .6 + c.z * .4); }
+vec2 fVEdge(vec2 p, float t){ vec3 c = vor(p, t); return vec2(1. - sstep(0., .1 + .1 * uSoft, c.y - c.x), c.z); }
+vec2 fVDots(vec2 p, float t){ vec3 c = vor(p, t); return vec2(1. - sstep(.03, .12 + .12 * uSoft, c.x), c.z); }
+vec2 fVLayer(vec2 p, float t){ vec3 a = vor(p, t), b = vor(p * 2.1 + 3.3, t * 1.3); return vec2(max(1. - sstep(0., .1, a.y - a.x), .55 * (1. - sstep(0., .09, b.y - b.x))), a.z * .5 + b.z * .5); }
 vec2 fWarp(vec2 p, float t){
   vec2 q = vec2(fbm(p + t * .1), fbm(p + vec2(5.2, 1.3) - t * .08));
   float v = fbm(p + 2.2 * q + t * .05);
@@ -123,6 +128,9 @@ vec2 field(vec2 p, float t){
   if (uField == 8) return fHex(p * 2.4, t);
   if (uField == 9) return fSpiral(p, t);
   if (uField == 10) return fPlasma(p, t);
+  if (uField == 12) return fVEdge(p * 1.8, t);
+  if (uField == 13) return fVDots(p * 2.2, t);
+  if (uField == 14) return fVLayer(p * 1.6, t);
   return fWorms(p, t);
 }
 vec3 ramp(float v){
@@ -139,9 +147,9 @@ void main(){
   vec2 d = p - fp; float r = length(d);
   p += d / (r + .18) * exp(-r * 2.2) * .22 * uDown * (.6 + uKick);
   // global warp of the plane
-  p += uWarpAmt * (vec2(fbm(p * 1.1 + t * .05), fbm(p * 1.1 + 9.7 - t * .04)) - .5);
-  p *= uScale;
-  vec2 vw = field(p, t);
+  if (uField != 100) { p += uWarpAmt * (vec2(fbm(p * 1.1 + t * .05), fbm(p * 1.1 + 9.7 - t * .04)) - .5);
+  p *= uScale; }
+  vec2 vw = uField == 100 ? texture2D(uTex, gl_FragCoord.xy / uRes).rg : field(p, t);
   float v = vw.x, w = vw.y;
   vec3 col;
   if (uMode == 0) {                       // smooth ramp, the second value tints
@@ -170,21 +178,86 @@ void main(){
   col += (h21(gl_FragCoord.xy + uT) - .5) * uGrain;
   gl_FragColor = vec4(max(col, 0.), 1.);
 }`;
+
+const FBFS = `
+precision highp float;
+uniform sampler2D uPrev;
+uniform vec2 uRes, uF;
+uniform float uT, uDown, uKick, uZoom, uRot, uSwirl, uDec, uWarpA, uWarpF, uFold, uA, uB, uC, uDx, uDy, uZr;
+uniform int uSrc;
+#define TAU 6.2831853
+float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 h22(vec2 p){ p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
+mat2 rot(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+float line(float d, float w){ return 1. - smoothstep(w * .5, w * .5 + .015, d); }
+float wave(float x, float t){ return .5 * sin(x * (2. + uA * 3.) + t * .9) + .3 * sin(x * 7. + t * 1.3 + uB * 6.) + .2 * sin(x * 13. - t * 1.7); }
+float spec(float i, float t){ float n = h21(vec2(i, floor(t * 4.))), m = h21(vec2(i, floor(t * 4.) + 1.)); float h = mix(n, m, fract(t * 4.)); return clamp((.2 + .8 * h) * (1.1 - i / 60.), 0., 1.) * (.5 + .7 * uKick); }
+vec3 vor(vec2 p, float t){
+  vec2 g = floor(p), f = fract(p); float d1 = 8., d2 = 8., id = 0.;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    vec2 o = vec2(float(i), float(j)), r = h22(g + o); r = .5 + .45 * sin(t * (.4 + r * .8) + TAU * r);
+    float d = length(o + r - f); if (d < d1) { d2 = d1; d1 = d; id = h21(g + o); } else if (d < d2) d2 = d;
+  }
+  return vec3(d1, d2, id);
+}
+void main(){
+  float asp = uRes.x / uRes.y;
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 p = (uv - .5) * vec2(asp, 1.) * 2.;
+  vec2 fp = (uF - .5) * vec2(asp, 1.) * 2.;
+  // where this pixel came from in the previous frame: zoom, rotate, swirl, drift, a gentle sine warp, optionally folded into a kaleidoscope
+  vec2 q = p;
+  if (uFold > 0.) { float n = uFold, a = atan(q.y, q.x), r = length(q); a = abs(mod(a, TAU / n) - TAU / n * .5); q = vec2(cos(a), sin(a)) * r; }
+  float r = length(q);
+  q = rot(uRot + uSwirl * r * r) * q * (uZoom + uZr * r) + vec2(uDx, uDy);
+  q += uWarpA * vec2(sin(q.y * uWarpF + uT * .7), cos(q.x * uWarpF - uT * .6));
+  vec2 puv = q / (vec2(asp, 1.) * 2.) + .5;
+  vec2 prev = texture2D(uPrev, puv).rg;
+  float v = max(prev.x * uDec - .004, 0.);
+  // the source drawn into the buffer this frame
+  float t = uT, s = 0.; float a = atan(p.y, p.x), rr = length(p);
+  if (uSrc == 0) { float rad = .45 + .14 * wave(a, t) * (.5 + uKick); s = line(abs(rr - rad), .03 + .03 * uKick); }
+  else if (uSrc == 1) { float y0 = .35 * wave(p.x * 1.3, t) * (.4 + uKick); s = line(abs(p.y - y0), .03 + .02 * uKick); }
+  else if (uSrc == 2) { float N = 40.; float i = floor((a / TAU + .5) * N), fr = fract((a / TAU + .5) * N); float h = spec(i, t); float r0 = .28;
+    float bar = (1. - smoothstep(r0 + .55 * h, r0 + .55 * h + .02, rr)) * smoothstep(r0 - .01, r0 + .01, rr) * smoothstep(.0, .16, .5 - abs(fr - .5)); s = bar; }
+  else if (uSrc == 3) { float N = 18.; float x = p.x / (2. * asp) + .5; float i = floor(x * N), fr = fract(x * N); float h = spec(i, t);
+    float top = -.95 + 1.5 * h; float bar = (1. - smoothstep(top, top + .02, p.y)) * smoothstep(-1., -.97, p.y);
+    float cap = line(abs(p.y - (top + .07)), .03);
+    s = max(bar, cap) * smoothstep(.0, .15, .5 - abs(fr - .5)); }
+  else if (uSrc == 4) { vec3 c = vor(p * 2.2, t); s = (1. - smoothstep(0., .09, c.y - c.x)) * (.55 + .45 * uKick); }
+  else if (uSrc == 5) { for (int k = 0; k < 3; k++) { float fk = float(k); vec2 c = vec2(sin(t * (.5 + fk * .23) + fk * 2.), cos(t * (.43 + fk * .19) + fk)) * (.5 + .1 * fk); s = max(s, exp(-length(p - c) * (14. - 2. * fk))); } }
+  else { vec2 o = uDown > .5 ? fp : vec2(0.); float rad = (1. - uKick) * 1.2; s = line(abs(length(p - o) - rad), .035) * smoothstep(0., .12, uKick) * smoothstep(0., .1, 1. - uKick + .0); }
+  s = max(s, exp(-length(p - fp) * 16.) * uDown * .9);
+  float g = mix(prev.y, fract(t * .06 + rr * .25 + uC), clamp(s * .6, 0., 1.));
+  gl_FragColor = vec4(max(v, s), g, 0., 1.);
+}`;
 function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 function hsl(h,s,l){h=((h%360)+360)%360/360;const f=(n)=>{const k=(n+h*12)%12,a=s*Math.min(l,1-l);return l-a*Math.max(-1,Math.min(k-3,Math.min(9-k,1)));};return [f(0),f(8),f(4)];}
-const FIELDS = ['voronoi','warp','truchet','rings','metaballs','stripes','dots','kaleido','hex','spiral','plasma','worms'];
+const FIELDS = ['voronoi','warp','truchet','rings','metaballs','stripes','dots','kaleido','hex','spiral','plasma','worms','vor-edges','vor-dots','vor-layers'];
+const SRCS = ['wave-ring','scope','radial-bars','bars','vor-web','orbits','kick-rings'];
 const MODES = ['ramp','levels','lines','halftone'];
 // world = seed
+const ONLY = Q.get('only') || '';
+function fieldPick(R){
+  if (ONLY === 'vor') return [0, 12, 13, 14][Math.floor(R() * 4)];
+  if (ONLY === 'fb') return 100;
+  if (!ONLY && R() < .3) return 100;
+  return Math.floor(R() * FIELDS.length);
+}
 function world(seed){
   const R = mulberry(seed * 9973 + 17), pick = a => a[Math.floor(R() * a.length)], rr = (a, b) => a + (b - a) * R();
   const h = R() * 360, scheme = pick(['mono', 'analogous', 'complement', 'triad', 'split']);
   const off = { mono: [0, 0], analogous: [25, 55], complement: [180, 195], triad: [120, 240], split: [150, 210] }[scheme];
   const sat = rr(.35, .85);
   const c0 = hsl(h + rr(-10, 10), rr(.2, .6), rr(.02, .085)), c1 = hsl(h, sat, rr(.16, .28)), c2 = hsl(h + off[0], sat, rr(.42, .6)), c3 = hsl(h + off[1], rr(.3, .7), rr(.78, .92));
+  const fld = fieldPick(R); let md = Math.floor(R() * MODES.length);
+  if (md === 2 && (fld === 12 || fld === 13 || fld === 14 || fld === 2 || fld === 8)) md = 0;   // iso lines on thin shapes only give moire
   return {
-    seed, hue: h, scheme, field: Math.floor(R() * FIELDS.length), mode: Math.floor(R() * MODES.length), c0, c1, c2, c3,
+    seed, hue: h, scheme, field: fld, mode: md, c0, c1, c2, c3,
     scale: rr(.7, 1.6), speed: rr(.35, 1.3), warp: R() < .5 ? rr(0, .9) : 0, soft: rr(.3, 1), levels: 2 + Math.floor(R() * 4),
-    a: R(), b: R(), c: R(), grain: rr(.015, .08), glow: rr(0, .7), vig: rr(.2, .9), t0: R() * 100
+    a: R(), b: R(), c: R(), grain: rr(.015, .08), glow: rr(0, .7), vig: rr(.2, .9), t0: R() * 100,
+    src: Math.floor(R() * SRCS.length), zoom: rr(.975, 1.012), zr: rr(-.02, .02), rot: rr(-.035, .035) * (R() < .5 ? 1 : -1), swirl: R() < .5 ? rr(-.04, .04) : 0,
+    dec: rr(.9, .975), warpA: R() < .6 ? rr(.0, .012) : 0, warpF: rr(2, 7), fold: R() < .3 ? 3 + Math.floor(R() * 5) : 0, dx: rr(-.004, .004), dy: rr(-.004, .004)
   };
 }
 const cv = document.createElement('canvas'); document.body.appendChild(cv);
@@ -193,9 +266,9 @@ function sh(t, s){ const o = gl.createShader(t); gl.shaderSource(o, s); gl.compi
 const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr); gl.useProgram(pr);
 const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
 const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-const U = {}; for (const n of ['uRes','uF','uT','uDown','uKick','uGrain','uGlow','uVig','uLevels','uWarpAmt','uScale','uSpeed','uSoft','uA','uB','uC','uField','uMode','c0','c1','c2','c3']) U[n] = gl.getUniformLocation(pr, n);
+const U = {}; for (const n of ['uTex','uRes','uF','uT','uDown','uKick','uGrain','uGlow','uVig','uLevels','uWarpAmt','uScale','uSpeed','uSoft','uA','uB','uC','uField','uMode','c0','c1','c2','c3']) U[n] = gl.getUniformLocation(pr, n);
 function draw(w, x, y, W, H, t, f, down, kick){
-  gl.viewport(x, y, W, H); gl.scissor(x, y, W, H);
+  gl.viewport(x, y, W, H); if (w.field === 100) fbBind();
   gl.uniform2f(U.uRes, W, H); gl.uniform2f(U.uF, f[0], f[1]); gl.uniform1f(U.uT, t + w.t0); gl.uniform1f(U.uDown, down); gl.uniform1f(U.uKick, kick);
   gl.uniform1f(U.uGrain, w.grain); gl.uniform1f(U.uGlow, w.glow); gl.uniform1f(U.uVig, w.vig); gl.uniform1f(U.uLevels, w.levels); gl.uniform1f(U.uWarpAmt, w.warp);
   gl.uniform1f(U.uScale, w.scale); gl.uniform1f(U.uSpeed, w.speed); gl.uniform1f(U.uSoft, w.soft); gl.uniform1f(U.uA, w.a); gl.uniform1f(U.uB, w.b); gl.uniform1f(U.uC, w.c);
@@ -203,7 +276,37 @@ function draw(w, x, y, W, H, t, f, down, kick){
   gl.uniform3fv(U.c0, w.c0); gl.uniform3fv(U.c1, w.c1); gl.uniform3fv(U.c2, w.c2); gl.uniform3fv(U.c3, w.c3);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
-gl.enable(gl.SCISSOR_TEST);
+
+// feedback frames: two textures, the new frame is the old one zoomed, turned and faded, plus the source drawn on top
+const fp_ = gl.createProgram(); gl.attachShader(fp_, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(fp_, sh(gl.FRAGMENT_SHADER, FBFS)); gl.linkProgram(fp_);
+const FU = {}; gl.useProgram(fp_);
+for (const n of ['uPrev','uRes','uF','uT','uDown','uKick','uZoom','uRot','uSwirl','uDec','uWarpA','uWarpF','uFold','uA','uB','uC','uDx','uDy','uZr','uSrc']) FU[n] = gl.getUniformLocation(fp_, n);
+const fbl = gl.getAttribLocation(fp_, 'a'); 
+gl.useProgram(pr);
+let FB = null;
+function fbInit(W, H){
+  if (FB && FB.W === W && FB.H === H) return;
+  const mk = () => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); return { t, f }; };
+  FB = { W, H, a: mk(), b: mk(), cur: 0 };
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+function fbClear(){ for (const o of [FB.a, FB.b]) { gl.bindFramebuffer(gl.FRAMEBUFFER, o.f); gl.viewport(0, 0, FB.W, FB.H); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); } gl.bindFramebuffer(gl.FRAMEBUFFER, null); FB.cur = 0; }
+function fbStep(w, t, dt, f, down, kick){
+  const k = dt * 30, src = FB.cur ? FB.b : FB.a, dst = FB.cur ? FB.a : FB.b;
+  gl.useProgram(fp_); gl.bindFramebuffer(gl.FRAMEBUFFER, dst.f); gl.viewport(0, 0, FB.W, FB.H);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src.t); gl.uniform1i(FU.uPrev, 0);
+  gl.uniform2f(FU.uRes, FB.W, FB.H); gl.uniform2f(FU.uF, f[0], f[1]); gl.uniform1f(FU.uT, t); gl.uniform1f(FU.uDown, down); gl.uniform1f(FU.uKick, kick);
+  gl.uniform1f(FU.uZoom, Math.pow(w.zoom, k)); gl.uniform1f(FU.uRot, w.rot * k); gl.uniform1f(FU.uSwirl, w.swirl * k); gl.uniform1f(FU.uDec, Math.pow(w.dec, k));
+  gl.uniform1f(FU.uWarpA, w.warpA * k); gl.uniform1f(FU.uWarpF, w.warpF); gl.uniform1f(FU.uFold, w.fold); gl.uniform1f(FU.uA, w.a); gl.uniform1f(FU.uB, w.b); gl.uniform1f(FU.uC, w.c);
+  gl.uniform1f(FU.uDx, w.dx * k); gl.uniform1f(FU.uDy, w.dy * k); gl.uniform1f(FU.uZr, w.zr * k); gl.uniform1i(FU.uSrc, w.src);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(fbl); gl.vertexAttribPointer(fbl, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.useProgram(pr); FB.cur ^= 1;
+}
+function fbBind(){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, FB.cur ? FB.b.t : FB.a.t); gl.uniform1i(U.uTex, 0); }
 if (SHEET) {
   document.body.classList.add('sheet');
   const cols = +(Q.get('cols') || 10), rows = +(Q.get('rows') || 5), tw = 156, th = 338, s0 = +(Q.get('from') || 1);
@@ -213,24 +316,30 @@ if (SHEET) {
   (async () => {
     for (let i = 0; i < cols * rows; i++) {
       const w = world(s0 + i), cx = i % cols, cy = Math.floor(i / cols);
-      draw(w, 0, 0, tw, th, 3.7, [.3 + .4 * ((i * .37) % 1), .35 + .3 * ((i * .61) % 1)], i % 2, .3);
+      const fpos = [.3 + .4 * ((i * .37) % 1), .35 + .3 * ((i * .61) % 1)];
+      if (w.field === 100) {
+        fbInit(tw, th); fbClear();
+        for (let n = 0; n < 150; n++) { const tt = n / 30, kk = Math.exp(-((n % 22) / 30) * 3); fbStep(w, tt + w.t0, 1 / 30, [fpos[0] + .12 * Math.sin(tt), fpos[1] + .1 * Math.cos(tt * 1.3)], i % 2, kk); }
+        draw(w, 0, 0, tw, th, 5, fpos, i % 2, .25);
+      } else draw(w, 0, 0, tw, th, 3.7, fpos, i % 2, .3);
       gl.finish(); c2.drawImage(cv, cx * tw, cy * th);
-      const sp = document.createElement('span'); sp.textContent = (s0 + i) + ' ' + FIELDS[w.field] + '/' + MODES[w.mode]; sp.style.left = (cx * tw + 4) + 'px'; sp.style.top = (cy * th + 3) + 'px'; wrap.appendChild(sp);
+      const sp = document.createElement('span'); sp.textContent = (s0 + i) + ' ' + (w.field === 100 ? 'fb:' + SRCS[w.src] : FIELDS[w.field]) + '/' + MODES[w.mode]; sp.style.left = (cx * tw + 4) + 'px'; sp.style.top = (cy * th + 3) + 'px'; wrap.appendChild(sp);
       if (i % 5 === 4) await new Promise(r => setTimeout(r, 0));
     }
     window.__done = true;
   })();
 } else {
-  let w = world(+(Q.get('seed') || (Math.random() * 1e6 | 0))), down = 0, f = [.5, .5], kick = 0, t0 = performance.now();
+  let w = world(+(Q.get('seed') || (Math.random() * 1e6 | 0))), fbReset = true, down = 0, f = [.5, .5], kick = 0, t0 = performance.now();
   function fit(){ const d = Math.min(devicePixelRatio || 1, 2); cv.width = innerWidth * d; cv.height = innerHeight * d; }
   fit(); addEventListener('resize', fit);
   const mv = e => { f = [e.clientX / innerWidth, 1 - e.clientY / innerHeight]; };
-  cv.addEventListener('pointerdown', e => { w = world((Math.random() * 1e6) | 0); t0 = performance.now(); down = 1; mv(e); kick = 1; });   // a touch is a new world
+  cv.addEventListener('pointerdown', e => { w = world((Math.random() * 1e6) | 0); fbReset = true; t0 = performance.now(); down = 1; mv(e); kick = 1; });   // a touch is a new world
   cv.addEventListener('pointermove', e => { if (down) mv(e); });
   addEventListener('pointerup', () => { down = 0; });
   let last = performance.now();
   (function loop(n){ requestAnimationFrame(loop); const dt = (n - last) / 1000; last = n; kick *= Math.exp(-dt * 3); if (down && Math.random() < dt * 2) kick = Math.max(kick, .7);
+    if (w.field === 100) { const FH = 480, FW = Math.round(FH * innerWidth / innerHeight); fbInit(FW, FH); if (fbReset) { fbClear(); fbReset = false; } fbStep(w, (n - t0) / 1000 + w.t0, Math.min(dt, .05), f, down, kick); }
     draw(w, 0, 0, cv.width, cv.height, (n - t0) / 1000, f, down, kick);
-    document.getElementById('lab').textContent = 'seed ' + w.seed + '\n' + FIELDS[w.field] + ' / ' + MODES[w.mode] + ' / ' + w.scheme; })(performance.now());
+    document.getElementById('lab').textContent = 'seed ' + w.seed + '\n' + (w.field === 100 ? 'fb:' + SRCS[w.src] : FIELDS[w.field]) + ' / ' + MODES[w.mode] + ' / ' + w.scheme; })(performance.now());
 }
 </script></body></html>
