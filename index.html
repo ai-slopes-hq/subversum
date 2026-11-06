@@ -371,7 +371,7 @@ html[data-skin="clouds"] .skinsvg, html[data-skin="amber"] .skinsvg, html[data-s
 .nd-vs0 { stop-color: hsl(var(--hue, 28) 100% 60%); stop-opacity: 0; } .nd-vs1 { stop-color: hsl(var(--hue, 28) 100% 66%); stop-opacity: .75; }
 /* mandala: a flower in layers, blooming across the whole screen */
 .mf { stroke-linejoin: round; }
-/* clouds: rings of beads that open into a drifting cloud */
+/* clouds: a scatter of grains */
 html[data-skin="clouds"] { --accent: hsl(var(--hue) 100% 72%); --bg: hsl(var(--hue) 30% 5%); }
 html[data-skin="clouds"] body { background-color: var(--bg); background-image: none; }
 .cl { fill: none; stroke-linecap: round; }
@@ -891,12 +891,14 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
         const ratio = pick([1, 1, 1, 1, 2, 0.5, 1.5]) * Math.pow(2, (Math.random() - 0.5) * 0.03), span = dur * ratio;
         let off = Math.random() < 0.7 ? cl.head / sr + Math.random() * 0.4 : Math.random() * sec;
         off = Math.max(0, Math.min(off % sec, sec - span - 0.01));
+        const pv = (Math.random() - 0.5) * 1.6;
+        if (SK.grain) SK.grain(ts - now, dur, pv, ratio, dens);
         const src = ctx.createBufferSource(), g = ctx.createGain(), amp = 0.5 * lvl * (0.4 + 0.6 * cl.vel) / Math.sqrt(Math.max(1, rate * dur));
         src.buffer = cl.buf; src.playbackRate.value = ratio;
         g.gain.value = 0; g.gain.setValueCurveAtTime(Float32Array.from(HANN, v => v * amp), ts, dur);
         const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
         src.connect(g);
-        if (pn) { pn.pan.value = (Math.random() - 0.5) * 1.6; g.connect(pn); pn.connect(cl.out); } else g.connect(cl.out);
+        if (pn) { pn.pan.value = pv; g.connect(pn); pn.connect(cl.out); } else g.connect(cl.out);
         src.onended = () => { try { src.disconnect(); g.disconnect(); if (pn) pn.disconnect(); } catch (e) {} };
         src.start(ts, off, span + 0.01);
         cl.next += (1 / rate) * (0.5 + Math.random());
@@ -1799,56 +1801,67 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   }
 
   function buildClouds() {
-    // beads into a cloud: every note sends a ring of beads out of the finger, the ring opens, the beads let go of it and drift away as a cloud that thins out.
-    // x: few big beads on the left, a fine dense fog on the right (the grains). y: how far and how long the cloud travels (the space).
-    const bins = [0, 1, 2, 3].map(n => se('path', { class: 'cl cl' + n, d: '' }));
-    const W = [3, 5, 7.5, 10];
-    const P = [], rings = [], dust = [];
-    for (let i = 0; i < 46; i++) dust.push({ x: (Math.random() - 0.5) * 420, y: (Math.random() - 0.5) * 900, ph: Math.random() * 6.28, sp: 0.1 + Math.random() * 0.2 });
-    const K = 1.4;
-    function emit(vel) {
-      const n = Math.round(10 + 26 * XV.x), vr = 150 + 190 * XV.y * (0.6 + 0.6 * vel), life = 2.2 + 2.8 * XV.y;
-      for (let i = 0; i < n; i++) P.push({ cx: FP.vx, cy: FP.vy, a: (i + Math.random() * 0.3) / n * TAU, vr: vr * (0.75 + Math.random() * 0.5), sp: (Math.random() - 0.5) * 0.5, seed: Math.random() * 6.28, bias: (Math.random() - 0.5) * 0.25, age: 0, life });
-      while (P.length > 520) P.shift();
-      if (rings.length < 10) rings.push({ el: se('circle', { class: 'cl-ring', cx: f1(FP.vx), cy: f1(FP.vy), r: 10 }), age: 0, vr });
+    // a scatter of grains: every note leaves a smudge of dots under the finger (the memory, which fades over the 4 s it lasts in the sound) and every grain of the sound
+    // lights a few dots for exactly its own length, with the same Hann swell, sideways by its pan and up or down by chance.
+    // x: few big soft grains on the left, fine dense fog on the right. y: how far from the finger the grains scatter.
+    const SZ = [1.7, 3.1, 5], bins = [];
+    for (let z = 0; z < 3; z++) for (let l = 0; l < 4; l++) bins.push(se('path', { class: 'cl cl' + l, d: '' }));
+    bins.forEach((el, n) => { el.style.strokeWidth = SZ[Math.floor(n / 4)]; });
+    const rnd2 = () => (Math.random() + Math.random() + Math.random() - 1.5) * 0.8;   // roughly a bell curve, about -1..1
+    const field = [];
+    for (let i = 0; i < 90; i++) field.push({ x: (Math.random() - 0.5) * 420, y: (Math.random() - 0.5) * 900, ph: Math.random() * 6.28, sp: 0.1 + Math.random() * 0.2 });
+    const mem = [], grains = [];
+    function smudge(vel) {
+      const n = Math.round(22 + 22 * vel), sg = 16 + 12 * XV.y;
+      for (let i = 0; i < n; i++) mem.push({ x: FP.vx + rnd2() * sg * 1.6, y: FP.vy + rnd2() * sg * 1.6, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5 - 2, age: 0, life: 4 });
+      while (mem.length > 320) mem.shift();
     }
+    // called by the sound for every grain it schedules: delay seconds from now, dur seconds long, pan -0.8..0.8, ratio of the playback rate
+    SK.grain = (delay, dur, pan, ratio, dens) => {
+      if (grains.length > 160) return;
+      const reach = 70 + 130 * XV.y, n = 2 + Math.round(4 * (1 - dens)), sg = 3 + 10 * (dur / 0.22), pts = [];
+      for (let i = 0; i < n; i++) pts.push([rnd2() * sg * 1.6, rnd2() * sg * 1.6]);
+      grains.push({ t0: performance.now() + delay * 1000, dur: dur * 1000, x: FP.vx + pan * reach * 1.2 + rnd2() * 20, y: FP.vy + rnd2() * (24 + 220 * XV.y), pts, z: dur > 0.14 ? 2 : dur > 0.08 ? 1 : 0, up: (Math.random() * 0.5 + 0.2) * (ratio >= 2 ? 1.6 : 1), boost: ratio >= 2 ? 1 : 0 });
+    };
     let T = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
     function draw(dt, env, kick) {
       T += dt;
-      const ds = ['', '', '', ''], sz = 1.4 - 0.7 * XV.x;
-      for (let q = P.length - 1; q >= 0; q--) {
-        const o = P[q]; o.age += dt;
-        const u = o.age / o.life;
-        if (u >= 1) { P.splice(q, 1); continue; }
-        const r = 10 + (o.vr / K) * (1 - Math.exp(-K * o.age)), a = o.a + o.sp * o.age, wob = Math.min(1, o.age) * 8;
-        const x = o.cx + r * Math.cos(a) + Math.sin(o.age * 1.3 + o.seed) * wob, y = o.cy + r * Math.sin(a) + Math.cos(o.age * 1.1 + o.seed) * wob;
-        const v = u + o.bias, bn = v < 0.15 ? 3 : v < 0.45 ? 2 : v < 0.75 ? 1 : 0;
-        ds[bn] += 'M' + f1(x) + ' ' + f1(y) + 'h0';
+      const now = performance.now(), ds = bins.map(() => '');
+      const put = (x, y, z, l) => { ds[z * 4 + l] += 'M' + f1(x) + ' ' + f1(y) + 'h0'; };
+      for (const d of field) put(d.x + Math.sin(T * d.sp + d.ph) * 30, d.y + Math.cos(T * d.sp * 0.8 + d.ph) * 30, 0, (d.ph > 3.14 && env > 0.15) ? 1 : 0);
+      for (let q = mem.length - 1; q >= 0; q--) {
+        const o = mem[q]; o.age += dt;
+        if (o.age >= o.life) { mem.splice(q, 1); continue; }
+        o.x += o.vx * dt; o.y += o.vy * dt;
+        const f = 1 - o.age / o.life;
+        put(o.x, o.y, 1, f > 0.66 ? 2 : f > 0.33 ? 1 : 0);
       }
-      for (const d of dust) {
-        const x = d.x + Math.sin(T * d.sp + d.ph) * 40, y = d.y + Math.cos(T * d.sp * 0.8 + d.ph) * 40;
-        ds[(d.ph > 3.14 && env > 0.15) ? 1 : 0] += 'M' + f1(x) + ' ' + f1(y) + 'h0';
+      for (let q = grains.length - 1; q >= 0; q--) {
+        const g = grains[q], u = (now - g.t0) / g.dur;
+        if (u >= 1) { grains.splice(q, 1); continue; }
+        if (u < 0) continue;
+        const a = Math.sin(Math.PI * u), a2 = a * a, l = Math.min(3, Math.floor(a2 * 3.4) + g.boost * (a2 > 0.5 ? 1 : 0)), rise = -g.up * u * g.dur * 0.06;
+        for (const p of g.pts) put(g.x + p[0] * (0.7 + 0.5 * a), g.y + p[1] * (0.7 + 0.5 * a) + rise, g.z, l);
       }
-      bins.forEach((el, n) => { el.setAttribute('d', ds[n]); el.style.strokeWidth = (W[n] * sz * (n === 3 ? 1 + 0.4 * kick : 1)).toFixed(1); });
-      for (let q = rings.length - 1; q >= 0; q--) {
-        const g = rings[q]; g.age += dt;
-        if (g.age > 0.8) { g.el.remove(); rings.splice(q, 1); continue; }
-        g.el.setAttribute('r', (10 + (g.vr / K) * (1 - Math.exp(-K * g.age))).toFixed(1)); g.el.setAttribute('stroke-opacity', (0.7 * (1 - g.age / 0.8)).toFixed(2));
-      }
+      bins.forEach((el, n) => el.setAttribute('d', ds[n]));
     }
-    function frame(now) {
+    function frame(tn) {
       if (dead) return;
       raf = requestAnimationFrame(frame);
       const env = Math.max(0, litN) / 60;
-      if (now - lastDraw < (seq || cur || kick > 0.01 || P.length ? 16 : 42)) return;
-      const dt = Math.min(0.1, (now - last) / 1000) * ACT;
-      last = lastDraw = now;
+      if (tn - lastDraw < (seq || cur || kick > 0.01 || grains.length || mem.length ? 16 : 42)) return;
+      const dt = Math.min(0.1, (tn - last) / 1000) * ACT;
+      last = lastDraw = tn;
       xvStep(dt);
       draw(dt, env, kick);
     }
     draw(0.016, 0, 0);
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = lastDraw = performance.now(); raf = requestAnimationFrame(frame); }
-    SK.note = (i, vel) => emit(vel);
+    SK.note = (i, vel) => {
+      smudge(vel);
+      const t = performance.now(), n = 6;   // the strike itself: a quick bright puff at the finger
+      for (let k = 0; k < n; k++) grains.push({ t0: t, dur: 260 + Math.random() * 120, x: FP.vx + rnd2() * 14, y: FP.vy + rnd2() * 14, pts: [[rnd2() * 8, rnd2() * 8], [rnd2() * 8, rnd2() * 8]], z: 2, up: 0.2, boost: 1 });
+    };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
   }
 
