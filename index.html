@@ -356,8 +356,14 @@ html[data-skin="ridges"] .go { inset: 33%; }
 /* no button and no sequencer ring in scope, topo, matrix and ridges: the waves start at the finger. amber, riso and mandala keep the button */
 html[data-skin="scope"] .go, html[data-skin="topo"] .go, html[data-skin="matrix"] .go, html[data-skin="ridges"] .go { display: none; }
 html[data-skin="topo"] .ring, html[data-skin="matrix"] .ring, html[data-skin="ridges"] .ring { display: none; }
-html[data-skin="scope"] .dial { display: none; }
-html[data-skin="scope"] .skinsvg { display: block; }
+html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
+html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
+/* riso: flat overprinted discs of different sizes */
+.rs-c { mix-blend-mode: screen; }
+.rs-c.o { fill: none !important; stroke-width: 3; }
+/* mandala: one endless line, drawn by three turning arms and repeated six times */
+/* line width follows --mdw */
+.md-t { stroke-width: var(--mdw, 1.1); fill: none; stroke: hsl(var(--hue, 38) 80% 68%); stroke-linecap: round; stroke-linejoin: round; }
 /* scope: Conway's Game of Life; age sets size and brightness */
 .lf { fill: none; stroke-linecap: round; }
 .lf0 { stroke: hsl(var(--sh, 140) 45% 15%); stroke-width: 4; }
@@ -1529,45 +1535,109 @@ html[data-skin="scope"] .skinsvg { display: block; }
     SK.beat = ripple; SK.touch = ripple;   // a ripple leaves the finger on every LFO beat and when you touch down
   }
 
+  function buildRiso() {
+    // flat overprinted discs of many sizes drift about; every note flashes one at the finger, the kick makes them all swell
+    const COL = ['hsl(calc(var(--rh) + 0) 100% 62%)', 'hsl(calc(var(--rb)) 100% 62%)', 'hsl(calc(var(--rh) + 70) 100% 62%)'];
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const discs = [];
+    for (let i = 0; i < 16; i++) {
+      const r = i < 4 ? rnd(80, 140) : i < 10 ? rnd(36, 80) : rnd(10, 36), o = i % 4 === 3;
+      const el = se('circle', { class: 'rs-c' + (o ? ' o' : ''), r });
+      const col = COL[i % 3];
+      if (o) el.style.stroke = col; else el.style.fill = col;
+      el.style.opacity = o ? 0.9 : 0.78;
+      discs.push({ el, r, x: rnd(-190, 190), y: rnd(-400, 400), vx: rnd(-9, 9), vy: rnd(-9, 9), pop: 0 });
+    }
+    const flashes = [];
+    function flash(i, vel) {
+      const el = se('circle', { class: 'rs-c', r: 10 });
+      el.style.fill = '#F2EBDC';
+      flashes.push({ el, x: FP.vx, y: FP.vy, r: 24 + 70 * vel, age: 0, col: COL[i % 3] });
+      const near = discs.reduce((m, d) => Math.hypot(d.x - FP.vx, d.y - FP.vy) < Math.hypot(m.x - FP.vx, m.y - FP.vy) ? d : m, discs[0]);
+      near.pop = 1;
+    }
+    let last = 0, lastDraw = 0, raf = 0, dead = false;
+    function draw(dt, env, kick) {
+      for (const d of discs) {
+        d.x += d.vx * dt; d.y += d.vy * dt;
+        if (d.x < -230 || d.x > 230) d.vx = -d.vx;
+        if (d.y < -450 || d.y > 450) d.vy = -d.vy;
+        d.pop = Math.max(0, d.pop - dt * 2.2);
+        const k = 1 + 0.1 * kick + 0.22 * d.pop + 0.05 * env;
+        d.el.setAttribute('cx', d.x.toFixed(1)); d.el.setAttribute('cy', d.y.toFixed(1)); d.el.setAttribute('r', (d.r * k).toFixed(1));
+      }
+      for (let q = flashes.length - 1; q >= 0; q--) {
+        const f = flashes[q]; f.age += dt;
+        const u = f.age / 1.1;
+        if (u >= 1) { f.el.remove(); flashes.splice(q, 1); continue; }
+        f.el.style.fill = u < 0.12 ? '#F2EBDC' : f.col;
+        f.el.setAttribute('cx', f.x.toFixed(1)); f.el.setAttribute('cy', f.y.toFixed(1)); f.el.setAttribute('r', (f.r * (0.6 + 0.7 * Math.sqrt(u))).toFixed(1));
+        f.el.style.opacity = (0.9 * (1 - u)).toFixed(2);
+      }
+    }
+    function frame(now) {
+      if (dead) return;
+      raf = requestAnimationFrame(frame);
+      const env = Math.max(0, litN) / 60, busy = seq || cur || kick > 0.01 || flashes.length;
+      if (now - lastDraw < (busy ? 16 : 42)) return;
+      const dt = Math.min(0.1, (now - last) / 1000) * (0.6 + 1.6 * env) * ACT;
+      last = lastDraw = now;
+      draw(dt, env, kick);
+    }
+    draw(0, 0, 0);
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = lastDraw = performance.now(); raf = requestAnimationFrame(frame); }
+    SK.note = flash; SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
+  }
+
   function buildMandala() {
-    const petal = (L, w) => 'M0 -66C' + w + ' ' + (-66 - L * 0.25) + ' ' + (w * 0.8) + ' ' + (-66 - L * 0.75) + ' 0 ' + (-66 - L) +
-      'C' + (-w * 0.8) + ' ' + (-66 - L * 0.75) + ' ' + (-w) + ' ' + (-66 - L * 0.25) + ' 0 -66Z';
-    const layer = cls => { const wrap = se('g'); return { wrap, spin: se('g', { class: 'md-spin ' + cls }, wrap) }; };
-    const A = layer('a'), B = layer('b'), C = layer('c');
-    se('circle', { class: 'md-ring', r: 150, 'stroke-dasharray': '2 9' }, A.spin);
-    se('circle', { class: 'md-ring', r: 196, 'stroke-dasharray': '1 14' }, A.spin);
-    se('circle', { class: 'md-ring thin', r: 232 }, A.spin);
-    const inner = [], petals = [], sc = [];
-    for (let i = 0; i < STEPS; i++) {
-      inner.push(se('path', { class: 'md-q', d: petal(52, 8) }, se('g', { transform: 'rotate(' + ((i + 0.5) * 22.5) + ')' }, B.spin)));
+    // one endless line: three turning arms (epicycles) with slowly drifting speeds draw a curve that never closes; the last few seconds stay visible and fade, and the whole picture is repeated six times
+    const N = 480, CH = 4, per = N / CH;
+    const AM = [112, 70, 34], W0 = [1, -2.6, 5.3], th = [0, 1.3, 2.1];
+    const g = se('g', { id: 'mdg' });
+    const paths = [];
+    for (let c = 0; c < CH; c++) paths.push(se('path', { class: 'md-t', d: '', 'stroke-opacity': (0.12 + 0.88 * (c + 1) / CH).toFixed(2) }, g));
+    for (let k = 1; k < 6; k++) { const u = se('use', { transform: 'rotate(' + (k * 60) + ')' }); u.setAttribute('href', '#mdg'); skinSvg.appendChild(u); }
+    const pts = [];
+    let T = 0, last = 0, lastDraw = 0, raf = 0, dead = false, pulse = 0;
+    function pen(dtt) {
+      T += dtt;
+      let x = 0, y = 0;
+      for (let i = 0; i < 3; i++) {
+        th[i] += (W0[i] + 0.35 * Math.sin(T * 0.07 + i * 2.1)) * dtt;
+        x += AM[i] * Math.cos(th[i]); y += AM[i] * Math.sin(th[i]);
+      }
+      pts.push(x, y);
+      if (pts.length > N * 2) pts.splice(0, 2);
     }
-    for (let i = 0; i < STEPS; i++) {
-      petals.push(se('path', { class: 'md-p', d: petal(100, 13) }, se('g', { transform: 'rotate(' + (i * 22.5) + ')' }, C.spin)));
-      sc.push([0.5, 0.16]);
+    function draw() {
+      const n = pts.length / 2;
+      for (let c = 0; c < CH; c++) {
+        let d = '';
+        const a = Math.max(0, n - (CH - c) * per - 1), b = Math.min(n, n - (CH - 1 - c) * per);
+        for (let i = a; i < b; i++) d += (i === a ? 'M' : 'L') + f1(pts[i * 2]) + ' ' + f1(pts[i * 2 + 1]);
+        paths[c].setAttribute('d', d);
+      }
+      const k = 0.84 * (1 + 0.05 * pulse);
+      g.setAttribute('transform', 'scale(' + k.toFixed(3) + ')');
+      skinSvg.style.setProperty('--mdw', (1.1 + 1.4 * pulse).toFixed(2));
     }
-    const put = (el, sx, sy) => { el.style.transform = 'scale(' + sx.toFixed(2) + ',' + sy.toFixed(2) + ')'; };
-    SK.pattern = sq => {
-      petals.forEach((el, i) => {
-        const st = sq.steps[i], nx = sq.steps[(i + 1) % STEPS];
-        sc[i] = st ? [0.65 + 0.35 * st.vel, 0.3 + 0.7 * st.vel] : [0.5, 0.16];
-        el.setAttribute('class', 'md-p' + (st ? ' n' : ''));
-        put(el, sc[i][0], sc[i][1]);
-        const v = ((st ? st.vel : 0) + (nx ? nx.vel : 0)) / 2;
-        put(inner[i], 0.55 + 0.45 * v, 0.2 + 0.8 * v);
-      });
-    };
-    SK.note = i => {
-      popHit(petals[i], 700);
-      put(petals[i], sc[i][0] * 1.15, sc[i][1] * 1.3);
-      clearTimeout(petals[i]._s);
-      petals[i]._s = setTimeout(() => put(petals[i], sc[i][0], sc[i][1]), 150);
-    };
-    SK.frame = (t, env, kick) => {
-      C.wrap.style.transform = 'scale(' + (1 + 0.03 * kick + 0.012 * env).toFixed(4) + ')';
-      B.wrap.style.transform = 'scale(' + (1 + 0.05 * kick).toFixed(4) + ')';
-      A.wrap.style.transform = 'scale(' + (1 + 0.08 * kick).toFixed(4) + ')';
-    };
-    SK.idle = () => [A, B, C].forEach(l => { l.wrap.style.transform = ''; });
+    for (let i = 0; i < N; i++) pen(0.012);
+    draw();
+    function frame(now) {
+      if (dead) return;
+      raf = requestAnimationFrame(frame);
+      const env = Math.max(0, litN) / 60;
+      if (now - lastDraw < (seq || cur || kick > 0.01 ? 16 : 33)) return;
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = lastDraw = now;
+      pulse = Math.max(0, pulse - dt * 1.6);
+      const sp = dt * (0.5 + 0.9 * env + 0.8 * pulse) * ACT;
+      for (let i = 0; i < 4; i++) pen(sp / 4 * 2.4);
+      draw();
+    }
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = lastDraw = performance.now(); raf = requestAnimationFrame(frame); }
+    SK.note = () => { pulse = 1; };
+    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
   }
 
   function buildRidges() {
@@ -1788,7 +1858,7 @@ html[data-skin="scope"] .skinsvg { display: block; }
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
     else root.style.removeProperty('--accent');
-    ({ topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges }[name] || (() => {}))();
+    ({ riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges }[name] || (() => {}))();
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
