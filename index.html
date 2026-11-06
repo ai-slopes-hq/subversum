@@ -946,7 +946,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       pg.gain.setValueAtTime(0, t0); pg.gain.linearRampToValueAtTime(0.28 * vel, t0 + 0.001); pg.gain.setTargetAtTime(0, t0 + 0.001, 0.008);   // the thumb
       c.noise().connect(pl); pl.connect(pg); pg.connect(c.out);
       // the same ring written into the memory
-      const L = Math.floor(0.9 * sr), size = Math.floor(4 * sr);
+      const L = Math.floor(1.5 * sr), size = Math.floor(4 * sr);
       if (!b.cl) {
         const out = ctx.createGain(), lp = ctx.createBiquadFilter();
         lp.type = 'lowpass'; lp.frequency.value = Math.min(16000, b.cut * 2.5); lp.Q.value = 0.5;
@@ -960,12 +960,14 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
         for (let i = 0; i < L; i++) { chunk[i] += env * Math.sin(ph); ph += dp; env *= d; }
       });
       for (let i = 0, e = 0.28 * vel; i < L && e > 0.0005; i++, e *= 0.996) chunk[i] += e * (Math.random() * 2 - 1) * 0.5;   // the noise pluck, about 12 ms
-      for (let i = 0; i < L; i++) { const j = (w0 + i) % size; cl.data[j] = cl.data[j] * 0.6 + chunk[i]; }
+      const FD = Math.floor(0.15 * sr), XF = 256;   // the rendered ring fades out over its last 150 ms, and the old memory is cross-faded in and out, so the write leaves no step
+      for (let i = L - FD; i < L; i++) chunk[i] *= (L - i) / FD;
+      for (let i = 0; i < L; i++) { const j = (w0 + i) % size, m = 1 - 0.4 * Math.min(1, i / XF, (L - i) / XF); cl.data[j] = cl.data[j] * m + chunk[i]; }
       cl.head = w0; cl.w = (w0 + Math.floor(0.45 * sr)) % size; cl.vel = vel;
       cl.buf.copyToChannel(cl.data, 0);
       cl.until = t0 + 2.2;
       cloudRun(b);
-      return t0 + 1.4;
+      return t0 + Math.min(6.5, 5 * Math.max(...parts.map(p => p.tau)));   // the oscillators are stopped at this time: it must be after the tail has died away, or the cut clicks
     },
     // scope: laser zaps after the Horologium drums of touch2decay: ZAP (a sine falls from kHz onto the note through tanh), STUTTER (short FM grains), BIT (1-bit noise), plus a CLICK ping in a resonator
     scope: c => {
@@ -1090,6 +1092,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     topo: sq => {
       const b = sq.dub, t0 = ctx.currentTime + 0.02, lo = Math.random() < 0.5 ? 24 : 36, f = 440 * Math.pow(2, (lo + sq.root - 69) / 12);
       const kill = ctx.createGain(), nodes = [kill], srcs = [];
+      kill.gain.value = 0;   // the pulse shapers output +1 for a silent input, so the gain must be closed before the oscillators start (it was a 20 ms DC step)
       kill.gain.setValueAtTime(0, t0); kill.gain.linearRampToValueAtTime(1.6 * (1 - 0.4 * b.res / 15), t0 + 0.35);
       kill.connect(b.inp);
       const lp1 = ctx.createBiquadFilter(), lp2 = ctx.createBiquadFilter();
