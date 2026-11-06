@@ -729,7 +729,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     scope:    { cut: [1500, 7000], len: [0.03, 0.35], fb: [0.3, 0.75], dela: [0.2, 0.8],  revSec: [1, 2.5],   reva: [0.05, 0.4],  res: [0, 10] },
     topo:     { cut: [300, 2200],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9],  res: [3, 14] },
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
-    clouds:   { shimmer: true, cut: [3000, 11000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
+    clouds:   { shimmer: true, cut: [2500, 7000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
     ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] }
   };
 
@@ -791,7 +791,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
         conv.connect(dly); dly.connect(gg); gg.connect(sum);
         const t = ctx.currentTime + 0.01; a.start(t, off); w.start(t, off); srcs.push(a, w, dly, gg);
       });
-      const shlp = ctx.createBiquadFilter(); shlp.type = 'lowpass'; shlp.frequency.value = 6500; shlp.Q.value = 0.5;
+      const shlp = ctx.createBiquadFilter(); shlp.type = 'lowpass'; shlp.frequency.value = 4500; shlp.Q.value = 0.5;
       const shfb = ctx.createGain(); shfb.gain.value = 0.3; const shout = ctx.createGain(); shout.gain.value = 0.3;
       sum.connect(shlp); shlp.connect(shfb); shfb.connect(rsend); shlp.connect(shout); shout.connect(out);
       sh = { shout, shfb, nodes: [sum, shlp, shfb, shout].concat(srcs) };
@@ -888,6 +888,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   const crushCurve = lv => { const c = new Float32Array(1025); for (let k = 0; k < c.length; k++) { const x = k / 1024 * 2 - 1; c[k] = Math.round(x * lv) / lv; } return c; };
 
   const RES_GAIN = 1.8;
+  const CURVES = new Map();
   const HANN = Float32Array.from({ length: 32 }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / 31));
   // clouds: while notes keep arriving (and for about two seconds after the last one) a steady stream of overlapping grains is cut out of the 4 s memory,
   // 16 to 80 grains a second, 40 to 220 ms long, with a slowly drifting read position, so it smears into a cloud instead of crackling
@@ -898,12 +899,12 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     cl.timer = setInterval(() => {
       const now = ctx.currentTime;
       if (now > cl.until) { clearInterval(cl.timer); cl.timer = 0; return; }
-      const sr = ctx.sampleRate, sec = cl.size / sr, dens = clamp((Math.log2(b.xt || 1) / 1.2 + 1) / 2, 0, 1), rate = 16 + 64 * dens;
-      cl.lp.frequency.setTargetAtTime(clamp(b.cut * 2.5, 800, 16000), now, 0.05);
+      const sr = ctx.sampleRate, sec = cl.size / sr, dens = clamp((Math.log2(b.xt || 1) / 1.2 + 1) / 2, 0, 1), rate = 16 + 36 * dens;
+      cl.lp.frequency.setTargetAtTime(clamp(b.cut * 2.5, 800, 9000), now, 0.05);
       const lvl = clamp((cl.until - now) / 1.2, 0, 1);       // the cloud fades over the last 1.2 s
       if (cl.next < now) cl.next = now;
       while (cl.next < now + 0.12) {
-        const ts = cl.next + 0.005, dur = (0.22 - 0.16 * dens) * (0.6 + Math.random() * 0.8);
+        const ts = cl.next + 0.005, dur = (0.22 - 0.12 * dens) * (0.6 + Math.random() * 0.8);
         const ratio = pick([1, 1, 1, 1, 2, 0.5, 1.5]) * Math.pow(2, (Math.random() - 0.5) * 0.03), span = dur * ratio;
         let off = Math.random() < 0.7 ? cl.head / sr + Math.random() * 0.4 : Math.random() * sec;
         off = Math.max(0, Math.min(off % sec, sec - span - 0.01));
@@ -911,11 +912,13 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
         if (SK.grain) SK.grain(ts - now, dur, pv, ratio, dens);
         const src = ctx.createBufferSource(), g = ctx.createGain(), amp = 0.5 * lvl * (0.4 + 0.6 * cl.vel) / Math.sqrt(Math.max(1, rate * dur));
         src.buffer = cl.buf; src.playbackRate.value = ratio;
-        g.gain.value = 0; g.gain.setValueCurveAtTime(Float32Array.from(HANN, v => v * amp), ts, dur);
-        const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+        // on a phone every node per grain counts: the curves come from a small cache (amplitude in 1/100 steps) and the panners are five shared ones
+        const qa = Math.max(1, Math.round(amp * 100));
+        let cv = CURVES.get(qa); if (!cv) { cv = Float32Array.from(HANN, v => v * qa / 100); CURVES.set(qa, cv); }
+        g.gain.value = 0; g.gain.setValueCurveAtTime(cv, ts, dur);
         src.connect(g);
-        if (pn) { pn.pan.value = pv; g.connect(pn); pn.connect(cl.out); } else g.connect(cl.out);
-        src.onended = () => { try { src.disconnect(); g.disconnect(); if (pn) pn.disconnect(); } catch (e) {} };
+        g.connect(cl.pans ? cl.pans[Math.max(0, Math.min(4, Math.round((pv / 0.8 + 1) * 2)))] : cl.out);
+        src.onended = () => { try { src.disconnect(); g.disconnect(); } catch (e) {} };
         src.start(ts, off, span + 0.01);
         cl.next += (1 / rate) * (0.5 + Math.random());
       }
@@ -967,7 +970,8 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
         const out = ctx.createGain(), lp = ctx.createBiquadFilter();
         lp.type = 'lowpass'; lp.frequency.value = Math.min(16000, b.cut * 2.5); lp.Q.value = 0.5;
         out.connect(lp); lp.connect(b.inp);
-        b.cl = { size, data: new Float32Array(size), w: 0, head: 0, buf: ctx.createBuffer(1, size, sr), out, lp, timer: 0, until: 0, vel: 1, next: 0 };
+        const pans = ctx.createStereoPanner ? [-0.8, -0.4, 0, 0.4, 0.8].map(v => { const n = ctx.createStereoPanner(); n.pan.value = v; n.connect(out); return n; }) : null;
+        b.cl = { size, data: new Float32Array(size), w: 0, head: 0, buf: ctx.createBuffer(1, size, sr), out, lp, pans, timer: 0, until: 0, vel: 1, next: 0 };
       }
       const cl = b.cl, w0 = cl.w, chunk = new Float32Array(L);
       parts.forEach(p => {
@@ -1387,7 +1391,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     const sk = skin, b = lastBus, now = ctx ? ctx.currentTime : 0;
     if (sk === 'amber') { XM.cut = Math.pow(2, MAC.cut * 1.4); XM.fm = Math.pow(2, MAC.color * 0.9); XM.fold = Math.pow(2, MAC.color * 0.5); return; }
     if (!ctx || !b || !b.base) return;
-    b.cut = clamp(b.base.cut * Math.pow(2, MAC.cut * (sk === 'mandala' || sk === 'topo' ? 1.6 : 1.5)), 60, 12000);
+    b.cut = clamp(b.base.cut * Math.pow(2, MAC.cut * (sk === 'mandala' || sk === 'topo' ? 1.6 : 1.5)), 60, sk === 'clouds' ? 7500 : 12000);
     const acid = sk === 'ridges';
     b.res = clamp(b.base.res + MAC.res * (acid || sk === 'matrix' ? 8 : 6), acid ? 1 : 0, acid ? 20 : 16);
     const da = clamp(b.base.delAmt + 0.45 * MAC.echo, 0, 0.95), fbk = clamp(b.base.delFb + 0.25 * MAC.echo, 0.1, 0.8);
@@ -1401,9 +1405,9 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     if (b.sh) {   // clouds: near the top of the y axis the sound goes fully wet, the dry signal melts away and the octave-up shimmer opens
       const w = clamp((MAC.space - 0.3) / 0.7, 0, 1), sw = w * w * (3 - 2 * w);
       b.dry.gain.setTargetAtTime(0.85 * (1 - 0.92 * sw), now, 0.08);
-      const rb = clamp(ra + 0.55 * sw, 0, 1.4); b.revAmt = rb; b.rsend.gain.setTargetAtTime(rb, now, 0.05);
+      const rb = clamp(ra + 0.4 * sw, 0, 1.2); b.revAmt = rb; b.rsend.gain.setTargetAtTime(rb, now, 0.05);
       if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * rb;
-      b.sh.shout.gain.setTargetAtTime(0.18 + 0.5 * sw, now, 0.1); b.sh.shfb.gain.setTargetAtTime(0.18 + 0.2 * sw, now, 0.1);
+      b.sh.shout.gain.setTargetAtTime(0.18 + 0.36 * sw, now, 0.1); b.sh.shfb.gain.setTargetAtTime(0.18 + 0.14 * sw, now, 0.1);
     }
     if (sk === 'riso') b.len = clamp(b.base.len + 0.4 * MAC.space, 0.02, 0.95);
     b.xt = Math.pow(2, MAC.color * 1.2); b.xc = Math.round(MAC.color * 7);
