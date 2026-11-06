@@ -7,11 +7,11 @@
 <script>
 // the look is picked at random on every launch; ?skin=riso|scope|amber forces one
 (function () {
-  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'approach'], k = all[Math.floor(Math.random() * all.length)];
-  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|approach|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
+  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges'], k = all[Math.floor(Math.random() * all.length)];
+  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
   document.documentElement.setAttribute('data-skin', k);
   var m = document.querySelector('meta[name=theme-color]');
-  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', approach: '#0A0A0E' }[k]);
+  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E' }[k]);
 })();
 </script>
 <meta name="mobile-web-app-capable" content="yes">
@@ -345,7 +345,7 @@ html[data-skin="ridges"] .go { inset: 33%; }
 
 /* ridges */
 .rg-bg { fill: var(--bg); }
-.rg-l { fill: var(--bg); stroke: hsl(var(--hue, 38) 100% 68%); stroke-width: 1.3; stroke-linejoin: round; }
+.rg-l { fill: var(--bg); stroke: url(#rgg); stroke-width: 1.5; stroke-linejoin: round; }
 .rg-dot { fill: hsl(var(--hue, 38) 60% 32%); transform-box: fill-box; transform-origin: center; }
 .rg-dot.n { fill: hsl(var(--hue, 38) 100% 72%); }
 .rg-dot.hit { animation: rghit .6s cubic-bezier(.2, .9, .3, 1.3); }
@@ -354,18 +354,6 @@ html[data-skin="ridges"] .go { inset: 33%; }
   .md-spin, .md-p.hit, .rg-dot.hit { animation: none; }
 }
 
-/* approach: an endless flight toward a goal that never arrives */
-html[data-skin="approach"] .skinsvg { display: block; }
-html[data-skin="approach"] .bg, html[data-skin="approach"] .dial::before, html[data-skin="approach"] .ring line, html[data-skin="approach"] .go .steps { display: none; }
-html[data-skin="approach"] .go > svg { width: 46%; height: 46%; }
-html[data-skin="approach"] .go::after { background: radial-gradient(circle, hsl(var(--hue) 100% 75% / .5) 0%, transparent 72%); }
-html[data-skin="approach"] { --accent: hsl(var(--hue) 100% 70%); --bg: hsl(var(--hue) 28% 5%); }
-html[data-skin="approach"] body { background-color: var(--bg); background-image: none; transition: none; }
-html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%); border: 2px solid var(--accent); box-shadow: 0 0 24px hsl(var(--hue) 100% 60% / .35); }
-.ap-r, .ap-t { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
-.ap-r { stroke: hsl(var(--hue, 38) 100% 66%); }
-.ap-t { stroke: hsl(calc(var(--hue, 38) + 40) 100% 74%); }
-.ap-n { stroke: #fff; }
 </style>
 
 <script>
@@ -703,8 +691,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     scope:    { cut: [1500, 7000], len: [0.03, 0.35], fb: [0.3, 0.75], dela: [0.2, 0.8],  revSec: [1, 2.5],   reva: [0.05, 0.4],  res: [0, 10] },
     topo:     { cut: [300, 2200],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9],  res: [3, 14] },
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
-    ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] },
-    approach: { cut: [800, 5000],  len: [0.3, 0.8],   fb: [0.4, 0.8],  dela: [0.2, 0.7],  revSec: [3, 5],     reva: [0.4, 0.9] }
+    ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] }
   };
 
   function rollDub(stepDur, tw) {
@@ -949,61 +936,38 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     });
   }
 
-  /* ---------- held voices: approach (Shepard), topo (evolving PWM), ridges (acid 303) ---------- */
+  /* ---------- held voices: topo (evolving PWM) and ridges (acid 303) ---------- */
   let cont = null;
-  function stopCont() { if (cont) { cont.stop(); cont = null; } }
+  function stopCont() { if (cont) { cont.stop(); cont = null; endMod(); } }
   function endSeqVoices(sq) { if (sq && sq.acidV) sq.acidV.stop(); stopCont(); }
-  // the steps of a held voice play nothing, they only drive the picture
-  function visualStep(st, idx, when) {
-    const t0 = when + 0.012;
-    atTime(t0, () => {
-      if (!seq) return;
-      cur = { t0, a: 0.004, tau: 0.12 };
-      flashStep(idx, st.vel);
-      pulse(st.vel);
-      if (!raf) raf = requestAnimationFrame(loop);
-    });
+  // held voices play no steps: the picture follows what the sound itself does (an LFO, the Shepard phase)
+  let mod = null, modTimer = 0;   // mod: { env 0..1, phase 0..1, beat }
+  function modBeat(vel) {
+    kick = Math.min(1.4, 0.5 + 0.8 * vel);
+    pulse(vel);
+    if (SK.beat) SK.beat(vel);
+    wakeFx();
+  }
+  function startMod() {
+    clearInterval(modTimer);
+    modTimer = setInterval(() => {
+      if (!cont || !cont.mod) return;
+      const m = cont.mod();
+      mod = m;
+      setLit(Math.round(Math.max(0, Math.min(1, m.env)) * 60));
+      if (m.beat) modBeat(0.9);
+      wakeFx();
+    }, 33);
+  }
+  function endMod() {
+    clearInterval(modTimer); modTimer = 0; mod = null;
+    if (!ctx) return;
+    // let the glow die away from where it is, instead of snapping to zero
+    const e = Math.max(0.01, litN / 60), a = 0.0001, tau = 0.5;
+    cur = { t0: ctx.currentTime - (a + tau * -Math.log(e)), a, tau };
+    if (!raf) raf = requestAnimationFrame(loop);
   }
   const CONT = {
-    // approach: a Shepard glissando, nine octave-spaced partials slide up and fade in and out under a bell-shaped window, so it climbs forever; it speeds up the longer it is held
-    approach: sq => {
-      const b = sq.dub, t0 = ctx.currentTime + 0.02, N = 9, f0 = 440 * Math.pow(2, (24 + sq.root - 69) / 12);
-      const kill = ctx.createGain();
-      kill.gain.setValueAtTime(0, t0); kill.gain.linearRampToValueAtTime(0.3, t0 + 0.07);
-      kill.connect(b.inp);
-      const type = b.r[0] < 0.5 ? 'sine' : 'triangle', sigma = 1.5 + b.r[2] * 1.2, rate0 = 0.05 + b.r[1] * 0.1, accel = 0.03 + b.r[2] * 0.06;
-      const parts = [];
-      for (let k = 0; k < N; k++) {
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.type = type; o.frequency.value = f0; g.gain.value = 0;
-        o.connect(g); g.connect(kill); o.start(t0);
-        parts.push({ o, g, k });
-      }
-      let phase = b.r[3], last = t0;
-      const fx = x => f0 * Math.pow(2, x);
-      const ax = x => { const w = Math.sin(Math.PI * x / N); return w * w * Math.exp(-((x - N / 2) * (x - N / 2)) / (2 * sigma * sigma)); };
-      const rateAt = t => rate0 * Math.min(2.5, 1 + accel * (t - t0));
-      const update = () => {
-        const now = ctx.currentTime, dt = now - last;
-        if (dt <= 0) return;
-        phase += rateAt(now) * dt; last = now;
-        const ahead = now + 0.06, ph2 = phase + rateAt(ahead) * 0.06;
-        parts.forEach(p => {
-          const x0 = (p.k + phase) % N, x1 = (p.k + ph2) % N;
-          if (x1 < x0) p.o.frequency.setValueAtTime(fx(x1), ahead); else p.o.frequency.linearRampToValueAtTime(fx(x1), ahead);
-          p.g.gain.linearRampToValueAtTime(ax(x1), ahead);
-        });
-      };
-      parts.forEach(p => { p.o.frequency.setValueAtTime(fx((p.k + phase) % N), t0); p.g.gain.setValueAtTime(ax((p.k + phase) % N), t0); });
-      const timer = setInterval(update, 25);
-      return { stop() {
-        clearInterval(timer);
-        const now = ctx.currentTime, endT = Math.max(now, t0 + 0.45);
-        kill.gain.cancelScheduledValues(now);
-        kill.gain.setTargetAtTime(0, endT, 0.12);
-        setTimeout(() => { parts.forEach(p => { try { p.o.stop(); p.o.disconnect(); p.g.disconnect(); } catch (e) {} }); try { kill.disconnect(); } catch (e) {} }, (endT - now) * 1000 + 1500);
-      } };
-    },
     // topo: an evolving drone, two pulse waves whose widths drift on their own slow LFOs, a fifth, and a resonant low pass that breathes
     topo: sq => {
       const b = sq.dub, t0 = ctx.currentTime + 0.02, lo = Math.random() < 0.5 ? 24 : 36, f = 440 * Math.pow(2, (lo + sq.root - 69) / 12);
@@ -1019,7 +983,8 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
         o.type = shape || 'sine'; o.frequency.value = rate; g.gain.value = amt; o.connect(g); g.connect(target); o.start(t0);
         srcs.push(o); nodes.push(g);
       };
-      lfo(lrnd(0.03, 0.12), 1100, lp1.detune); lfo(lrnd(0.1, 0.35), 500, lp2.detune);   // cutoff drift, in cents
+      const rA = lrnd(0.03, 0.12), rB = lrnd(0.1, 0.35);
+      lfo(rA, 1100, lp1.detune); lfo(rB, 500, lp2.detune);   // cutoff drift, in cents
       const curve = new Float32Array(2049);
       for (let i = 0; i < curve.length; i++) curve[i] = i < 1024 ? -1 : 1;
       const hasCS = !!ctx.createConstantSource;
@@ -1035,7 +1000,12 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
         out.connect(lp1);
       };
       pwm(f, -5, 0.12); pwm(f, 6, 0.12); pwm(f * 1.4983, 0, 0.07);
-      return { stop() {
+      let prevB = 0;
+      return { mod() {
+        const t = ctx.currentTime - t0, a = Math.sin(TAU * rA * t), bb = Math.sin(TAU * rB * t);
+        const beat = prevB < 0 && bb >= 0; prevB = bb;      // one beat per cycle of the faster cutoff LFO
+        return { env: 0.5 + 0.28 * a + 0.22 * bb, phase: ((rB * t) % 1 + 1) % 1, beat };
+      }, stop() {
         const now = ctx.currentTime, endT = Math.max(now, t0 + 0.5);
         kill.gain.cancelScheduledValues(now);
         kill.gain.setTargetAtTime(0, endT, 0.25);
@@ -1141,7 +1111,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     }
     const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0, dub: null, voice: null, dubChord: null, cont: null, acid: false, acidV: null };
     if (VOICES[skin]) { s.dub = rollDub(s.dur, TW[skin]); s.voice = VOICES[skin]; }
-    if (skin === 'approach' || skin === 'topo') { s.dub = rollDub(s.dur, TW[skin]); s.cont = skin; }
+    if (skin === 'topo') { s.dub = rollDub(s.dur, TW[skin]); s.cont = skin; }
     if (skin === 'ridges') { s.dub = rollDub(s.dur, TW.ridges); s.acid = true; }
     if (skin === 'riso') {
       // triads and seventh chords built on the scale degrees: major or minor depending on what the scale gives
@@ -1174,7 +1144,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     s.i = (s.i + 1) % STEPS;
     if (!st) return;
     if (s.acid) { s.acidV.step(t + 0.012, st, idx); return; }
-    if (s.cont) { visualStep(st, idx, t); return; }
+    if (s.cont) return;
     if (s.voice) { hitVoice(s, st, idx, t); return; }
     if (s.dubChord) { playDub(s, st, idx, t); return; }
     const midi = st.midi;
@@ -1203,7 +1173,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     // every press rolls a new patch, scale, tempo and pattern
     stopCont();
     seq = makeSeq();
-    if (seq.cont) cont = CONT[seq.cont](seq);
+    if (seq.cont) { cont = CONT[seq.cont](seq); startMod(); }
     renderPattern(seq);
     retireLfo(prev);
     const now = ctx.currentTime;
@@ -1518,12 +1488,18 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
       raf = requestAnimationFrame(frame);
     }
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
-    SK.pattern = sq => steps.forEach((el, i) => {
-      const st = sq.steps[i];
-      el.setAttribute('class', 'tp-step' + (st ? ' n' : ''));
-      el.style.strokeWidth = st ? (3.5 + 4 * st.vel).toFixed(1) : '1.6';
-    });
-    SK.note = i => popHit(steps[i], 700);
+    // the 16 arcs do not show a pattern here: a bright spot runs round them with the phase of the cutoff LFO
+    SK.pattern = () => steps.forEach(el => { el.setAttribute('class', 'tp-step n'); el.style.strokeWidth = '3'; });
+    SK.frame = (t, env, kick) => {
+      if (!mod) return;
+      steps.forEach((el, i) => {
+        const w = 0.5 + 0.5 * Math.cos(TAU * (i / STEPS - mod.phase));
+        el.style.opacity = (0.25 + 0.75 * w).toFixed(2);
+        el.style.strokeWidth = (2 + 5 * w).toFixed(1);
+      });
+    };
+    SK.idle = () => steps.forEach(el => { el.style.opacity = ''; el.style.strokeWidth = '3'; });
+    SK.beat = () => steps.forEach(el => popHit(el, 600));
   }
 
   function buildMandala() {
@@ -1571,12 +1547,30 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     // a stack of ridgelines, hidden-line style: every note sends a bump from its own x position up through the stack
     const N = 36, X0 = -195, X1 = 195, M = 64, DY = 17, Y0 = -300;
     se('rect', { class: 'rg-bg', x: -2000, y: -2000, width: 4000, height: 4000 });
+    // acid colour: one horizontal gradient paints every ridge; each step owns a stop with its own hue, the hues drift round the wheel,
+    // and the stop of the step that has just played flashes bright
+    const defs = se('defs'), grad = se('linearGradient', { id: 'rgg', gradientUnits: 'userSpaceOnUse', x1: X0, y1: 0, x2: X1, y2: 0 }, defs);
+    const stops = [], act = new Array(STEPS).fill(0.5), flash = new Array(STEPS).fill(0);
+    for (let i = 0; i < STEPS; i++) stops.push(se('stop', { offset: ((-150 + i * 20 - X0) / (X1 - X0)).toFixed(4) }, grad));
+    let hueDrift = 0;
+    const baseHue = () => parseFloat(document.documentElement.style.getPropertyValue('--hue')) || 38;
+    function paint(dt, env) {
+      hueDrift = (hueDrift + dt * (10 + 40 * env)) % 360;
+      const h0 = baseHue() + hueDrift;
+      for (let i = 0; i < STEPS; i++) {
+        flash[i] = Math.max(0, flash[i] - dt * 2.2);
+        const hue = (h0 + i * 360 / STEPS * 1.5) % 360, f = flash[i], a = act[i];
+        stops[i].setAttribute('stop-color', 'hsl(' + hue.toFixed(0) + ' 100% ' + (a > 0 ? 52 + 12 * a + 34 * f : 30 + 40 * f).toFixed(0) + '%)');
+        dots[i].style.fill = 'hsl(' + hue.toFixed(0) + ' 100% ' + (a > 0 ? 55 + 30 * f : 30 + 40 * f).toFixed(0) + '%)';
+      }
+    }
     const lines = [];
     for (let j = 0; j < N; j++) lines.push(se('path', { class: 'rg-l', d: '', 'stroke-opacity': (0.25 + 0.75 * j / (N - 1)).toFixed(2) }));
     const dots = [];
     for (let i = 0; i < STEPS; i++) dots.push(se('circle', { class: 'rg-dot', cx: -150 + i * 20, cy: 376, r: 3 }));
     const pulses = [];
     let tt = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
+    paint(0, 0.2);
     const bell = x => Math.exp(-(x * x) / (2 * 95 * 95));
     function draw(env) {
       for (let j = 0; j < N; j++) {
@@ -1605,6 +1599,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
       const dt = Math.min(0.1, (now - last) / 1000);
       last = lastDraw = now;
       tt += dt * (0.8 + 2.5 * env + 1.5 * kick);
+      paint(dt, env);
       for (let q = pulses.length - 1; q >= 0; q--) { pulses[q].p += dt * 26; if (pulses[q].p > 34) pulses.splice(q, 1); }
       draw(env);
     }
@@ -1614,88 +1609,17 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
       raf = requestAnimationFrame(frame);
     }
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
-    SK.pattern = sq => dots.forEach((el, i) => {
+    SK.pattern = sq => { dots.forEach((el, i) => {
       const st = sq.steps[i];
       el.setAttribute('r', st ? (3.4 + 3.6 * st.vel).toFixed(1) : '2');
       el.setAttribute('class', 'rg-dot' + (st ? ' n' : ''));
-    });
+      act[i] = st ? st.vel : 0;
+    }); paint(0, 0.2); };
     SK.note = (i, vel) => {
+      flash[i] = 1;
       popHit(dots[i], 600);
       pulses.push({ x: -150 + i * 20, p: 0, a: 0.45 + 0.9 * vel });
     };
-  }
-
-  function buildApproach() {
-    // flight down a 16-sided tunnel toward a light that never arrives: rings grow exponentially, every note launches a bright gate
-    const R = 100, TAU2 = Math.PI * 2;
-    se('rect', { x: -2000, y: -2000, width: 4000, height: 4000, fill: 'var(--bg)' });
-    const halo = se('circle', { cx: 0, cy: 0, r: 80, fill: 'url(#apg)' });
-    const defs = se('defs');
-    const rg = se('radialGradient', { id: 'apg' }, defs);
-    se('stop', { offset: 0, 'stop-color': 'hsl(' + 0 + ' 0% 100%)', 'stop-opacity': 0.9 }, rg);
-    se('stop', { offset: 0.35, 'stop-color': 'var(--accent)', 'stop-opacity': 0.5 }, rg);
-    se('stop', { offset: 1, 'stop-color': 'var(--accent)', 'stop-opacity': 0 }, rg);
-    let poly = '';
-    for (let i = 0; i < STEPS; i++) { const a = i * TAU2 / STEPS; poly += (i ? 'L' : 'M') + f1(Math.sin(a) * R) + ' ' + f1(-Math.cos(a) * R); }
-    poly += 'Z';
-    let ticks = '', tickOf = [];
-    function setTicks(sq) {
-      ticks = ''; tickOf = [];
-      for (let i = 0; i < STEPS; i++) {
-        const st = sq.steps[i], a = i * TAU2 / STEPS, r2 = st ? R - 10 - 22 * st.vel : R - 4;
-        tickOf.push('M' + f1(Math.sin(a) * R) + ' ' + f1(-Math.cos(a) * R) + 'L' + f1(Math.sin(a) * r2) + ' ' + f1(-Math.cos(a) * r2));
-        if (st) ticks += tickOf[i];
-      }
-    }
-    setTicks({ steps: DEMO });
-    const rings = [];
-    const layer = se('g');
-    function spawn(note) {
-      const g = se('g', {}, layer);
-      const body = se('path', { class: 'ap-r', d: poly }, g);
-      const tk = se('path', { class: 'ap-t' + (note ? ' ap-n' : ''), d: note ? tickOf[note.i] + ticks : ticks }, g);
-      rings.push({ g, body, tk, z: 1.6, note: !!note, rot: Math.random() * 6 });
-    }
-    spawn(); spawn(); rings[0].z = 1.6 * 0.78; rings[1].z = 1.6 * 0.6;
-    let prog = 0, last = 0, lastDraw = 0, raf = 0, dead = false, tt = 0;
-    const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    function draw(dt, env) {
-      const playing = seq || cur;
-      const v = (playing ? 0.32 + 1.3 * env : 0.09) + 1.6 * kick;
-      tt += dt;
-      if (playing) prog += dt * (0.4 + env);
-      const h = 1 - Math.exp(-prog / 40);              // the goal gets closer with every press, but never arrives
-      halo.setAttribute('r', (74 + 120 * h + 26 * kick + 10 * env).toFixed(1));
-      halo.setAttribute('opacity', (0.35 + 0.6 * h).toFixed(2));
-      for (let q = rings.length - 1; q >= 0; q--) {
-        const o = rings[q];
-        o.z *= Math.exp(-v * dt);
-        if (o.z < 0.085) { o.g.remove(); rings.splice(q, 1); continue; }
-        const r = 44 / o.z, s = r / R;
-        const fade = Math.min(1, (1.6 - o.z) / 0.45) * Math.min(1, (o.z - 0.085) / 0.12);
-        o.g.setAttribute('transform', 'rotate(' + ((o.rot + (1 - o.z) * 40) % 360).toFixed(1) + ') scale(' + s.toFixed(3) + ')');
-        o.g.setAttribute('opacity', Math.max(0, fade * (o.note ? 0.95 : 0.4)).toFixed(2));
-        o.body.setAttribute('stroke-width', (0.6 + 0.5 / o.z * (o.note ? 1.6 : 1)).toFixed(2));
-        o.tk.setAttribute('stroke-width', (0.8 + 0.9 / o.z).toFixed(2));
-      }
-      let nearest = 9; rings.forEach(o => { if (!o.note || o.z < 1.5) nearest = Math.min(nearest, o.z); });
-      let newest = 0; rings.forEach(o => { if (!o.note) newest = Math.max(newest, o.z); });
-      if (newest < 1.25) spawn();
-    }
-    function frame(now) {
-      if (dead) return;
-      raf = requestAnimationFrame(frame);
-      const busy = seq || cur || kick > 0.01;
-      if (!busy && now - lastDraw < 42) return;
-      const dt = Math.min(0.1, (now - last) / 1000);
-      last = lastDraw = now;
-      draw(dt, Math.max(0, litN) / 60);
-    }
-    draw(0.016, 0);
-    if (!reduced) { last = lastDraw = performance.now(); raf = requestAnimationFrame(frame); }
-    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
-    SK.pattern = sq => { setTicks(sq); rings.forEach(o => { if (!o.note) o.tk.setAttribute('d', ticks); }); };
-    SK.note = i => { spawn({ i }); const o = rings[rings.length - 1]; o.z = 1.45; };
   }
 
   function buildMatrix() {
@@ -1805,8 +1729,8 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
   }
 
   // skins can be swapped at any time: clear the old full-screen layer, build the new one, redraw the current pattern
-  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'approach'];   // paper and donut are light: kept in the code, out of the rotation
-  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', approach: '#0A0A0E' };
+  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges'];   // paper and donut are light: kept in the code, out of the rotation
+  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E' };
   function applySkin(name) {
     skin = name;
     root.setAttribute('data-skin', name);
@@ -1818,7 +1742,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
     else root.style.removeProperty('--accent');
-    ({ topo: buildTopo, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges, approach: buildApproach }[name] || (() => {}))();
+    ({ topo: buildTopo, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges }[name] || (() => {}))();
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
