@@ -380,10 +380,10 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
 .md-t { stroke-width: var(--mdw, 1.1); fill: none; stroke: hsl(var(--hue, 38) 80% 68%); stroke-linecap: round; stroke-linejoin: round; }
 /* scope: Conway's Game of Life; age sets size and brightness */
 .lf { fill: none; stroke-linecap: round; }
-.lf0 { stroke: hsl(var(--sh, 140) 45% 15%); stroke-width: 4; }
-.lf1 { stroke: hsl(var(--sh, 140) 70% 30%); stroke-width: 8; }
-.lf2 { stroke: hsl(var(--sh, 140) 90% 48%); stroke-width: 11; }
-.lf3 { stroke: hsl(var(--sh, 140) 100% 72%); stroke-width: 13; filter: drop-shadow(0 0 3px hsl(var(--sh, 140) 100% 60%)); }
+.lf0 { stroke: hsl(calc(var(--sh, 140) + var(--lh, 0)) 45% 15%); stroke-width: 4; }
+.lf1 { stroke: hsl(calc(var(--sh, 140) + var(--lh, 0)) 70% 30%); stroke-width: 8; }
+.lf2 { stroke: hsl(calc(var(--sh, 140) + var(--lh, 0)) 90% 48%); stroke-width: 11; }
+.lf3 { stroke: hsl(calc(var(--sh, 140) + var(--lh, 0)) 100% 72%); stroke-width: 13; filter: drop-shadow(0 0 3px hsl(calc(var(--sh, 140) + var(--lh, 0)) 100% 60%)); }
 .tp-ripple { fill: none; stroke: hsl(var(--tp, 38) 80% 78%); stroke-width: 1.6; }
 </style>
 
@@ -1518,6 +1518,8 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
 
   /* ---------- skins with a full-screen layer: each builds its own picture and plugs into the hooks ---------- */
   const skinSvg = $('#skin'), TAU = 2 * Math.PI;
+  const XV = { x: 0.5, y: 0.5 };   // the finger as 0..1 (y up), smoothed, for everything on the screen that answers the XY axes
+  function xvStep(dt) { const k = Math.min(1, dt * 6); XV.x += ((XY.nx + 1) / 2 - XV.x) * k; XV.y += ((XY.ny + 1) / 2 - XV.y) * k; }
   const FP = { vx: 0, vy: 0, down: false };   // the finger in the coordinates of the skin layer (centre of the screen is 0, 0), where the waves start
   const se = (tag, attrs, parent) => {
     const e = document.createElementNS(NS, tag);
@@ -1553,7 +1555,8 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       if (push > 0.01 && d2 > 1) { const k = push * Math.exp(-d2 / (2 * 80 * 80)) / Math.sqrt(d2); x += dx * k; y += dy * k; }
       return f1(x) + ' ' + f1(y);
     };
-    const ripple = () => ripples.push({ el: se('circle', { class: 'tp-ripple', cx: f1(FP.vx), cy: f1(FP.vy), r: 4 }), r: 4 });
+    const spawnR = () => ripples.push({ el: se('circle', { class: 'tp-ripple', cx: f1(FP.vx), cy: f1(FP.vy), r: 4 }), r: 4 });
+    const ripple = () => { spawnR(); if (XV.y > 0.55) setTimeout(() => { if (!dead) spawnR(); }, 320); };
     function draw(m) {
       const ds = ['', '', ''];
       for (let k = 0; k < 36; k++) {
@@ -1575,10 +1578,14 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       push = (FP.down ? 26 : 8) * (0.4 + 0.9 * env + 1.2 * kick);
       for (let q = ripples.length - 1; q >= 0; q--) {
         const o = ripples[q];
+        const RL = 380 * (0.6 + 1.3 * XV.y);
         o.r += dt * 240;
-        if (o.r > 380) { o.el.remove(); ripples.splice(q, 1); continue; }
-        o.el.setAttribute('r', o.r.toFixed(1)); o.el.setAttribute('stroke-opacity', (0.9 * (1 - o.r / 380)).toFixed(2));
+        if (o.r > RL) { o.el.remove(); ripples.splice(q, 1); continue; }
+        o.el.setAttribute('r', o.r.toFixed(1)); o.el.setAttribute('stroke-opacity', (0.9 * (1 - o.r / RL)).toFixed(2));
       }
+      xvStep(dt);
+      parts[0].style.strokeOpacity = 0.22 * (0.5 + XV.x); parts[1].style.strokeOpacity = Math.min(1, 0.5 * (0.5 + XV.x));
+      parts[2].style.strokeOpacity = 0.6 + 0.35 * XV.x; parts[2].style.strokeWidth = (3.2 - 1.8 * XV.x).toFixed(2);
       draw(1 + 0.5 * env + 0.6 * kick);
     }
     draw(1);
@@ -1632,9 +1639,13 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       const tx = FP.down ? FP.vx * 0.55 : vx * 0.97, ty = hy0 + (FP.down ? FP.vy * 0.12 : (hy - hy0) * 0.97);
       vx += (tx - vx) * Math.min(1, dt * 4); hy += (ty - hy) * Math.min(1, dt * 4);
       sun.setAttribute('cx', f1(vx * 0.6)); sun.setAttribute('cy', f1(hy - 6)); sun.setAttribute('r', (130 * (1 + 0.025 * kick + 0.02 * env)).toFixed(1));
-      stripes.forEach((r, j) => { r.setAttribute('y', f1(hy - 60 + j * 17 + 8 * Math.sin(phase * 0.6 + j))); });
+      stripes.forEach((r, j) => { r.setAttribute('y', f1(hy - 60 + j * 17 + (3 + 18 * XV.y) * Math.sin(phase * 0.6 + j))); });
       city.setAttribute('transform', 'translate(' + f1(vx * 0.35) + ' ' + f1(hy + 1) + ')'); wins.setAttribute('transform', 'translate(' + f1(vx * 0.35) + ' ' + f1(hy + 1) + ')');
       ground.setAttribute('y', f1(hy));
+      for (let n = 0; n < 3; n++) {
+        hg[n].setAttribute('stroke-opacity', Math.min(0.6, (0.12 + 0.1 * n) * (0.4 + 1.4 * XV.x)).toFixed(2));
+        hc[n].setAttribute('stroke-opacity', Math.min(1, (0.3 + 0.3 * n) * (0.5 + 1.0 * XV.x)).toFixed(2));
+      }
       vg.setAttribute('y1', f1(hy)); vg.setAttribute('y2', B);
       const N = 13, hd = ['', '', ''];
       for (let i = 0; i < N; i++) {
@@ -1662,6 +1673,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       phase += dt * (0.5 + 1.8 * env + 1.2 * kick) * ACT;
+      xvStep(dt);
       draw(dt, env, kick);
     }
     draw(0, 0, 0);
@@ -1681,13 +1693,13 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       const col = COL[i % 3];
       if (o) el.style.stroke = col; else el.style.fill = col;
       el.style.opacity = o ? 0.9 : 0.78;
-      discs.push({ el, r, x: rnd(-190, 190), y: rnd(-400, 400), vx: rnd(-9, 9), vy: rnd(-9, 9), pop: 0 });
+      discs.push({ el, o: o ? 0.9 : 0.78, r, x: rnd(-190, 190), y: rnd(-400, 400), vx: rnd(-9, 9), vy: rnd(-9, 9), pop: 0 });
     }
     const flashes = [];
     function flash(i, vel) {
       const el = se('circle', { class: 'rs-c', r: 10 });
       el.style.fill = '#F2EBDC';
-      flashes.push({ el, x: FP.vx, y: FP.vy, r: 24 + 70 * vel, age: 0, col: COL[i % 3] });
+      flashes.push({ el, x: FP.vx, y: FP.vy, r: 24 + 70 * vel, age: 0, life: 0.6 + 1.6 * XV.y, col: COL[i % 3] });
       const near = discs.reduce((m, d) => Math.hypot(d.x - FP.vx, d.y - FP.vy) < Math.hypot(m.x - FP.vx, m.y - FP.vy) ? d : m, discs[0]);
       near.pop = 1;
     }
@@ -1700,10 +1712,11 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
         d.pop = Math.max(0, d.pop - dt * 2.2);
         const k = 1 + 0.1 * kick + 0.22 * d.pop + 0.05 * env;
         d.el.setAttribute('cx', d.x.toFixed(1)); d.el.setAttribute('cy', d.y.toFixed(1)); d.el.setAttribute('r', (d.r * k).toFixed(1));
+        d.el.style.opacity = Math.min(1, d.o * (0.55 + 0.9 * XV.x)).toFixed(2);
       }
       for (let q = flashes.length - 1; q >= 0; q--) {
         const f = flashes[q]; f.age += dt;
-        const u = f.age / 1.1;
+        const u = f.age / f.life;
         if (u >= 1) { f.el.remove(); flashes.splice(q, 1); continue; }
         f.el.style.fill = u < 0.12 ? '#F2EBDC' : f.col;
         f.el.setAttribute('cx', f.x.toFixed(1)); f.el.setAttribute('cy', f.y.toFixed(1)); f.el.setAttribute('r', (f.r * (0.6 + 0.7 * Math.sqrt(u))).toFixed(1));
@@ -1717,6 +1730,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       if (now - lastDraw < (busy ? 16 : 42)) return;
       const dt = Math.min(0.1, (now - last) / 1000) * (0.6 + 1.6 * env) * ACT;
       last = lastDraw = now;
+      xvStep(0.03);
       draw(dt, env, kick);
     }
     draw(0, 0, 0);
@@ -1725,7 +1739,8 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
   }
 
   function buildMandala() {
-    // the flower is back, without the button and the step ring: five layers of petals, each deeper layer bigger and slower, bloom across the whole screen, shift in parallax with the finger and light up around it as a gradient
+    // the flower in five layers of petals. Everything breathes: each petal sways on its own phase, the layers turn at the speed of the music, a note sends a wave of swelling out from the centre and echo rings from the finger.
+    // x = brightness and spin (the filter), y = how many echo rings follow a note (the echo). The finger also pulls a glow and shifts the layers in parallax.
     const defs = se('defs');
     const rg = se('radialGradient', { id: 'mdglow', gradientUnits: 'userSpaceOnUse', cx: 0, cy: 0, r: 300 }, defs);
     se('stop', { offset: 0, class: 'md-g0' }, rg); se('stop', { offset: 1, class: 'md-g1' }, rg);
@@ -1734,44 +1749,71 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       'C' + (-w * 0.8) + ' ' + (-r0 - len * 0.75) + ' ' + (-w) + ' ' + (-r0 - len * 0.25) + ' 0 ' + (-r0);
     const LAY = [[16, 90, 17, 12], [64, 130, 24, 16], [134, 170, 30, 20], [234, 200, 36, 24], [354, 240, 42, 28]];
     const layers = LAY.map(([r0, len, w, n], li) => {
-      const par = se('g'), bloom = se('g', {}, par), spin = se('g', { class: 'md-spin ' + 'abc'[li % 3] }, bloom);
-      spin.style.animationDirection = li % 2 ? 'reverse' : 'normal';
-      const d = petal(r0, len, w), off = li * 18;
+      const par = se('g'), bloom = se('g', {}, par), spin = se('g', {}, bloom);
+      const d = petal(r0, len, w), off = li * 18, ps = [];
       for (let i = 0; i < n; i++) {
-        const p = se('path', { class: 'mf', d, transform: 'rotate(' + (i * 360 / n + (li % 2 ? 180 / n : 0)).toFixed(2) + ')' }, spin);
-        p.style.fill = 'hsl(calc(var(--hue, 38) + ' + off + ') 100% 62% / ' + (0.09 + 0.02 * li) + ')';
-        p.style.stroke = 'hsl(calc(var(--hue, 38) + ' + off + ') 100% 72% / ' + (0.3 + 0.07 * li) + ')';
-        p.style.strokeWidth = 1.2;
+        const el = se('path', { class: 'mf', d }, spin);
+        el.style.fill = 'hsl(calc(var(--hue, 38) + ' + off + ') 100% 62% / ' + (0.09 + 0.02 * li) + ')';
+        el.style.stroke = 'hsl(calc(var(--hue, 38) + ' + off + ') 100% 72% / ' + (0.3 + 0.07 * li) + ')';
+        el.style.strokeWidth = 1.2;
+        ps.push({ el, a: i * 360 / n + (li % 2 ? 180 / n : 0), ph: i * 0.62 + li * 1.7 });
       }
-      return { par, bloom, depth: 0.25 + li * 0.2, open: 0 };
+      return { par, bloom, spin, ps, depth: 0.25 + li * 0.2, ang: li * 17, dir: li % 2 ? -1 : 1, sp: 0.05 + 0.012 * (4 - li) };
     });
-    let gx = 0, gy = 0, open = 0, pulse = 0, last = 0, raf = 0, dead = false;
-    function draw(env) {
+    const rip = [];
+    let gx = 0, gy = 0, open = 0, T = 0, noteT = -9, last = 0, raf = 0, dead = false;
+    function echoRing(delay, a) {
+      rip.push({ el: null, age: -delay, a });
+    }
+    function draw(dt, env, kick) {
+      const on = seq || cur, bright = 0.6 + 0.8 * XV.x, spin = (0.5 + 1.5 * XV.x) * (1 + 2.5 * env + 1.5 * kick);
+      T += dt;
+      const since = performance.now() / 1000 - noteT;
       layers.forEach((L, li) => {
-        const o = Math.max(0, Math.min(1, open * 1.4 - li * 0.12));        // the layers open one after another from the middle out
-        const k = (0.18 + 0.82 * o) * (1 + 0.025 * pulse * (li + 1) / 5 + 0.012 * env);
+        const o = Math.max(0, Math.min(1, open * 1.4 - li * 0.12));
+        const age = since - li * 0.07, pl = age > 0 ? Math.exp(-age * 3.5) * Math.min(1, age * 25) : 0;   // the swell travels outwards layer by layer
+        const k = (0.18 + 0.82 * o) * (1 + 0.035 * Math.sin(T * 0.9 + li) + 0.06 * pl + 0.012 * env);
+        L.ang += L.dir * L.sp * spin * dt * 57.3;
+        L.spin.setAttribute('transform', 'rotate(' + L.ang.toFixed(2) + ')');
         L.bloom.setAttribute('transform', 'scale(' + k.toFixed(3) + ')');
-        L.bloom.setAttribute('opacity', (0.15 + 0.85 * o).toFixed(2));
+        L.bloom.setAttribute('opacity', Math.min(1, (0.15 + 0.85 * o) * bright).toFixed(2));
         L.par.setAttribute('transform', 'translate(' + (-gx * 0.22 * L.depth).toFixed(1) + ' ' + (-gy * 0.22 * L.depth).toFixed(1) + ')');
+        const sw = 3.5 + 4 * pl + 2 * env;
+        for (let i = 0; i < L.ps.length; i++) {
+          const q = L.ps[i], sn = Math.sin(T * 0.8 + q.ph);
+          q.el.setAttribute('transform', 'rotate(' + (q.a + sw * sn).toFixed(2) + ') scale(1 ' + (1 + 0.05 * Math.sin(T * 1.1 + q.ph * 1.3) + 0.12 * pl).toFixed(3) + ')');
+        }
       });
-      rg.setAttribute('cx', gx.toFixed(1)); rg.setAttribute('cy', gy.toFixed(1)); rg.setAttribute('r', (210 + 120 * env + 60 * pulse).toFixed(0));
-      glow.style.opacity = (0.55 + 0.45 * Math.min(1, env * 1.5 + pulse * 0.5)).toFixed(2);
+      rg.setAttribute('cx', gx.toFixed(1)); rg.setAttribute('cy', gy.toFixed(1)); rg.setAttribute('r', (210 + 120 * env + 70 * kick).toFixed(0));
+      glow.style.opacity = (0.55 + 0.45 * Math.min(1, env * 1.5 + kick * 0.5)).toFixed(2);
+      for (let q = rip.length - 1; q >= 0; q--) {
+        const r = rip[q]; r.age += dt;
+        if (r.age < 0) continue;
+        if (!r.el) { r.el = se('circle', { cx: f1(FP.vx), cy: f1(FP.vy), r: 6, fill: 'none', 'stroke-width': 1.6 }); r.el.style.stroke = 'hsl(calc(var(--hue, 38) + 20) 100% 78%)'; }
+        const u = r.age / 1.7;
+        if (u >= 1) { r.el.remove(); rip.splice(q, 1); continue; }
+        r.el.setAttribute('r', (6 + 330 * Math.sqrt(u)).toFixed(1)); r.el.setAttribute('stroke-opacity', (r.a * (1 - u)).toFixed(2));
+      }
     }
     function frame(now) {
       if (dead) return;
       raf = requestAnimationFrame(frame);
       const env = Math.max(0, litN) / 60, on = seq || cur;
-      if (now - last < (on || kick > 0.01 ? 16 : 33)) return;
-      const dt = Math.min(0.1, (now - last) / 1000);
+      if (now - last < (on || kick > 0.01 || rip.length ? 16 : 24)) return;
+      const dt = Math.min(0.1, (now - last) / 1000) * ACT;
       last = now;
-      pulse = Math.max(0, pulse - dt * 1.8);
-      open += ((on ? 1 : 0.6) - open) * Math.min(1, dt * (on ? 1.6 : 0.5));
+      xvStep(dt);
+      open += ((on ? 1 : 0.65) - open) * Math.min(1, dt * (on ? 1.8 : 0.6));
       gx += (FP.vx - gx) * Math.min(1, dt * 5); gy += (FP.vy - gy) * Math.min(1, dt * 5);
-      draw(env);
+      draw(dt, env, kick);
     }
-    open = 0.4; draw(0);
-    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = performance.now(); raf = requestAnimationFrame(frame); } else { open = 1; draw(0); }
-    SK.note = () => { pulse = 1; };
+    open = 0.4; draw(0.016, 0, 0);
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = performance.now(); raf = requestAnimationFrame(frame); } else { open = 1; draw(0.016, 0, 0); }
+    SK.note = () => {
+      noteT = performance.now() / 1000;
+      const n = 1 + Math.round(2.4 * XV.y);                    // more echo, more rings
+      for (let k = 0; k < n; k++) echoRing(k * 0.24, 0.55 * Math.pow(0.6, k));
+    };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
   }
 
@@ -1794,13 +1836,14 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
           for (let q = 0; q < pulses.length; q++) {
             const pu = pulses[q], pos = Math.abs(j - pu.r0) - pu.p;
             if (pos > -6 && pos < 6) {
-              const sx = 14 + pu.p * 1.4;
-              h += pu.a * 34 * Math.exp(-(pos * pos) / 9.7) * Math.exp(-((x - pu.x) * (x - pu.x)) / (2 * sx * sx)) * Math.exp(-pu.p / 18);
+              const sx = (14 + pu.p * 1.4) * (1.5 - 0.9 * XV.y);
+              h += pu.a * 34 * (0.6 + 1.1 * XV.y) * Math.exp(-(pos * pos) / 9.7) * Math.exp(-((x - pu.x) * (x - pu.x)) / (2 * sx * sx)) * Math.exp(-pu.p / 18);
             }
           }
           d += (m ? 'L' : 'M') + f1(x) + ' ' + f1(y - h);
         }
         lines[j].setAttribute('d', d + 'L' + X1 + ' 480L' + X0 + ' 480Z');
+        lines[j].setAttribute('stroke-opacity', Math.min(1, (0.25 + 0.75 * j / (N - 1)) * (0.55 + 0.9 * XV.x)).toFixed(2));
       }
     }
     function frame(now) {
@@ -1812,6 +1855,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       last = lastDraw = now;
       tt += dt * (0.8 + 2.5 * env + 1.5 * kick) * ACT;
       for (let q = pulses.length - 1; q >= 0; q--) { pulses[q].p += dt * 26; if (pulses[q].p > 34) pulses.splice(q, 1); }
+      xvStep(dt);
       draw(env);
     }
     draw(0.2);
@@ -1867,9 +1911,16 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     function tick() { step(); draw(); lastStep = performance.now(); }
     soup(0.1); draw();
     const timer = setInterval(() => { if (performance.now() - lastStep > 420) tick(); }, 500);
-    SK.note = (i, vel) => { spawn(vel); tick(); };
-    SK.frame = (t, env, kick) => { bins[3].style.strokeWidth = (13 + 4 * kick).toFixed(1); };
-    SK.dispose = () => clearInterval(timer);
+    let alive = true;
+    // y is the echo: the more of it, the more copies of the glider follow the note
+    SK.note = (i, vel) => {
+      spawn(vel); tick();
+      const n = XV.y > 0.7 ? 2 : XV.y > 0.4 ? 1 : 0;
+      for (let k = 1; k <= n; k++) setTimeout(() => { if (alive) spawn(vel * 0.8); }, 170 * k);
+    };
+    SK.xy = xy => skinSvg.style.setProperty('--lh', (xy.nx * 45).toFixed(0));   // x is the pitch: the colour slides from cold to hot
+    SK.frame = (t, env, kick) => { xvStep(0.03); bins[3].style.strokeWidth = (13 + 4 * kick).toFixed(1); };
+    SK.dispose = () => { alive = false; clearInterval(timer); };
   }
 
   function buildMatrix() {
@@ -1878,12 +1929,12 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     const bins = [0, 1, 2, 3, 4].map(n => se('path', { class: 'mx mx' + n, d: '' }));
     // rings run out of the finger, two slow interference waves shimmer across the whole field, so nothing is ever dark or empty
     function draw(t, env, kick) {
-      const gain = 0.8 + 0.5 * env + 0.5 * kick, ds = ['', '', '', '', ''];
+      const gain = (0.8 + 0.5 * env + 0.5 * kick) * (1 + 0.8 * XV.y), ds = ['', '', '', '', ''], lv = 2 + Math.round(3 * XV.x), sharp = 1 + 2.5 * XV.y;
       for (let n = 0; n < dots.length; n++) {
         const q = dots[n], d = Math.hypot(q[0] - FP.vx, q[1] - FP.vy);
         const w = 0.34 * (0.5 + 0.5 * Math.cos(d / 24 - t * 2.4)) + 0.33 * (0.5 + 0.5 * Math.sin(q[0] * 0.021 + q[1] * 0.012 + t * 0.9)) + 0.33 * (0.5 + 0.5 * Math.sin(q[1] * 0.017 - q[0] * 0.013 - t * 0.6));
-        const s = Math.min(1, w * gain);
-        ds[s < 0.2 ? 0 : s < 0.38 ? 1 : s < 0.55 ? 2 : s < 0.72 ? 3 : 4] += 'M' + q[0] + ' ' + q[1] + 'h0';
+        const s = Math.min(0.999, Math.pow(w, sharp) * gain);
+        ds[Math.round(Math.min(lv - 1, Math.floor(s * lv)) * 4 / (lv - 1))] += 'M' + q[0] + ' ' + q[1] + 'h0';
       }
       bins.forEach((b, n) => b.setAttribute('d', ds[n]));
     }
@@ -1896,6 +1947,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       const dt = Math.min(0.1, (now - last) / 1000);
       last = lastDraw = now;
       tt += dt * (0.7 + 2.2 * env + 1.5 * kick) * ACT;
+      xvStep(dt);
       draw(tt, env, kick);
     }
     draw(0, 0.1, 0);
