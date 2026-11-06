@@ -356,13 +356,27 @@ html[data-skin="ridges"] .go { inset: 33%; }
 /* no button and no sequencer ring in scope, topo, matrix and ridges: the waves start at the finger. amber, riso and mandala keep the button */
 html[data-skin="scope"] .go, html[data-skin="topo"] .go, html[data-skin="matrix"] .go, html[data-skin="ridges"] .go { display: none; }
 html[data-skin="topo"] .ring, html[data-skin="matrix"] .ring, html[data-skin="ridges"] .ring { display: none; }
-html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
-html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
+html[data-skin="amber"] .dial, html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
+html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
+/* amber: night drive towards a sunset, neon grid road */
+.nd-s0 { stop-color: hsl(var(--hue, 28) 45% 3%); } .nd-s1 { stop-color: hsl(calc(var(--hue, 28) - 12) 80% 13%); } .nd-s2 { stop-color: hsl(calc(var(--hue, 28) - 4) 100% 34%); }
+.nd-u0 { stop-color: hsl(calc(var(--hue, 28) + 24) 100% 68%); } .nd-u1 { stop-color: hsl(calc(var(--hue, 28) - 22) 100% 52%); }
+.nd-g0 { stop-color: hsl(var(--hue, 28) 70% 7%); } .nd-g1 { stop-color: hsl(var(--hue, 28) 50% 2%); }
+.nd-city { fill: hsl(var(--hue, 28) 45% 3%); }
+.nd-win { fill: hsl(var(--hue, 28) 100% 72%); }
+.nd-glow { fill: none; stroke: hsl(var(--hue, 28) 100% 55%); stroke-width: 4.5; stroke-opacity: .2; stroke-linecap: round; }
+.nd-core { fill: none; stroke: hsl(var(--hue, 28) 100% 72%); stroke-width: 1.2; stroke-linecap: round; }
+.nd-v { stroke: url(#ndv); stroke-width: 1.2; }
+.nd-p { fill: none; stroke: hsl(calc(var(--hue, 28) + 30) 100% 82%); stroke-linecap: round; }
+.nd-vs0 { stop-color: hsl(var(--hue, 28) 100% 60%); stop-opacity: 0; } .nd-vs1 { stop-color: hsl(var(--hue, 28) 100% 66%); stop-opacity: .75; }
+/* mandala: a flower in layers, blooming across the whole screen */
+.mf { stroke-linejoin: round; }
 /* riso: flat overprinted discs of different sizes */
 .rs-c { mix-blend-mode: screen; }
 .rs-c.o { fill: none !important; stroke-width: 3; }
 /* mandala: one endless line, drawn by three turning arms and repeated six times */
 /* line width follows --mdw */
+.md-g0 { stop-color: hsl(var(--hue, 38) 100% 50%); stop-opacity: .42; } .md-g1 { stop-color: hsl(var(--hue, 38) 100% 40%); stop-opacity: 0; }
 .md-t { stroke-width: var(--mdw, 1.1); fill: none; stroke: hsl(var(--hue, 38) 80% 68%); stroke-linecap: round; stroke-linejoin: round; }
 /* scope: Conway's Game of Life; age sets size and brightness */
 .lf { fill: none; stroke-linecap: round; }
@@ -1535,6 +1549,86 @@ html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-ski
     SK.beat = ripple; SK.touch = ripple;   // a ripple leaves the finger on every LFO beat and when you touch down
   }
 
+  function buildAmber() {
+    // night drive: a neon grid road runs into a striped sun behind a skyline; the road bends towards the finger, every note sends a bright bar down it
+    const mk = (tag, a, par) => se(tag, a, par);
+    const defs = mk('defs');
+    const lg = (id, x2, y2, cls, stops) => { const g = mk('linearGradient', { id, x1: 0, y1: 0, x2, y2 }, defs); stops.forEach((st, i) => mk('stop', { offset: st, class: cls[i] }, g)); return g; };
+    lg('ndsky', 0, 1, ['nd-s0', 'nd-s1', 'nd-s2'], [0, 0.6, 1]);
+    lg('ndsun', 0, 1, ['nd-u0', 'nd-u1'], [0, 1]);
+    lg('ndgr', 0, 1, ['nd-g0', 'nd-g1'], [0, 1]);
+    const vg = mk('linearGradient', { id: 'ndv', gradientUnits: 'userSpaceOnUse', x1: 0, y1: -90, x2: 0, y2: 430 }, defs);
+    mk('stop', { offset: 0, 'stop-color': '#fff', 'stop-opacity': 0 }, vg); mk('stop', { offset: 1, 'stop-color': '#fff', 'stop-opacity': 0 }, vg);
+    vg.children[0].setAttribute('class', 'nd-vs0'); vg.children[1].setAttribute('class', 'nd-vs1');
+    const mask = mk('mask', { id: 'ndm' }, defs);
+    mk('rect', { x: -300, y: -500, width: 600, height: 1000, fill: '#fff' }, mask);
+    mk('rect', { x: -2000, y: -520, width: 4000, height: 520, fill: 'url(#ndsky)' });
+    const sun = mk('circle', { r: 130, fill: 'url(#ndsun)', mask: 'url(#ndm)' });
+    const stripes = [];
+    for (let j = 0; j < 6; j++) stripes.push(mk('rect', { x: -300, width: 600, height: 3 + j * 2.4, fill: '#000' }, mask));
+    const city = mk('path', { class: 'nd-city', d: '' });
+    const wins = mk('path', { class: 'nd-win', d: '', 'stroke-width': 2.4, 'stroke-linecap': 'round', fill: 'none', stroke: 'currentColor' });
+    wins.removeAttribute('stroke'); wins.setAttribute('class', 'nd-win nd-wins');
+    const ground = mk('rect', { x: -2000, width: 4000, height: 2000, fill: 'url(#ndgr)' });
+    const hg = [0, 1, 2].map(n => mk('path', { class: 'nd-glow', d: '', 'stroke-opacity': (0.12 + 0.1 * n).toFixed(2) }));
+    const hc = [0, 1, 2].map(n => mk('path', { class: 'nd-core', d: '', 'stroke-opacity': (0.3 + 0.3 * n).toFixed(2), 'stroke-width': (0.8 + 0.5 * n).toFixed(1) }));
+    const vl = mk('path', { class: 'nd-v', d: '' });
+    const bars = [];
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    // skyline and a few lit windows, built once around x = 0 and shifted with the vanishing point
+    let cd = 'M-420 0', wd = '';
+    for (let x = -420; x < 420;) {
+      const w = rnd(14, 34), h = rnd(10, 70) * (Math.abs(x) < 150 ? 1 : 1.5);
+      cd += 'L' + x + ' ' + (-h) + 'L' + (x + w) + ' ' + (-h);
+      if (Math.random() < 0.5) wd += 'M' + f1(x + w * 0.4) + ' ' + f1(-h * rnd(0.2, 0.9)) + 'h0';
+      x += w;
+    }
+    city.setAttribute('d', cd + 'L420 0Z'); wins.setAttribute('d', wd);
+    const WS = 0.6, HS = 0.7;
+    let vx = 0, hy = -90, phase = 0, last = 0, raf = 0, dead = false;
+    const hy0 = -90, B = 430;
+    function draw(dt, env, kick) {
+      const tx = FP.down ? FP.vx * 0.55 : vx * 0.97, ty = hy0 + (FP.down ? FP.vy * 0.12 : (hy - hy0) * 0.97);
+      vx += (tx - vx) * Math.min(1, dt * 4); hy += (ty - hy) * Math.min(1, dt * 4);
+      sun.setAttribute('cx', f1(vx * 0.6)); sun.setAttribute('cy', f1(hy - 6)); sun.setAttribute('r', (130 * (1 + 0.025 * kick + 0.02 * env)).toFixed(1));
+      stripes.forEach((r, j) => { r.setAttribute('y', f1(hy - 60 + j * 17 + 8 * Math.sin(phase * 0.6 + j))); });
+      city.setAttribute('transform', 'translate(' + f1(vx * 0.35) + ' ' + f1(hy + 1) + ')'); wins.setAttribute('transform', 'translate(' + f1(vx * 0.35) + ' ' + f1(hy + 1) + ')');
+      ground.setAttribute('y', f1(hy));
+      vg.setAttribute('y1', f1(hy)); vg.setAttribute('y2', B);
+      const N = 13, hd = ['', '', ''];
+      for (let i = 0; i < N; i++) {
+        const f = ((i + phase) % N) / N, y = hy + (B - hy) * f * f * f, bn = f < 0.34 ? 0 : f < 0.67 ? 1 : 2;
+        const half = 14 + (y - hy) * 2.6;
+        hd[bn] += 'M' + f1(vx - half) + ' ' + f1(y) + 'H' + f1(vx + half);
+      }
+      for (let n = 0; n < 3; n++) { hg[n].setAttribute('d', hd[n]); hc[n].setAttribute('d', hd[n]); }
+      let vd = '';
+      for (let k = -8; k <= 8; k++) vd += 'M' + f1(vx) + ' ' + f1(hy) + 'L' + f1(vx + k * 95 * 1.0) + ' ' + B + 'L' + f1(vx + k * 95) + ' ' + B;
+      vl.setAttribute('d', vd);
+      for (let q = bars.length - 1; q >= 0; q--) {
+        const b = bars[q]; b.f += dt * (0.55 + 0.5 * b.a);
+        if (b.f >= 1) { b.el.remove(); bars.splice(q, 1); continue; }
+        const y = hy + (B - hy) * b.f * b.f * b.f, half = 14 + (y - hy) * 2.6;
+        b.el.setAttribute('d', 'M' + f1(vx - half) + ' ' + f1(y) + 'H' + f1(vx + half));
+        b.el.setAttribute('stroke-width', (1 + 4 * b.f * b.a).toFixed(1)); b.el.setAttribute('stroke-opacity', (0.95 * Math.min(1, b.f * 4) * (1 - b.f * 0.3)).toFixed(2));
+      }
+    }
+    function frame(now) {
+      if (dead) return;
+      raf = requestAnimationFrame(frame);
+      const env = Math.max(0, litN) / 60;
+      if (now - last < (seq || cur || kick > 0.01 ? 16 : 33)) return;
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      phase += dt * (0.5 + 1.8 * env + 1.2 * kick) * ACT;
+      draw(dt, env, kick);
+    }
+    draw(0, 0, 0);
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = performance.now(); raf = requestAnimationFrame(frame); }
+    SK.note = (i, vel) => bars.push({ el: mk('path', { class: 'nd-p', d: '' }), f: 0, a: 0.5 + 0.5 * vel });
+    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
+  }
+
   function buildRiso() {
     // flat overprinted discs of many sizes drift about; every note flashes one at the finger, the kick makes them all swell
     const COL = ['hsl(calc(var(--rh) + 0) 100% 62%)', 'hsl(calc(var(--rb)) 100% 62%)', 'hsl(calc(var(--rh) + 70) 100% 62%)'];
@@ -1590,52 +1684,52 @@ html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-ski
   }
 
   function buildMandala() {
-    // one endless line: three turning arms (epicycles) with slowly drifting speeds draw a curve that never closes; the last few seconds stay visible and fade, and the whole picture is repeated six times
-    const N = 480, CH = 4, per = N / CH;
-    const AM = [112, 70, 34], W0 = [1, -2.6, 5.3], th = [0, 1.3, 2.1];
-    const g = se('g', { id: 'mdg' });
-    const paths = [];
-    for (let c = 0; c < CH; c++) paths.push(se('path', { class: 'md-t', d: '', 'stroke-opacity': (0.12 + 0.88 * (c + 1) / CH).toFixed(2) }, g));
-    for (let k = 1; k < 6; k++) { const u = se('use', { transform: 'rotate(' + (k * 60) + ')' }); u.setAttribute('href', '#mdg'); skinSvg.appendChild(u); }
-    const pts = [];
-    let T = 0, last = 0, lastDraw = 0, raf = 0, dead = false, pulse = 0;
-    function pen(dtt) {
-      T += dtt;
-      let x = 0, y = 0;
-      for (let i = 0; i < 3; i++) {
-        th[i] += (W0[i] + 0.35 * Math.sin(T * 0.07 + i * 2.1)) * dtt;
-        x += AM[i] * Math.cos(th[i]); y += AM[i] * Math.sin(th[i]);
+    // the flower is back, without the button and the step ring: five layers of petals, each deeper layer bigger and slower, bloom across the whole screen, shift in parallax with the finger and light up around it as a gradient
+    const defs = se('defs');
+    const rg = se('radialGradient', { id: 'mdglow', gradientUnits: 'userSpaceOnUse', cx: 0, cy: 0, r: 300 }, defs);
+    se('stop', { offset: 0, class: 'md-g0' }, rg); se('stop', { offset: 1, class: 'md-g1' }, rg);
+    const glow = se('rect', { x: -2000, y: -2000, width: 4000, height: 4000, fill: 'url(#mdglow)' });
+    const petal = (r0, len, w) => 'M0 ' + (-r0) + 'C' + w + ' ' + (-r0 - len * 0.25) + ' ' + (w * 0.8) + ' ' + (-r0 - len * 0.75) + ' 0 ' + (-r0 - len) +
+      'C' + (-w * 0.8) + ' ' + (-r0 - len * 0.75) + ' ' + (-w) + ' ' + (-r0 - len * 0.25) + ' 0 ' + (-r0);
+    const LAY = [[16, 90, 17, 12], [64, 130, 24, 16], [134, 170, 30, 20], [234, 200, 36, 24], [354, 240, 42, 28]];
+    const layers = LAY.map(([r0, len, w, n], li) => {
+      const par = se('g'), bloom = se('g', {}, par), spin = se('g', { class: 'md-spin ' + 'abc'[li % 3] }, bloom);
+      spin.style.animationDirection = li % 2 ? 'reverse' : 'normal';
+      const d = petal(r0, len, w), off = li * 18;
+      for (let i = 0; i < n; i++) {
+        const p = se('path', { class: 'mf', d, transform: 'rotate(' + (i * 360 / n + (li % 2 ? 180 / n : 0)).toFixed(2) + ')' }, spin);
+        p.style.fill = 'hsl(calc(var(--hue, 38) + ' + off + ') 100% 62% / ' + (0.09 + 0.02 * li) + ')';
+        p.style.stroke = 'hsl(calc(var(--hue, 38) + ' + off + ') 100% 72% / ' + (0.3 + 0.07 * li) + ')';
+        p.style.strokeWidth = 1.2;
       }
-      pts.push(x, y);
-      if (pts.length > N * 2) pts.splice(0, 2);
+      return { par, bloom, depth: 0.25 + li * 0.2, open: 0 };
+    });
+    let gx = 0, gy = 0, open = 0, pulse = 0, last = 0, raf = 0, dead = false;
+    function draw(env) {
+      layers.forEach((L, li) => {
+        const o = Math.max(0, Math.min(1, open * 1.4 - li * 0.12));        // the layers open one after another from the middle out
+        const k = (0.18 + 0.82 * o) * (1 + 0.025 * pulse * (li + 1) / 5 + 0.012 * env);
+        L.bloom.setAttribute('transform', 'scale(' + k.toFixed(3) + ')');
+        L.bloom.setAttribute('opacity', (0.15 + 0.85 * o).toFixed(2));
+        L.par.setAttribute('transform', 'translate(' + (-gx * 0.22 * L.depth).toFixed(1) + ' ' + (-gy * 0.22 * L.depth).toFixed(1) + ')');
+      });
+      rg.setAttribute('cx', gx.toFixed(1)); rg.setAttribute('cy', gy.toFixed(1)); rg.setAttribute('r', (210 + 120 * env + 60 * pulse).toFixed(0));
+      glow.style.opacity = (0.55 + 0.45 * Math.min(1, env * 1.5 + pulse * 0.5)).toFixed(2);
     }
-    function draw() {
-      const n = pts.length / 2;
-      for (let c = 0; c < CH; c++) {
-        let d = '';
-        const a = Math.max(0, n - (CH - c) * per - 1), b = Math.min(n, n - (CH - 1 - c) * per);
-        for (let i = a; i < b; i++) d += (i === a ? 'M' : 'L') + f1(pts[i * 2]) + ' ' + f1(pts[i * 2 + 1]);
-        paths[c].setAttribute('d', d);
-      }
-      const k = 0.84 * (1 + 0.05 * pulse);
-      g.setAttribute('transform', 'scale(' + k.toFixed(3) + ')');
-      skinSvg.style.setProperty('--mdw', (1.1 + 1.4 * pulse).toFixed(2));
-    }
-    for (let i = 0; i < N; i++) pen(0.012);
-    draw();
     function frame(now) {
       if (dead) return;
       raf = requestAnimationFrame(frame);
-      const env = Math.max(0, litN) / 60;
-      if (now - lastDraw < (seq || cur || kick > 0.01 ? 16 : 33)) return;
+      const env = Math.max(0, litN) / 60, on = seq || cur;
+      if (now - last < (on || kick > 0.01 ? 16 : 33)) return;
       const dt = Math.min(0.1, (now - last) / 1000);
-      last = lastDraw = now;
-      pulse = Math.max(0, pulse - dt * 1.6);
-      const sp = dt * (0.5 + 0.9 * env + 0.8 * pulse) * ACT;
-      for (let i = 0; i < 4; i++) pen(sp / 4 * 2.4);
-      draw();
+      last = now;
+      pulse = Math.max(0, pulse - dt * 1.8);
+      open += ((on ? 1 : 0.6) - open) * Math.min(1, dt * (on ? 1.6 : 0.5));
+      gx += (FP.vx - gx) * Math.min(1, dt * 5); gy += (FP.vy - gy) * Math.min(1, dt * 5);
+      draw(env);
     }
-    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = lastDraw = performance.now(); raf = requestAnimationFrame(frame); }
+    open = 0.4; draw(0);
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = performance.now(); raf = requestAnimationFrame(frame); } else { open = 1; draw(0); }
     SK.note = () => { pulse = 1; };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
   }
@@ -1858,7 +1952,7 @@ html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-ski
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
     else root.style.removeProperty('--accent');
-    ({ riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges }[name] || (() => {}))();
+    ({ amber: buildAmber, riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges }[name] || (() => {}))();
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
