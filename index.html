@@ -1136,13 +1136,16 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     return { midi: s.pool[s.idx], vel: Math.random() < 0.25 ? 1 : rnd(0.62, 0.85) };
   }
 
+  let carry = null, handoffMac = false;   // set when a swipe passes a held press on to the next world: tempo, key and scale carry over
   function makeSeq() {
-    const bpm = Math.round(rnd(BPM_MIN, BPM_MAX));
-    const root = Math.floor(Math.random() * 12);
+    const bpm = carry ? carry.bpm : Math.round(rnd(BPM_MIN, BPM_MAX));
+    const root = carry ? carry.root : Math.floor(Math.random() * 12);
+    const same = list => (carry && list.filter(x => x.name === carry.sc)[0]) || pick(list);
     const skin = document.documentElement.dataset.skin, dubOn = skin === 'mandala';
     const RISO_SCALES = ['MAJOR', 'MINOR', 'DORIAN', 'MIXOLYDIAN'];
     const ACID_SCALES = ['MINOR', 'PHRYGIAN', 'HARM MINOR', 'MIN PENTA', 'BLUES', 'DORIAN'];
-    const sc = skin === 'ridges' ? pick(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? pick(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? pick(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : pick(SCALES);
+    const sc = skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
+    carry = null;
     const pool = [];
     for (let m = LOW; m <= HIGH; m++) {
       if (sc.iv.indexOf(((m - root) % 12 + 12) % 12) !== -1) pool.push(m);
@@ -1212,7 +1215,14 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     seq = makeSeq();
     setAccent(tapPatch, characterOf(seq, tapPatch));
     if (seq.cont) { cont = CONT[seq.cont](seq); startMod(); }
-    applyXY(XY.nx, XY.ny);        // the press starts where the finger is
+    // a fresh press starts from the finger; a press that continues after a swipe keeps the macros and glides to the new axes
+    clearInterval(glideTimer); glide = null;
+    if (handoffMac) {
+      handoffMac = false;
+      glide = { t0: performance.now(), from: Object.assign({}, MAC) };
+      glideTimer = setInterval(() => { if (!glide) { clearInterval(glideTimer); return; } applyXY(XY.nx, XY.ny); }, 60);
+    } else for (const m in MAC) MAC[m] = 0;
+    applyXY(XY.nx, XY.ny);
     renderPattern(seq);
     retireLfo(prev);
     const now = ctx.currentTime;
@@ -1242,29 +1252,48 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
        matrix   x crush depth                    y filter focus (resonance)
        ridges   x cutoff                         y resonance: the acid pair */
   const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
+  // The axes do not poke at one world's knobs, they set five shared macros (cut, res, echo, space, color); every world turns them into its own sound.
+  // When you swipe to another world with the finger down, the macros stay and glide to the new axes over 1.5 s, so the modulation carries over.
+  const AXES = {
+    amber:   { x: ['cut'],   y: ['color'] },
+    mandala: { x: ['echo'],  y: ['cut', 'res'] },
+    riso:    { x: ['cut'],   y: ['space'] },
+    scope:   { x: ['color'], y: ['echo'] },
+    topo:    { x: ['cut'],   y: ['color', 'space'] },
+    matrix:  { x: ['color'], y: ['res'] },
+    ridges:  { x: ['cut'],   y: ['res'] }
+  };
+  const MAC = { cut: 0, res: 0, echo: 0, space: 0, color: 0 };   // -1..1 around the press patch
+  let glide = null, glideTimer = 0;
   function applyXY(nx, ny) {
+    const ax = AXES[skin];
+    if (!ax) return;
+    const g = glide;
+    let k = 1;
+    if (g) { k = Math.min(1, (performance.now() - g.t0) / 1500); k = k * k * (3 - 2 * k); if (k >= 1) glide = null; }
+    const set = (list, v) => list.forEach(m => { MAC[m] = g ? g.from[m] + (v - g.from[m]) * k : v; });
+    set(ax.x, nx); set(ax.y, ny);
+    applyMacros();
+  }
+  function applyMacros() {
     const sk = skin, b = lastBus, now = ctx ? ctx.currentTime : 0;
-    if (sk === 'amber') { XM.cut = Math.pow(2, nx * 1.4); XM.fm = Math.pow(2, ny * 0.9); XM.fold = Math.pow(2, ny * 0.5); return; }
+    if (sk === 'amber') { XM.cut = Math.pow(2, MAC.cut * 1.4); XM.fm = Math.pow(2, MAC.color * 0.9); XM.fold = Math.pow(2, MAC.color * 0.5); return; }
     if (!ctx || !b || !b.base) return;
-    const cut = (v, m) => { b.cut = clamp(b.base.cut * Math.pow(2, v * m), 60, 12000); };
-    const echo = v => {
-      const da = clamp(b.base.delAmt + 0.45 * v, 0, 0.95), fbk = clamp(b.base.delFb + 0.25 * v, 0.1, 0.8);
-      b.delAmt = da; b.dsend.gain.setTargetAtTime(da, now, 0.05);
-      if (b.mg.delAmt) b.mg.delAmt.g.gain.value = b.mg.delAmt.d * 0.5 * da;
-      b.delFb = fbk; b.fb.gain.setTargetAtTime(fbk, now, 0.05);
-      if (b.mg.fb) b.mg.fb.g.gain.value = b.mg.fb.d * Math.max(0, Math.min(fbk - 0.1, 0.86 - fbk));   // feedback plus its own wobble can never pass 0.86
-    };
-    const rev = () => {
-      const ra = clamp(b.base.revAmt + 0.4 * ny, 0, 0.9);
-      b.revAmt = ra; b.rsend.gain.setTargetAtTime(ra, now, 0.05);
-      if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * ra;
-    };
-    if (sk === 'mandala') { echo(nx); cut(ny, 1.6); b.res = clamp(b.base.res + ny * 6, 0, 16); }
-    else if (sk === 'riso') { cut(nx, 1.5); b.len = clamp(b.base.len + 0.4 * ny, 0.02, 0.95); rev(); }
-    else if (sk === 'scope') { b.xt = Math.pow(2, nx * 1.2); echo(ny); }
-    else if (sk === 'topo') { cut(nx, 1.6); if (cont && cont.xy) cont.xy(b.cut, (ny + 1) / 2); rev(); }
-    else if (sk === 'matrix') { b.xc = Math.round(nx * 7); b.res = clamp(b.base.res + ny * 8, 0, 16); }
-    else if (sk === 'ridges') { cut(nx, 1.5); b.res = clamp(b.base.res + ny * 8, 1, 20); if (seq && seq.acidV) seq.acidV.setRes(b.res); }
+    b.cut = clamp(b.base.cut * Math.pow(2, MAC.cut * (sk === 'mandala' || sk === 'topo' ? 1.6 : 1.5)), 60, 12000);
+    const acid = sk === 'ridges';
+    b.res = clamp(b.base.res + MAC.res * (acid || sk === 'matrix' ? 8 : 6), acid ? 1 : 0, acid ? 20 : 16);
+    const da = clamp(b.base.delAmt + 0.45 * MAC.echo, 0, 0.95), fbk = clamp(b.base.delFb + 0.25 * MAC.echo, 0.1, 0.8);
+    b.delAmt = da; b.dsend.gain.setTargetAtTime(da, now, 0.05);
+    if (b.mg.delAmt) b.mg.delAmt.g.gain.value = b.mg.delAmt.d * 0.5 * da;
+    b.delFb = fbk; b.fb.gain.setTargetAtTime(fbk, now, 0.05);
+    if (b.mg.fb) b.mg.fb.g.gain.value = b.mg.fb.d * Math.max(0, Math.min(fbk - 0.1, 0.86 - fbk));   // feedback plus its own wobble can never pass 0.86
+    const ra = clamp(b.base.revAmt + 0.4 * MAC.space, 0, 0.9);
+    b.revAmt = ra; b.rsend.gain.setTargetAtTime(ra, now, 0.05);
+    if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * ra;
+    if (sk === 'riso') b.len = clamp(b.base.len + 0.4 * MAC.space, 0.02, 0.95);
+    b.xt = Math.pow(2, MAC.color * 1.2); b.xc = Math.round(MAC.color * 7);
+    if (sk === 'topo' && cont && cont.xy) cont.xy(b.cut, (MAC.color + 1) / 2);
+    if (acid && seq && seq.acidV) seq.acidV.setRes(b.res);
   }
 
   function stopMelody() {
@@ -2061,7 +2090,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     clearTimeout(dotsTimer);
     dotsTimer = setTimeout(() => dotsEl.classList.remove('show'), 1500);
   }
-  function switchSkin(dir) {
+  function switchSkin(dir, after) {
     if (switching) return;
     switching = true;
     const next = SKINS[(SKINS.indexOf(skin) + dir + SKINS.length) % SKINS.length];
@@ -2074,6 +2103,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     clearTimeout(dotsTimer);
     setTimeout(() => {
       applySkin(next);
+      if (after) after();
       root.classList.remove('swap-out');
       root.classList.add('swap-in');
       wakeFx();
@@ -2117,7 +2147,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
   // XY: where the finger is. x, y are 0..1 over the screen (y down), nx, ny are -1..1 from the centre (ny up). Nothing is mapped to sound yet:
   // this is the groundwork for an xy pad, other code can read window.skladka.xy or listen to the 'skladka:xy' event
   const XY = { x: 0.5, y: 0.5, nx: 0, ny: 0, down: false };
-  window.skladka = { xy: XY, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM) } : { xm: Object.assign({}, XM) } };   // groundwork: nothing is mapped to sound yet
+  window.skladka = { xy: XY, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // groundwork: nothing is mapped to sound yet
   function place(cx, cy, snap) {
     const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844);
     XY.x = cx / W; XY.y = cy / H; XY.nx = XY.x * 2 - 1; XY.ny = 1 - XY.y * 2;
@@ -2132,6 +2162,19 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
   }
   // a quick horizontal flick (within 300 ms) changes the skin: left = next, right = previous. Slower movement moves the world (xy)
   let sx = 0, sy = 0, swiped = false, tDown = 0, dragging = false;
+  // a swipe with the finger down does not stop the music: the old world fades on its own bus, the new one picks up at the same tempo and key with the same macros
+  function handoff(dir, cx, cy) {
+    if (switching) { up(); return; }
+    carry = seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null;
+    handoffMac = !!seq;
+    up();
+    switchSkin(dir, () => {
+      if (!XY.down) { carry = null; handoffMac = false; return; }
+      sx = cx; sy = cy; tDown = performance.now(); swiped = false; dragging = false;
+      place(cx, cy, true);   // the axes now follow the finger where it is, and the macros glide there
+      down();
+    });
+  }
   surface.addEventListener('pointerdown', e => {
     e.preventDefault();
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
@@ -2157,8 +2200,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     }
     if (early && Math.abs(dx) > 56 && horizontal) {
       swiped = true;
-      up();
-      switchSkin(dx < 0 ? 1 : -1);
+      handoff(dx < 0 ? 1 : -1, e.clientX, e.clientY);
     }
   });
   const dragReset = () => { XY.down = FP.down = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); };
