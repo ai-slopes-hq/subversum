@@ -733,7 +733,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     scope:    { cut: [1500, 7000], len: [0.03, 0.35], fb: [0.3, 0.75], dela: [0.2, 0.8],  revSec: [1, 2.5],   reva: [0.05, 0.4],  res: [0, 10] },
     topo:     { cut: [300, 2200],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9],  res: [3, 14] },
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
-    clouds:   { cut: [1200, 8000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
+    clouds:   { cut: [3000, 11000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
     ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] }
   };
 
@@ -873,6 +873,36 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 
   const RES_GAIN = 1.8;
   const HANN = Float32Array.from({ length: 32 }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / 31));
+  // clouds: while notes keep arriving (and for about two seconds after the last one) a steady stream of overlapping grains is cut out of the 4 s memory,
+  // 16 to 80 grains a second, 40 to 220 ms long, with a slowly drifting read position, so it smears into a cloud instead of crackling
+  function cloudRun(b) {
+    const cl = b.cl;
+    if (cl.timer) return;
+    cl.next = ctx.currentTime;
+    cl.timer = setInterval(() => {
+      const now = ctx.currentTime;
+      if (now > cl.until) { clearInterval(cl.timer); cl.timer = 0; return; }
+      const sr = ctx.sampleRate, sec = cl.size / sr, dens = clamp((Math.log2(b.xt || 1) / 1.2 + 1) / 2, 0, 1), rate = 16 + 64 * dens;
+      cl.lp.frequency.setTargetAtTime(clamp(b.cut * 2.5, 800, 16000), now, 0.05);
+      const lvl = clamp((cl.until - now) / 1.2, 0, 1);       // the cloud fades over the last 1.2 s
+      if (cl.next < now) cl.next = now;
+      while (cl.next < now + 0.12) {
+        const ts = cl.next + 0.005, dur = (0.22 - 0.16 * dens) * (0.6 + Math.random() * 0.8);
+        const ratio = pick([1, 1, 1, 1, 2, 0.5, 1.5]) * Math.pow(2, (Math.random() - 0.5) * 0.03), span = dur * ratio;
+        let off = Math.random() < 0.7 ? cl.head / sr + Math.random() * 0.4 : Math.random() * sec;
+        off = Math.max(0, Math.min(off % sec, sec - span - 0.01));
+        const src = ctx.createBufferSource(), g = ctx.createGain(), amp = 0.5 * lvl * (0.4 + 0.6 * cl.vel) / Math.sqrt(Math.max(1, rate * dur));
+        src.buffer = cl.buf; src.playbackRate.value = ratio;
+        g.gain.value = 0; g.gain.setValueCurveAtTime(Float32Array.from(HANN, v => v * amp), ts, dur);
+        const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+        src.connect(g);
+        if (pn) { pn.pan.value = (Math.random() - 0.5) * 1.6; g.connect(pn); pn.connect(cl.out); } else g.connect(cl.out);
+        src.onended = () => { try { src.disconnect(); g.disconnect(); if (pn) pn.disconnect(); } catch (e) {} };
+        src.start(ts, off, span + 0.01);
+        cl.next += (1 / rate) * (0.5 + Math.random());
+      }
+    }, 40);
+  }
   const VOICES = {
     // riso: a bank of resonators tuned to a major or minor chord, struck by a burst of ink noise (a bit like Rings fed with noise)
     riso: c => {
@@ -894,51 +924,46 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       sum.connect(cr); cr.connect(lp); lp.connect(c.out);
       return t0 + 0.003 + Math.min(T * 3, 1.6);
     },
-    // clouds: Rings into Clouds from the head. A modal ring (a few slightly inharmonic partials) is struck, written into a 4 s memory together with the last notes,
-    // and grains of that memory (octaves and fifths) are scattered around it. x makes the grains small and dense, a beads-to-fog axis.
+    // clouds: Rings into Clouds from the head. A modal ring (a bright, slightly inharmonic set of partials and a short noise pluck) is struck and written into a 4 s memory
+    // together with the last notes; cloudRun cuts grains out of that memory. x makes the grains small and dense, a beads-to-fog axis.
     clouds: c => {
-      const { t0, vel, b, r } = c, sr = ctx.sampleRate, T0 = 0.12 + b.len * 0.5, ins = 0.005 + r[1] * 0.04;
+      const { t0, vel, b, r } = c, sr = ctx.sampleRate, T0 = 0.12 + b.len * 0.5, ins = 0.003 + r[1] * 0.02, F = c.f * 4;   // the bell sits two octaves above the pool: in the bass register it was dull
       const parts = [];
-      for (let k = 0; k < 5; k++) {
-        const fr = c.f * (k + 1) * (1 + ins * k * k);
-        if (fr > 9000) break;
-        parts.push({ fr, a: 0.2 * vel / Math.pow(k + 1, 1.1) / (1 + Math.pow(fr / b.cut, 2)), tau: T0 / (1 + 0.6 * k) });
+      for (let k = 0; k < 9; k++) {
+        const fr = F * (k + 1) * (1 + ins * k * k);
+        if (fr > 12000) break;
+        parts.push({ fr, a: 0.2 * vel / Math.pow(k + 1, 0.9) / (1 + Math.pow(fr / b.cut, 1.5)), tau: T0 / (1 + 0.35 * k) });
       }
-      // the ring itself
+      // the ring itself, plus a short band-passed noise pluck
       parts.forEach(p => {
         const o = c.osc('sine', p.fr), g = c.g(0);
         g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(p.a, t0 + 0.002); g.gain.setTargetAtTime(0, t0 + 0.002, p.tau);
         o.connect(g); g.connect(c.out);
       });
+      const pl = c.bq('bandpass', Math.min(9000, F * 3.5), 0.8), pg = c.g(0);
+      pg.gain.setValueAtTime(0, t0); pg.gain.linearRampToValueAtTime(0.5 * vel, t0 + 0.001); pg.gain.setTargetAtTime(0, t0 + 0.001, 0.012);
+      c.noise().connect(pl); pl.connect(pg); pg.connect(c.out);
       // the same ring written into the memory
-      const L = Math.floor(0.9 * sr), cl = b.cl || (b.cl = { size: Math.floor(4 * sr), data: new Float32Array(Math.floor(4 * sr)), w: 0, buf: ctx.createBuffer(1, Math.floor(4 * sr), sr) });
-      const w0 = cl.w, chunk = new Float32Array(L);
+      const L = Math.floor(0.9 * sr), size = Math.floor(4 * sr);
+      if (!b.cl) {
+        const out = ctx.createGain(), lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = Math.min(16000, b.cut * 2.5); lp.Q.value = 0.5;
+        out.connect(lp); lp.connect(b.inp);
+        b.cl = { size, data: new Float32Array(size), w: 0, head: 0, buf: ctx.createBuffer(1, size, sr), out, lp, timer: 0, until: 0, vel: 1, next: 0 };
+      }
+      const cl = b.cl, w0 = cl.w, chunk = new Float32Array(L);
       parts.forEach(p => {
         const d = Math.exp(-1 / (sr * p.tau)), dp = 2 * Math.PI * p.fr / sr;
         let env = p.a, ph = 0;
         for (let i = 0; i < L; i++) { chunk[i] += env * Math.sin(ph); ph += dp; env *= d; }
       });
-      for (let i = 0; i < L; i++) { const j = (w0 + i) % cl.size; cl.data[j] = cl.data[j] * 0.6 + chunk[i]; }
-      cl.w = (w0 + Math.floor(0.45 * sr)) % cl.size;
+      for (let i = 0, e = 0.5 * vel; i < L && e > 0.0005; i++, e *= 0.9973) chunk[i] += e * (Math.random() * 2 - 1) * 0.5;   // the noise pluck, about 12 ms
+      for (let i = 0; i < L; i++) { const j = (w0 + i) % size; cl.data[j] = cl.data[j] * 0.6 + chunk[i]; }
+      cl.head = w0; cl.w = (w0 + Math.floor(0.45 * sr)) % size; cl.vel = vel;
       cl.buf.copyToChannel(cl.data, 0);
-      // the grains
-      const dens = clamp((Math.log2(b.xt || 1) / 1.2 + 1) / 2, 0, 1), N = 3 + Math.round(10 * dens), gs = 0.26 - 0.2 * dens, sec = cl.size / sr;
-      let tail = 0.9;
-      for (let i = 0; i < N; i++) {
-        const ts = t0 + 0.03 + Math.random() * (0.5 + T0 * 3), dur = gs * (0.6 + Math.random() * 0.8), ratio = pick([0.5, 1, 1, 1, 1.5, 2]);
-        let off = Math.random() < 0.6 ? w0 / sr + Math.random() * 0.5 : Math.random() * sec;
-        off = Math.max(0, Math.min(off, sec - dur * ratio - 0.01));
-        const src = ctx.createBufferSource(), g = ctx.createGain(), amp = 0.35 * (0.5 + 0.5 * vel);
-        src.buffer = cl.buf; src.playbackRate.value = ratio;
-        g.gain.value = 0; g.gain.setValueCurveAtTime(Float32Array.from(HANN, v => v * amp), ts, dur);
-        const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-        src.connect(g);
-        if (pn) { pn.pan.value = (Math.random() - 0.5) * 1.6; g.connect(pn); pn.connect(c.out); } else g.connect(c.out);
-        src.onended = () => { try { src.disconnect(); g.disconnect(); if (pn) pn.disconnect(); } catch (e) {} };
-        src.start(ts, off, dur * ratio + 0.01);
-        tail = Math.max(tail, ts + dur - t0);
-      }
-      return t0 + tail + 0.1;
+      cl.until = t0 + 2.2;
+      cloudRun(b);
+      return t0 + 1.4;
     },
     // scope: laser zaps after the Horologium drums of touch2decay: ZAP (a sine falls from kHz onto the note through tanh), STUTTER (short FM grains), BIT (1-bit noise), plus a CLICK ping in a resonator
     scope: c => {
