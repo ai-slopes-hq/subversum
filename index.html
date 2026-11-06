@@ -924,24 +924,24 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       sum.connect(cr); cr.connect(lp); lp.connect(c.out);
       return t0 + 0.003 + Math.min(T * 3, 1.6);
     },
-    // clouds: Rings into Clouds from the head. A modal ring (a bright, slightly inharmonic set of partials and a short noise pluck) is struck and written into a 4 s memory
+    // clouds: a kalimba tine (fundamental plus two quickly dying beam overtones and a thumb click) is struck and written into a 4 s memory
     // together with the last notes; cloudRun cuts grains out of that memory. x makes the grains small and dense, a beads-to-fog axis.
     clouds: c => {
       const { t0, vel, b, r } = c, sr = ctx.sampleRate, T0 = 0.12 + b.len * 0.5, ins = 0.003 + r[1] * 0.02, F = c.f * 4;   // the bell sits two octaves above the pool: in the bass register it was dull
-      const parts = [];
-      for (let k = 0; k < 9; k++) {
-        const fr = F * (k + 1) * (1 + ins * k * k);
-        if (fr > 12000) break;
-        parts.push({ fr, a: 0.2 * vel / Math.pow(k + 1, 0.9) / (1 + Math.pow(fr / b.cut, 1.5)), tau: T0 / (1 + 0.35 * k) });
-      }
+      // kalimba tine: a strong fundamental (doubled, a touch detuned for slow beating) and the stiff-beam overtones at about 6.3x and 17.5x that die within a few ms
+      const parts = [], R = [[1, 1, 1], [1.003, 0.55, 1], [6.27 * (1 + ins), 0.32, 0.16], [17.5 * (1 + ins), 0.1, 0.05]];
+      R.forEach(q => {
+        const fr = F * q[0];
+        if (fr < 13000) parts.push({ fr, a: 0.3 * vel * q[1] / (1 + Math.pow(fr / b.cut, 1.5)), tau: q[2] * (0.25 + T0 * 1.6) });
+      });
       // the ring itself, plus a short band-passed noise pluck
       parts.forEach(p => {
         const o = c.osc('sine', p.fr), g = c.g(0);
         g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(p.a, t0 + 0.002); g.gain.setTargetAtTime(0, t0 + 0.002, p.tau);
         o.connect(g); g.connect(c.out);
       });
-      const pl = c.bq('bandpass', Math.min(9000, F * 3.5), 0.8), pg = c.g(0);
-      pg.gain.setValueAtTime(0, t0); pg.gain.linearRampToValueAtTime(0.5 * vel, t0 + 0.001); pg.gain.setTargetAtTime(0, t0 + 0.001, 0.012);
+      const pl = c.bq('bandpass', Math.min(5000, F * 2.2), 1.2), pg = c.g(0);
+      pg.gain.setValueAtTime(0, t0); pg.gain.linearRampToValueAtTime(0.28 * vel, t0 + 0.001); pg.gain.setTargetAtTime(0, t0 + 0.001, 0.008);   // the thumb
       c.noise().connect(pl); pl.connect(pg); pg.connect(c.out);
       // the same ring written into the memory
       const L = Math.floor(0.9 * sr), size = Math.floor(4 * sr);
@@ -957,7 +957,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
         let env = p.a, ph = 0;
         for (let i = 0; i < L; i++) { chunk[i] += env * Math.sin(ph); ph += dp; env *= d; }
       });
-      for (let i = 0, e = 0.5 * vel; i < L && e > 0.0005; i++, e *= 0.9973) chunk[i] += e * (Math.random() * 2 - 1) * 0.5;   // the noise pluck, about 12 ms
+      for (let i = 0, e = 0.28 * vel; i < L && e > 0.0005; i++, e *= 0.996) chunk[i] += e * (Math.random() * 2 - 1) * 0.5;   // the noise pluck, about 12 ms
       for (let i = 0; i < L; i++) { const j = (w0 + i) % size; cl.data[j] = cl.data[j] * 0.6 + chunk[i]; }
       cl.head = w0; cl.w = (w0 + Math.floor(0.45 * sr)) % size; cl.vel = vel;
       cl.buf.copyToChannel(cl.data, 0);
