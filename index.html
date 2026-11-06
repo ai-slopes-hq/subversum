@@ -330,9 +330,9 @@ html[data-skin="mandala"] .go { inset: 34%; }
 html[data-skin="ridges"] .go { inset: 33%; }
 
 /* mandala */
-.md-spin { animation: mdspin 90s linear infinite; }
-.md-spin.b { animation-duration: 140s; animation-direction: reverse; }
-.md-spin.a { animation-duration: 200s; }
+.md-spin { animation: mdspin calc(90s / var(--act, 1)) linear infinite; }
+.md-spin.b { animation-duration: calc(140s / var(--act, 1)); animation-direction: reverse; }
+.md-spin.a { animation-duration: calc(200s / var(--act, 1)); }
 @keyframes mdspin { to { transform: rotate(360deg); } }
 .md-ring { fill: none; stroke: hsl(var(--hue, 38) 80% 60% / .35); stroke-width: 2; stroke-linecap: round; }
 .md-ring.thin { stroke-dasharray: none; stroke-width: 1; stroke: hsl(var(--hue, 38) 80% 60% / .2); }
@@ -345,7 +345,7 @@ html[data-skin="ridges"] .go { inset: 33%; }
 
 /* ridges */
 .rg-bg { fill: var(--bg); }
-.rg-l { fill: var(--bg); stroke: url(#rgg); stroke-width: 1.5; stroke-linejoin: round; }
+.rg-l { fill: var(--bg); stroke: hsl(var(--hue, 38) 100% 68%); stroke-width: 1.3; stroke-linejoin: round; }
 .rg-dot { fill: hsl(var(--hue, 38) 60% 32%); transform-box: fill-box; transform-origin: center; }
 .rg-dot.n { fill: hsl(var(--hue, 38) 100% 72%); }
 .rg-dot.hit { animation: rghit .6s cubic-bezier(.2, .9, .3, 1.3); }
@@ -354,6 +354,16 @@ html[data-skin="ridges"] .go { inset: 33%; }
   .md-spin, .md-p.hit, .rg-dot.hit { animation: none; }
 }
 
+
+/* no button: the world is the instrument. It is built round the finger and follows it (the xy pad groundwork) */
+.go { background: none !important; border-color: transparent !important; box-shadow: none !important; backdrop-filter: none !important; outline: none !important; pointer-events: none; }
+.go > svg:not(.steps) { display: none !important; }
+.skinsvg { overflow: visible; }
+.skinsvg, .dial { translate: var(--tx, 0px) var(--ty, 0px); transition: translate .18s ease-out, transform .12s ease-out, opacity .12s; }
+html.snap .skinsvg, html.snap .dial { transition: none !important; }
+.asm { animation: asm .5s cubic-bezier(.2, .9, .3, 1.15) backwards; }
+@keyframes asm { 0% { scale: .45; opacity: 0; } 55% { opacity: 1; } 100% { scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .asm { animation: none; } }
 </style>
 
 <script>
@@ -1169,10 +1179,10 @@ html[data-skin="ridges"] .go { inset: 33%; }
   function startSeq() {
     const prev = tapPatch;
     tapPatch = roll();
-    setAccent(tapPatch);
     // every press rolls a new patch, scale, tempo and pattern
     stopCont();
     seq = makeSeq();
+    setAccent(tapPatch, characterOf(seq, tapPatch));
     if (seq.cont) { cont = CONT[seq.cont](seq); startMod(); }
     renderPattern(seq);
     retireLfo(prev);
@@ -1302,7 +1312,7 @@ html[data-skin="ridges"] .go { inset: 33%; }
     }
   })();
   // pattern of this press: rests stay empty, notes are filled the more the louder they are
-  let lastSq = null, accentL = 64;
+  let lastSq = null, accentL = 64, ACT = 1;   // ACT: how lively the sound is, scales the pace of the pictures
   function renderPattern(sq) {
     lastSq = sq;
     sq.steps.forEach((st, i) => {
@@ -1338,12 +1348,33 @@ html[data-skin="ridges"] .go { inset: 33%; }
     go._pt = setTimeout(() => go.classList.remove('pulse'), 450);
   }
   // every patch gets its own colour: sine is cold, triangle amber, saw hot; FM pushes it further
-  function setAccent(p) {
+  // The picture mirrors the sound. From the patch and the pattern we read three things:
+  //   brightness (filter cutoff and how far the envelope opens it) -> how light the screen is
+  //   liveliness (resonance, envelope depth, how many steps play, tempo, short notes) -> saturation and the pace of the motion
+  //   coldness (brightness, space of echo and reverb, resonance, FM) -> hue, from warm amber through pink and violet to cold blue
+  function characterOf(sq, p) {
+    const d = sq.dub, c01 = x => Math.max(0, Math.min(1, x)), lnr = (x, a, b) => c01((Math.log(x) - Math.log(a)) / (Math.log(b) - Math.log(a)));
+    let cut, res, env, len, space, fm = 0, range = [900, 9000];   // brightness is judged inside the range of this skin's own voice
+    if (d) { cut = d.cut; res = d.res; env = d.env; len = d.len; space = (d.revAmt + d.delAmt) / 2; range = (TW[root.dataset.skin] || {}).cut || [140, 3800]; }
+    else { cut = p.cutoff; res = p.res; env = p.depth / DEPTH_MAX; len = lnr(p.decay, 0.12, 1.8); space = 0.1; fm = p.fmIdx / FM_MAX; }
+    const bright = c01(lnr(cut, range[0], range[1]) * 0.85 + 0.15 * env), res01 = c01(res / 20);
+    const dens = sq.steps.filter(Boolean).length / STEPS, tempo = c01((sq.bpm - BPM_MIN) / (BPM_MAX - BPM_MIN));
+    const act = c01((0.3 * res01 + 0.25 * env + 0.2 * dens + 0.15 * tempo + 0.1 * (1 - len) - 0.3) / 0.5);
+    const cold = c01((0.45 * bright + 0.2 * space + 0.2 * res01 + 0.15 * fm - 0.2) / 0.6);
+    return { bright, act, cold };
+  }
+  function applyMood(ch) {
+    ACT = 0.6 + ch.act;
+    root.style.setProperty('--act', ACT.toFixed(2));
+    root.style.filter = 'saturate(' + (0.6 + 0.65 * ch.act).toFixed(2) + ') brightness(' + (0.8 + 0.38 * ch.bright).toFixed(2) + ')';
+  }
+  function setAccent(p, ch) {
     renderWave(p);
     const base = { sine: 192, triangle: 38, sawtooth: 6 }[p.wave[0]];
-    const h = (base + (p.fmIdx / FM_MAX) * 36 + 360) % 360;
+    const h = ch ? (28 - 170 * ch.cold + 360) % 360 : (base + (p.fmIdx / FM_MAX) * 36 + 360) % 360;
     root.style.setProperty('--hue', h.toFixed(0));   // every skin builds its palette from this
-    accentL = 60 + p.depth * 8;
+    accentL = ch ? 56 + 14 * ch.bright : 60 + p.depth * 8;
+    if (ch) applyMood(ch);
     if (root.dataset.skin === 'amber') root.style.setProperty('--accent', 'hsl(' + h.toFixed(0) + ' 100% ' + accentL.toFixed(0) + '%)');
   }
   // the glow follows the patch's LFOs, computed here from their definitions (rate, shape, phase)
@@ -1479,7 +1510,7 @@ html[data-skin="ridges"] .go { inset: 33%; }
       if (!busy && now - lastDraw < 42) return;        // at rest the map drifts at about 24 fps
       const dt = Math.min(0.1, (now - last) / 1000);
       last = lastDraw = now;
-      tt += dt * (0.8 + 3 * env + 2 * kick);
+      tt += dt * (0.8 + 3 * env + 2 * kick) * ACT;
       draw(1 + 0.5 * env + 0.6 * kick);
     }
     draw(1);
@@ -1545,32 +1576,14 @@ html[data-skin="ridges"] .go { inset: 33%; }
 
   function buildRidges() {
     // a stack of ridgelines, hidden-line style: every note sends a bump from its own x position up through the stack
-    const N = 36, X0 = -195, X1 = 195, M = 64, DY = 17, Y0 = -300;
+    const N = 36, X0 = -330, X1 = 330, M = 96, DY = 17, Y0 = -300;
     se('rect', { class: 'rg-bg', x: -2000, y: -2000, width: 4000, height: 4000 });
-    // acid colour: one horizontal gradient paints every ridge; each step owns a stop with its own hue, the hues drift round the wheel,
-    // and the stop of the step that has just played flashes bright
-    const defs = se('defs'), grad = se('linearGradient', { id: 'rgg', gradientUnits: 'userSpaceOnUse', x1: X0, y1: 0, x2: X1, y2: 0 }, defs);
-    const stops = [], act = new Array(STEPS).fill(0.5), flash = new Array(STEPS).fill(0);
-    for (let i = 0; i < STEPS; i++) stops.push(se('stop', { offset: ((-150 + i * 20 - X0) / (X1 - X0)).toFixed(4) }, grad));
-    let hueDrift = 0;
-    const baseHue = () => parseFloat(document.documentElement.style.getPropertyValue('--hue')) || 38;
-    function paint(dt, env) {
-      hueDrift = (hueDrift + dt * (10 + 40 * env)) % 360;
-      const h0 = baseHue() + hueDrift;
-      for (let i = 0; i < STEPS; i++) {
-        flash[i] = Math.max(0, flash[i] - dt * 2.2);
-        const hue = (h0 + i * 360 / STEPS * 1.5) % 360, f = flash[i], a = act[i];
-        stops[i].setAttribute('stop-color', 'hsl(' + hue.toFixed(0) + ' 100% ' + (a > 0 ? 52 + 12 * a + 34 * f : 30 + 40 * f).toFixed(0) + '%)');
-        dots[i].style.fill = 'hsl(' + hue.toFixed(0) + ' 100% ' + (a > 0 ? 55 + 30 * f : 30 + 40 * f).toFixed(0) + '%)';
-      }
-    }
     const lines = [];
     for (let j = 0; j < N; j++) lines.push(se('path', { class: 'rg-l', d: '', 'stroke-opacity': (0.25 + 0.75 * j / (N - 1)).toFixed(2) }));
     const dots = [];
     for (let i = 0; i < STEPS; i++) dots.push(se('circle', { class: 'rg-dot', cx: -150 + i * 20, cy: 376, r: 3 }));
     const pulses = [];
     let tt = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
-    paint(0, 0.2);
     const bell = x => Math.exp(-(x * x) / (2 * 95 * 95));
     function draw(env) {
       for (let j = 0; j < N; j++) {
@@ -1598,8 +1611,7 @@ html[data-skin="ridges"] .go { inset: 33%; }
       if (!busy && now - lastDraw < 42) return;
       const dt = Math.min(0.1, (now - last) / 1000);
       last = lastDraw = now;
-      tt += dt * (0.8 + 2.5 * env + 1.5 * kick);
-      paint(dt, env);
+      tt += dt * (0.8 + 2.5 * env + 1.5 * kick) * ACT;
       for (let q = pulses.length - 1; q >= 0; q--) { pulses[q].p += dt * 26; if (pulses[q].p > 34) pulses.splice(q, 1); }
       draw(env);
     }
@@ -1609,14 +1621,12 @@ html[data-skin="ridges"] .go { inset: 33%; }
       raf = requestAnimationFrame(frame);
     }
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
-    SK.pattern = sq => { dots.forEach((el, i) => {
+    SK.pattern = sq => dots.forEach((el, i) => {
       const st = sq.steps[i];
       el.setAttribute('r', st ? (3.4 + 3.6 * st.vel).toFixed(1) : '2');
       el.setAttribute('class', 'rg-dot' + (st ? ' n' : ''));
-      act[i] = st ? st.vel : 0;
-    }); paint(0, 0.2); };
+    });
     SK.note = (i, vel) => {
-      flash[i] = 1;
       popHit(dots[i], 600);
       pulses.push({ x: -150 + i * 20, p: 0, a: 0.45 + 0.9 * vel });
     };
@@ -1808,31 +1818,58 @@ html[data-skin="ridges"] .go { inset: 33%; }
   }
 
   const surface = document.body;
-  // a horizontal swipe changes the skin instead of playing: left = next, right = previous
-  let sx = 0, sy = 0, swiped = false;
+  // XY: where the finger is. x, y are 0..1 over the screen (y down), nx, ny are -1..1 from the centre (ny up). Nothing is mapped to sound yet:
+  // this is the groundwork for an xy pad, other code can read window.skladka.xy or listen to the 'skladka:xy' event
+  const XY = { x: 0.5, y: 0.5, nx: 0, ny: 0, down: false };
+  window.skladka = { xy: XY };
+  const asmEls = [$('.dial'), $('#skin')];
+  function place(cx, cy, snap) {
+    const W = innerWidth, H = innerHeight;
+    XY.x = cx / W; XY.y = cy / H; XY.nx = XY.x * 2 - 1; XY.ny = 1 - XY.y * 2;
+    if (snap) root.classList.add('snap');
+    root.style.setProperty('--tx', (cx - W / 2).toFixed(1) + 'px');
+    root.style.setProperty('--ty', (cy - H / 2).toFixed(1) + 'px');
+    if (snap) {
+      void root.offsetWidth;
+      root.classList.remove('snap');
+      // the world builds itself again round the new point
+      asmEls.forEach(el => { el.classList.remove('asm'); void el.offsetWidth; el.classList.add('asm'); });
+    }
+    if (SK.xy) SK.xy(XY);
+    dispatchEvent(new CustomEvent('skladka:xy', { detail: XY }));
+  }
+  // a quick horizontal flick (within 300 ms) changes the skin: left = next, right = previous. Slower movement moves the world (xy)
+  let sx = 0, sy = 0, swiped = false, tDown = 0, dragging = false;
   surface.addEventListener('pointerdown', e => {
     e.preventDefault();
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
-    sx = e.clientX; sy = e.clientY; swiped = false;
+    sx = e.clientX; sy = e.clientY; swiped = false; dragging = false; tDown = performance.now();
+    XY.down = true;
+    place(e.clientX, e.clientY, true);
     down();
   });
   surface.addEventListener('pointermove', e => {
     if (!holding || swiped) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
     const horizontal = Math.abs(dx) > 1.5 * Math.abs(dy);
-    if (horizontal && Math.abs(dx) > 10) {
-      // feedback while dragging: the scene follows the finger and dims, the dots appear
+    const early = performance.now() - tDown < 300;
+    if (early && horizontal && Math.abs(dx) > 10) {
+      // feedback while flicking: the scene follows the finger and dims, the dots appear
+      dragging = true;
       root.style.setProperty('--sw', (dx * 0.45).toFixed(1) + 'px');
       root.style.setProperty('--swo', (1 - Math.min(0.5, Math.abs(dx) / 200)).toFixed(2));
       showDots();
+    } else {
+      if (dragging) { dragging = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); }
+      place(e.clientX, e.clientY, false);
     }
-    if (Math.abs(dx) > 56 && horizontal) {
+    if (early && Math.abs(dx) > 56 && horizontal) {
       swiped = true;
       up();
       switchSkin(dx < 0 ? 1 : -1);
     }
   });
-  const dragReset = () => { root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); };
+  const dragReset = () => { XY.down = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); };
   surface.addEventListener('pointerup', dragReset);
   surface.addEventListener('pointercancel', dragReset);
   surface.addEventListener('pointerup', up);
