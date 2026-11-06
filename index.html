@@ -355,15 +355,13 @@ html[data-skin="ridges"] .go { inset: 33%; }
 }
 
 
-/* no button: the world is the instrument. It is built round the finger and follows it (the xy pad groundwork) */
-.go { background: none !important; border-color: transparent !important; box-shadow: none !important; backdrop-filter: none !important; outline: none !important; pointer-events: none; }
-.go > svg:not(.steps) { display: none !important; }
-.skinsvg { overflow: visible; }
-.skinsvg, .dial { translate: var(--tx, 0px) var(--ty, 0px); transition: translate .18s ease-out, transform .12s ease-out, opacity .12s; }
-html.snap .skinsvg, html.snap .dial { transition: none !important; }
-.asm { animation: asm .5s cubic-bezier(.2, .9, .3, 1.15) backwards; }
-@keyframes asm { 0% { scale: .45; opacity: 0; } 55% { opacity: 1; } 100% { scale: 1; } }
-@media (prefers-reduced-motion: reduce) { .asm { animation: none; } }
+/* no button and no sequencer ring in scope, topo, matrix and ridges: the waves start at the finger. amber, riso and mandala keep the button */
+html[data-skin="scope"] .go, html[data-skin="topo"] .go, html[data-skin="matrix"] .go, html[data-skin="ridges"] .go { display: none; }
+html[data-skin="topo"] .ring, html[data-skin="matrix"] .ring, html[data-skin="ridges"] .ring { display: none; }
+html[data-skin="scope"] .ring .ink { display: none; }
+html[data-skin="scope"] .dial { translate: var(--tx, 0px) var(--ty, 0px); transition: translate .18s ease-out; }
+html.snap[data-skin="scope"] .dial { transition: none; }
+.tp-ripple { fill: none; stroke: hsl(var(--tp, 38) 80% 78%); stroke-width: 1.6; }
 </style>
 
 <script>
@@ -1264,7 +1262,7 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
   // the trace breathes with the envelope, scrolls with time, and a bump runs around it with the sequencer
   function drawWave(t, env, kick, head) {
     const amp = wp.amp * (0.4 + 1.3 * env + 0.8 * kick);
-    const ha = head >= 0 ? head / STEPS * 2 * Math.PI : null;
+    const ha = null;   // the sequencer head is not drawn here any more
     let d = '';
     for (let i = 0; i <= 180; i++) {
       const a = i / 180 * 2 * Math.PI;
@@ -1459,6 +1457,7 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
 
   /* ---------- skins with a full-screen layer: each builds its own picture and plugs into the hooks ---------- */
   const skinSvg = $('#skin'), TAU = 2 * Math.PI;
+  const FP = { vx: 0, vy: 0, down: false };   // the finger in the coordinates of the skin layer (centre of the screen is 0, 0), where the waves start
   const se = (tag, attrs, parent) => {
     const e = document.createElementNS(NS, tag);
     for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -1484,33 +1483,41 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
       const outer = se('g', { class: 'tp-spin ' + c }), inner = se('g', {}, outer);
       return se('path', { class: cls, d: '' }, inner);
     });
-    const steps = [];
-    for (let i = 0; i < STEPS; i++) steps.push(se('path', { class: 'tp-step', d: '' }));
-    let tt = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
+    const ripples = [];
+    let tt = 0, last = 0, lastDraw = 0, raf = 0, dead = false, push = 0;
+    // the finger pushes the contours aside like a stone in a stream
+    const pt = (r, a) => {
+      let x = Math.sin(a) * r, y = -Math.cos(a) * r;
+      const dx = x - FP.vx, dy = y - FP.vy, d2 = dx * dx + dy * dy;
+      if (push > 0.01 && d2 > 1) { const k = push * Math.exp(-d2 / (2 * 80 * 80)) / Math.sqrt(d2); x += dx * k; y += dy * k; }
+      return f1(x) + ' ' + f1(y);
+    };
+    const ripple = () => ripples.push({ el: se('circle', { class: 'tp-ripple', cx: f1(FP.vx), cy: f1(FP.vy), r: 4 }), r: 4 });
     function draw(m) {
       const ds = ['', '', ''];
       for (let k = 0; k < 28; k++) {
-        if (k === 3) continue;
         const r0 = 70 + k * 13;
         let d = '';
-        for (let i = 0; i <= 96; i++) { const a = i / 96 * TAU; d += (i ? 'L' : 'M') + vpt(r0 + m * A(k, a, tt), a); }
+        for (let i = 0; i <= 96; i++) { const a = i / 96 * TAU; d += (i ? 'L' : 'M') + pt(r0 + m * A(k, a, tt), a); }
         ds[k % 5 === 0 ? 2 : k < 13 ? 1 : 0] += d + 'Z';
       }
       parts.forEach((el, n) => el.setAttribute('d', ds[n]));
-      for (let i = 0; i < STEPS; i++) {
-        let d = '';
-        for (let j = 0; j <= 12; j++) { const a = (i + 0.08 + 0.84 * j / 12) / 16 * TAU; d += (j ? 'L' : 'M') + vpt(94 + m * A(3, a, tt), a); }
-        steps[i].setAttribute('d', d);
-      }
     }
     function frame(now) {
       if (dead) return;
       raf = requestAnimationFrame(frame);
-      const env = Math.max(0, litN) / 60, busy = seq || cur || kick > 0.01;
+      const env = Math.max(0, litN) / 60, busy = seq || cur || kick > 0.01 || ripples.length;
       if (!busy && now - lastDraw < 42) return;        // at rest the map drifts at about 24 fps
       const dt = Math.min(0.1, (now - last) / 1000);
       last = lastDraw = now;
       tt += dt * (0.8 + 3 * env + 2 * kick) * ACT;
+      push = (FP.down ? 26 : 8) * (0.4 + 0.9 * env + 1.2 * kick);
+      for (let q = ripples.length - 1; q >= 0; q--) {
+        const o = ripples[q];
+        o.r += dt * 240;
+        if (o.r > 380) { o.el.remove(); ripples.splice(q, 1); continue; }
+        o.el.setAttribute('r', o.r.toFixed(1)); o.el.setAttribute('stroke-opacity', (0.9 * (1 - o.r / 380)).toFixed(2));
+      }
       draw(1 + 0.5 * env + 0.6 * kick);
     }
     draw(1);
@@ -1519,18 +1526,7 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
       raf = requestAnimationFrame(frame);
     }
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
-    // the 16 arcs do not show a pattern here: a bright spot runs round them with the phase of the cutoff LFO
-    SK.pattern = () => steps.forEach(el => { el.setAttribute('class', 'tp-step n'); el.style.strokeWidth = '3'; });
-    SK.frame = (t, env, kick) => {
-      if (!mod) return;
-      steps.forEach((el, i) => {
-        const w = 0.5 + 0.5 * Math.cos(TAU * (i / STEPS - mod.phase));
-        el.style.opacity = (0.25 + 0.75 * w).toFixed(2);
-        el.style.strokeWidth = (2 + 5 * w).toFixed(1);
-      });
-    };
-    SK.idle = () => steps.forEach(el => { el.style.opacity = ''; el.style.strokeWidth = '3'; });
-    SK.beat = () => steps.forEach(el => popHit(el, 600));
+    SK.beat = ripple; SK.touch = ripple;   // a ripple leaves the finger on every LFO beat and when you touch down
   }
 
   function buildMandala() {
@@ -1580,8 +1576,6 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
     se('rect', { class: 'rg-bg', x: -2000, y: -2000, width: 4000, height: 4000 });
     const lines = [];
     for (let j = 0; j < N; j++) lines.push(se('path', { class: 'rg-l', d: '', 'stroke-opacity': (0.25 + 0.75 * j / (N - 1)).toFixed(2) }));
-    const dots = [];
-    for (let i = 0; i < STEPS; i++) dots.push(se('circle', { class: 'rg-dot', cx: -150 + i * 20, cy: 376, r: 3 }));
     const pulses = [];
     let tt = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
     const bell = x => Math.exp(-(x * x) / (2 * 95 * 95));
@@ -1593,7 +1587,7 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
           const x = X0 + (X1 - X0) * m / M;
           let h = (Math.sin(x * 0.045 + j * 0.9 + tt * 0.5) * 0.6 + Math.sin(x * 0.1 - j * 0.55 + tt * 0.33) * 0.4) * (2 + 9 * env) * bell(x);
           for (let q = 0; q < pulses.length; q++) {
-            const pu = pulses[q], pos = (N - 1 - j) - pu.p;
+            const pu = pulses[q], pos = Math.abs(j - pu.r0) - pu.p;
             if (pos > -6 && pos < 6) {
               const sx = 14 + pu.p * 1.4;
               h += pu.a * 34 * Math.exp(-(pos * pos) / 9.7) * Math.exp(-((x - pu.x) * (x - pu.x)) / (2 * sx * sx)) * Math.exp(-pu.p / 18);
@@ -1621,45 +1615,24 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
       raf = requestAnimationFrame(frame);
     }
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
-    SK.pattern = sq => dots.forEach((el, i) => {
-      const st = sq.steps[i];
-      el.setAttribute('r', st ? (3.4 + 3.6 * st.vel).toFixed(1) : '2');
-      el.setAttribute('class', 'rg-dot' + (st ? ' n' : ''));
-    });
-    SK.note = (i, vel) => {
-      popHit(dots[i], 600);
-      pulses.push({ x: -150 + i * 20, p: 0, a: 0.45 + 0.9 * vel });
-    };
+    const spawn = a => pulses.push({ x: FP.vx, r0: Math.max(0, Math.min(N - 1, (FP.vy - Y0) / DY)), p: 0, a });
+    SK.note = (i, vel) => spawn(0.45 + 0.9 * vel);   // every note sends a bump out of the finger, up and down the stack
+    SK.touch = () => spawn(1.1);
   }
 
   function buildMatrix() {
     const dots = [];
-    for (let i = 0; i < 13; i++) for (let j = 0; j < 28; j++) {
-      const x = -180 + i * 30, y = -406 + j * 30, d = Math.hypot(x, y);
-      if (d >= 118) dots.push([x, y, d]);
-    }
+    for (let i = 0; i < 13; i++) for (let j = 0; j < 28; j++) dots.push([-180 + i * 30, -406 + j * 30]);
     const bins = [0, 1, 2, 3, 4].map(n => se('path', { class: 'mx mx' + n, d: '' }));
-    se('circle', { class: 'mx-clear', r: 112 });
-    const ringDots = [];
-    for (let i = 0; i < STEPS; i++) {
-      const a = i * TAU / 16;
-      ringDots.push(se('circle', { class: 'mx-dot', cx: f1(Math.sin(a) * 88), cy: f1(-Math.cos(a) * 88), r: 3 }));
-    }
     function draw(t, env, kick) {
       const gain = 0.55 + 0.9 * env + 0.7 * kick, ds = ['', '', '', '', ''];
       for (let n = 0; n < dots.length; n++) {
-        const q = dots[n];
-        const s = Math.min(1, (0.5 + 0.5 * Math.cos(q[2] / 24 - t * 2.4)) * Math.max(0, 1 - (q[2] - 118) / 420) * gain);
+        const q = dots[n], d = Math.hypot(q[0] - FP.vx, q[1] - FP.vy);   // rings of brightness run outwards from the finger
+        const s = Math.min(1, (0.5 + 0.5 * Math.cos(d / 24 - t * 2.4)) * Math.max(0.1, 1 - d / 480) * gain);
         ds[s < 0.12 ? 0 : s < 0.28 ? 1 : s < 0.45 ? 2 : s < 0.62 ? 3 : 4] += 'M' + q[0] + ' ' + q[1] + 'h0';
       }
       bins.forEach((b, n) => b.setAttribute('d', ds[n]));
     }
-    SK.pattern = sq => ringDots.forEach((c, i) => {
-      const st = sq.steps[i];
-      c.setAttribute('r', st ? (3.6 + 4 * st.vel).toFixed(1) : '2');
-      c.setAttribute('class', 'mx-dot' + (st ? ' n' : ''));
-    });
-    SK.note = i => popHit(ringDots[i], 600);
     SK.frame = draw;
     SK.idle = () => draw(0, 0.25, 0);
     draw(0, 0.25, 0);
@@ -1821,20 +1794,15 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
   // XY: where the finger is. x, y are 0..1 over the screen (y down), nx, ny are -1..1 from the centre (ny up). Nothing is mapped to sound yet:
   // this is the groundwork for an xy pad, other code can read window.skladka.xy or listen to the 'skladka:xy' event
   const XY = { x: 0.5, y: 0.5, nx: 0, ny: 0, down: false };
-  window.skladka = { xy: XY };
-  const asmEls = [$('.dial'), $('#skin')];
+  window.skladka = { xy: XY };   // groundwork: nothing is mapped to sound yet
   function place(cx, cy, snap) {
-    const W = innerWidth, H = innerHeight;
+    const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844);
     XY.x = cx / W; XY.y = cy / H; XY.nx = XY.x * 2 - 1; XY.ny = 1 - XY.y * 2;
+    FP.vx = (cx - W / 2) / sc; FP.vy = (cy - H / 2) / sc;
     if (snap) root.classList.add('snap');
     root.style.setProperty('--tx', (cx - W / 2).toFixed(1) + 'px');
     root.style.setProperty('--ty', (cy - H / 2).toFixed(1) + 'px');
-    if (snap) {
-      void root.offsetWidth;
-      root.classList.remove('snap');
-      // the world builds itself again round the new point
-      asmEls.forEach(el => { el.classList.remove('asm'); void el.offsetWidth; el.classList.add('asm'); });
-    }
+    if (snap) { void root.offsetWidth; root.classList.remove('snap'); if (SK.touch) SK.touch(FP); }
     if (SK.xy) SK.xy(XY);
     dispatchEvent(new CustomEvent('skladka:xy', { detail: XY }));
   }
@@ -1844,7 +1812,7 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
     e.preventDefault();
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
     sx = e.clientX; sy = e.clientY; swiped = false; dragging = false; tDown = performance.now();
-    XY.down = true;
+    XY.down = FP.down = true;
     place(e.clientX, e.clientY, true);
     down();
   });
@@ -1869,7 +1837,7 @@ html.snap .skinsvg, html.snap .dial { transition: none !important; }
       switchSkin(dx < 0 ? 1 : -1);
     }
   });
-  const dragReset = () => { XY.down = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); };
+  const dragReset = () => { XY.down = FP.down = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); };
   surface.addEventListener('pointerup', dragReset);
   surface.addEventListener('pointercancel', dragReset);
   surface.addEventListener('pointerup', up);
