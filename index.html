@@ -7,11 +7,11 @@
 <script>
 // the look is picked at random on every launch; ?skin=riso|scope|amber forces one
 (function () {
-  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges'], k = all[Math.floor(Math.random() * all.length)];
-  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
+  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds'], k = all[Math.floor(Math.random() * all.length)];
+  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|clouds|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
   document.documentElement.setAttribute('data-skin', k);
   var m = document.querySelector('meta[name=theme-color]');
-  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E' }[k]);
+  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12' }[k]);
 })();
 </script>
 <meta name="mobile-web-app-capable" content="yes">
@@ -356,8 +356,8 @@ html[data-skin="ridges"] .go { inset: 33%; }
 /* no button and no sequencer ring in scope, topo, matrix and ridges: the waves start at the finger. amber, riso and mandala keep the button */
 html[data-skin="scope"] .go, html[data-skin="topo"] .go, html[data-skin="matrix"] .go, html[data-skin="ridges"] .go { display: none; }
 html[data-skin="topo"] .ring, html[data-skin="matrix"] .ring, html[data-skin="ridges"] .ring { display: none; }
-html[data-skin="amber"] .dial, html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
-html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
+html[data-skin="clouds"] .dial, html[data-skin="clouds"] .bg, html[data-skin="amber"] .dial, html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
+html[data-skin="clouds"] .skinsvg, html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
 /* amber: night drive towards a sunset, neon grid road */
 .nd-s0 { stop-color: hsl(var(--hue, 28) 45% 3%); } .nd-s1 { stop-color: hsl(calc(var(--hue, 28) - 12) 80% 13%); } .nd-s2 { stop-color: hsl(calc(var(--hue, 28) - 4) 100% 34%); }
 .nd-u0 { stop-color: hsl(calc(var(--hue, 28) + 24) 100% 68%); } .nd-u1 { stop-color: hsl(calc(var(--hue, 28) - 22) 100% 52%); }
@@ -371,6 +371,15 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
 .nd-vs0 { stop-color: hsl(var(--hue, 28) 100% 60%); stop-opacity: 0; } .nd-vs1 { stop-color: hsl(var(--hue, 28) 100% 66%); stop-opacity: .75; }
 /* mandala: a flower in layers, blooming across the whole screen */
 .mf { stroke-linejoin: round; }
+/* clouds: rings of beads that open into a drifting cloud */
+html[data-skin="clouds"] { --accent: hsl(var(--hue) 100% 72%); --bg: hsl(var(--hue) 30% 5%); }
+html[data-skin="clouds"] body { background-color: var(--bg); background-image: none; }
+.cl { fill: none; stroke-linecap: round; }
+.cl0 { stroke: hsl(calc(var(--hue, 200) + 60) 60% 45% / .4); }
+.cl1 { stroke: hsl(calc(var(--hue, 200) + 40) 80% 55% / .7); }
+.cl2 { stroke: hsl(calc(var(--hue, 200) + 20) 100% 68%); }
+.cl3 { stroke: hsl(var(--hue, 200) 100% 82%); filter: drop-shadow(0 0 4px hsl(var(--hue, 200) 100% 65%)); }
+.cl-ring { fill: none; stroke: hsl(var(--hue, 200) 100% 82%); stroke-width: 1.2; }
 /* riso: flat overprinted discs of different sizes */
 .rs-c { mix-blend-mode: screen; }
 .rs-c.o { fill: none !important; stroke-width: 3; }
@@ -724,6 +733,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     scope:    { cut: [1500, 7000], len: [0.03, 0.35], fb: [0.3, 0.75], dela: [0.2, 0.8],  revSec: [1, 2.5],   reva: [0.05, 0.4],  res: [0, 10] },
     topo:     { cut: [300, 2200],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9],  res: [3, 14] },
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
+    clouds:   { cut: [1200, 8000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
     ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] }
   };
 
@@ -862,6 +872,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
   const crushCurve = lv => { const c = new Float32Array(1025); for (let k = 0; k < c.length; k++) { const x = k / 1024 * 2 - 1; c[k] = Math.round(x * lv) / lv; } return c; };
 
   const RES_GAIN = 1.8;
+  const HANN = Float32Array.from({ length: 32 }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / 31));
   const VOICES = {
     // riso: a bank of resonators tuned to a major or minor chord, struck by a burst of ink noise (a bit like Rings fed with noise)
     riso: c => {
@@ -882,6 +893,52 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       });
       sum.connect(cr); cr.connect(lp); lp.connect(c.out);
       return t0 + 0.003 + Math.min(T * 3, 1.6);
+    },
+    // clouds: Rings into Clouds from the head. A modal ring (a few slightly inharmonic partials) is struck, written into a 4 s memory together with the last notes,
+    // and grains of that memory (octaves and fifths) are scattered around it. x makes the grains small and dense, a beads-to-fog axis.
+    clouds: c => {
+      const { t0, vel, b, r } = c, sr = ctx.sampleRate, T0 = 0.12 + b.len * 0.5, ins = 0.005 + r[1] * 0.04;
+      const parts = [];
+      for (let k = 0; k < 5; k++) {
+        const fr = c.f * (k + 1) * (1 + ins * k * k);
+        if (fr > 9000) break;
+        parts.push({ fr, a: 0.2 * vel / Math.pow(k + 1, 1.1) / (1 + Math.pow(fr / b.cut, 2)), tau: T0 / (1 + 0.6 * k) });
+      }
+      // the ring itself
+      parts.forEach(p => {
+        const o = c.osc('sine', p.fr), g = c.g(0);
+        g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(p.a, t0 + 0.002); g.gain.setTargetAtTime(0, t0 + 0.002, p.tau);
+        o.connect(g); g.connect(c.out);
+      });
+      // the same ring written into the memory
+      const L = Math.floor(0.9 * sr), cl = b.cl || (b.cl = { size: Math.floor(4 * sr), data: new Float32Array(Math.floor(4 * sr)), w: 0, buf: ctx.createBuffer(1, Math.floor(4 * sr), sr) });
+      const w0 = cl.w, chunk = new Float32Array(L);
+      parts.forEach(p => {
+        const d = Math.exp(-1 / (sr * p.tau)), dp = 2 * Math.PI * p.fr / sr;
+        let env = p.a, ph = 0;
+        for (let i = 0; i < L; i++) { chunk[i] += env * Math.sin(ph); ph += dp; env *= d; }
+      });
+      for (let i = 0; i < L; i++) { const j = (w0 + i) % cl.size; cl.data[j] = cl.data[j] * 0.6 + chunk[i]; }
+      cl.w = (w0 + Math.floor(0.45 * sr)) % cl.size;
+      cl.buf.copyToChannel(cl.data, 0);
+      // the grains
+      const dens = clamp((Math.log2(b.xt || 1) / 1.2 + 1) / 2, 0, 1), N = 3 + Math.round(10 * dens), gs = 0.26 - 0.2 * dens, sec = cl.size / sr;
+      let tail = 0.9;
+      for (let i = 0; i < N; i++) {
+        const ts = t0 + 0.03 + Math.random() * (0.5 + T0 * 3), dur = gs * (0.6 + Math.random() * 0.8), ratio = pick([0.5, 1, 1, 1, 1.5, 2]);
+        let off = Math.random() < 0.6 ? w0 / sr + Math.random() * 0.5 : Math.random() * sec;
+        off = Math.max(0, Math.min(off, sec - dur * ratio - 0.01));
+        const src = ctx.createBufferSource(), g = ctx.createGain(), amp = 0.35 * (0.5 + 0.5 * vel);
+        src.buffer = cl.buf; src.playbackRate.value = ratio;
+        g.gain.value = 0; g.gain.setValueCurveAtTime(Float32Array.from(HANN, v => v * amp), ts, dur);
+        const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+        src.connect(g);
+        if (pn) { pn.pan.value = (Math.random() - 0.5) * 1.6; g.connect(pn); pn.connect(c.out); } else g.connect(c.out);
+        src.onended = () => { try { src.disconnect(); g.disconnect(); if (pn) pn.disconnect(); } catch (e) {} };
+        src.start(ts, off, dur * ratio + 0.01);
+        tail = Math.max(tail, ts + dur - t0);
+      }
+      return t0 + tail + 0.1;
     },
     // scope: laser zaps after the Horologium drums of touch2decay: ZAP (a sine falls from kHz onto the note through tanh), STUTTER (short FM grains), BIT (1-bit noise), plus a CLICK ping in a resonator
     scope: c => {
@@ -1144,7 +1201,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     const skin = document.documentElement.dataset.skin, dubOn = skin === 'mandala';
     const RISO_SCALES = ['MAJOR', 'MINOR', 'DORIAN', 'MIXOLYDIAN'];
     const ACID_SCALES = ['MINOR', 'PHRYGIAN', 'HARM MINOR', 'MIN PENTA', 'BLUES', 'DORIAN'];
-    const sc = skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
+    const sc = skin === 'clouds' ? same(SCALES.filter(x => ['MAJOR', 'MINOR', 'DORIAN', 'MAJ PENTA', 'MIN PENTA'].indexOf(x.name) >= 0)) : skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
     carry = null;
     const pool = [];
     for (let m = LOW; m <= HIGH; m++) {
@@ -1250,7 +1307,8 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
        scope    x laser pitch (sweep and grains) y echo (amount and feedback)
        topo     x drone filter                   y pulse-width sweep (PWM) and reverb
        matrix   x crush depth                    y filter focus (resonance)
-       ridges   x cutoff                         y resonance: the acid pair */
+       ridges   x cutoff                         y resonance: the acid pair
+       clouds   x grain density and size         y reverb and brightness */
   const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
   // The axes do not poke at one world's knobs, they set five shared macros (cut, res, echo, space, color); every world turns them into its own sound.
   // When you swipe to another world with the finger down, the macros stay and glide to the new axes over 1.5 s, so the modulation carries over.
@@ -1261,7 +1319,8 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     scope:   { x: ['color'], y: ['echo'] },
     topo:    { x: ['cut'],   y: ['color', 'space'] },
     matrix:  { x: ['color'], y: ['res'] },
-    ridges:  { x: ['cut'],   y: ['res'] }
+    ridges:  { x: ['cut'],   y: ['res'] },
+    clouds:  { x: ['color'], y: ['space', 'cut'] }
   };
   const MAC = { cut: 0, res: 0, echo: 0, space: 0, color: 0 };   // -1..1 around the press patch
   let glide = null, glideTimer = 0;
@@ -1714,6 +1773,60 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
   }
 
+  function buildClouds() {
+    // beads into a cloud: every note sends a ring of beads out of the finger, the ring opens, the beads let go of it and drift away as a cloud that thins out.
+    // x: few big beads on the left, a fine dense fog on the right (the grains). y: how far and how long the cloud travels (the space).
+    const bins = [0, 1, 2, 3].map(n => se('path', { class: 'cl cl' + n, d: '' }));
+    const W = [3, 5, 7.5, 10];
+    const P = [], rings = [], dust = [];
+    for (let i = 0; i < 46; i++) dust.push({ x: (Math.random() - 0.5) * 420, y: (Math.random() - 0.5) * 900, ph: Math.random() * 6.28, sp: 0.1 + Math.random() * 0.2 });
+    const K = 1.4;
+    function emit(vel) {
+      const n = Math.round(10 + 26 * XV.x), vr = 150 + 190 * XV.y * (0.6 + 0.6 * vel), life = 2.2 + 2.8 * XV.y;
+      for (let i = 0; i < n; i++) P.push({ cx: FP.vx, cy: FP.vy, a: (i + Math.random() * 0.3) / n * TAU, vr: vr * (0.75 + Math.random() * 0.5), sp: (Math.random() - 0.5) * 0.5, seed: Math.random() * 6.28, bias: (Math.random() - 0.5) * 0.25, age: 0, life });
+      while (P.length > 520) P.shift();
+      if (rings.length < 10) rings.push({ el: se('circle', { class: 'cl-ring', cx: f1(FP.vx), cy: f1(FP.vy), r: 10 }), age: 0, vr });
+    }
+    let T = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
+    function draw(dt, env, kick) {
+      T += dt;
+      const ds = ['', '', '', ''], sz = 1.4 - 0.7 * XV.x;
+      for (let q = P.length - 1; q >= 0; q--) {
+        const o = P[q]; o.age += dt;
+        const u = o.age / o.life;
+        if (u >= 1) { P.splice(q, 1); continue; }
+        const r = 10 + (o.vr / K) * (1 - Math.exp(-K * o.age)), a = o.a + o.sp * o.age, wob = Math.min(1, o.age) * 8;
+        const x = o.cx + r * Math.cos(a) + Math.sin(o.age * 1.3 + o.seed) * wob, y = o.cy + r * Math.sin(a) + Math.cos(o.age * 1.1 + o.seed) * wob;
+        const v = u + o.bias, bn = v < 0.15 ? 3 : v < 0.45 ? 2 : v < 0.75 ? 1 : 0;
+        ds[bn] += 'M' + f1(x) + ' ' + f1(y) + 'h0';
+      }
+      for (const d of dust) {
+        const x = d.x + Math.sin(T * d.sp + d.ph) * 40, y = d.y + Math.cos(T * d.sp * 0.8 + d.ph) * 40;
+        ds[(d.ph > 3.14 && env > 0.15) ? 1 : 0] += 'M' + f1(x) + ' ' + f1(y) + 'h0';
+      }
+      bins.forEach((el, n) => { el.setAttribute('d', ds[n]); el.style.strokeWidth = (W[n] * sz * (n === 3 ? 1 + 0.4 * kick : 1)).toFixed(1); });
+      for (let q = rings.length - 1; q >= 0; q--) {
+        const g = rings[q]; g.age += dt;
+        if (g.age > 0.8) { g.el.remove(); rings.splice(q, 1); continue; }
+        g.el.setAttribute('r', (10 + (g.vr / K) * (1 - Math.exp(-K * g.age))).toFixed(1)); g.el.setAttribute('stroke-opacity', (0.7 * (1 - g.age / 0.8)).toFixed(2));
+      }
+    }
+    function frame(now) {
+      if (dead) return;
+      raf = requestAnimationFrame(frame);
+      const env = Math.max(0, litN) / 60;
+      if (now - lastDraw < (seq || cur || kick > 0.01 || P.length ? 16 : 42)) return;
+      const dt = Math.min(0.1, (now - last) / 1000) * ACT;
+      last = lastDraw = now;
+      xvStep(dt);
+      draw(dt, env, kick);
+    }
+    draw(0.016, 0, 0);
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = lastDraw = performance.now(); raf = requestAnimationFrame(frame); }
+    SK.note = (i, vel) => emit(vel);
+    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
+  }
+
   function buildRiso() {
     // flat overprinted discs of many sizes drift about; every note flashes one at the finger, the kick makes them all swell
     const COL = ['hsl(calc(var(--rh) + 0) 100% 62%)', 'hsl(calc(var(--rb)) 100% 62%)', 'hsl(calc(var(--rh) + 70) 100% 62%)'];
@@ -2064,8 +2177,8 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
   }
 
   // skins can be swapped at any time: clear the old full-screen layer, build the new one, redraw the current pattern
-  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges'];   // paper and donut are light: kept in the code, out of the rotation
-  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E' };
+  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds'];   // paper and donut are light: kept in the code, out of the rotation
+  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12' };
   function applySkin(name) {
     skin = name;
     root.setAttribute('data-skin', name);
@@ -2077,7 +2190,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
     else root.style.removeProperty('--accent');
-    ({ amber: buildAmber, riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges }[name] || (() => {}))();
+    ({ amber: buildAmber, riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges, clouds: buildClouds }[name] || (() => {}))();
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
