@@ -680,7 +680,8 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     try { b.out.gain.setTargetAtTime(0, ctx.currentTime, 0.4); } catch (e) {}
     setTimeout(() => {
       try { b.lfo.stop(); } catch (e) {}
-      [b.inp, b.out, b.dl, b.dr, b.fb, b.dlp, b.dhp, b.dsend, b.rsend, b.conv, b.lfo, b.lfoG, b.pl, b.pr].forEach(n => { try { n.disconnect(); } catch (e) {} });
+      b.mods.forEach(n => { try { if (n.stop) n.stop(); n.disconnect(); } catch (e) {} });
+      [b.sat, b.inp, b.out, b.dl, b.dr, b.fb, b.dlp, b.dhp, b.dsend, b.rsend, b.conv, b.lfo, b.lfoG, b.pl, b.pr].forEach(n => { try { n.disconnect(); } catch (e) {} });
     }, 3000);
   }
 
@@ -703,7 +704,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
       res: rnd(0, 15),                      // filter resonance, dB
       len: rnd(0.05, 0.75),                 // stab length: tau = 0.035 + len^2 * 1.8
       delT: stepDur * pick(DUB_DT),
-      delFb: rnd(0.3, 0.85),
+      delFb: rnd(0.3, 0.82),
       delAmt: Math.random() < 0.15 ? 0 : rnd(0.12, 0.95),
       delTone: lrnd(900, 5000),
       revSec: rnd(1.2, 4.5),
@@ -725,7 +726,10 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     const dhp = ctx.createBiquadFilter(); dhp.type = 'highpass'; dhp.frequency.value = 160;
     const dsend = ctx.createGain(); dsend.gain.value = P.delAmt;
     const dret = ctx.createGain(); dret.gain.value = 0.9;
-    inp.connect(dsend); dsend.connect(dl); dl.connect(dlp); dlp.connect(dhp); dhp.connect(fb); fb.connect(dr); dr.connect(dl);
+    inp.connect(dsend); dsend.connect(dl); dl.connect(dlp); dlp.connect(dhp); const sat = ctx.createWaveShaper(), sc = new Float32Array(1025);
+    for (let k = 0; k < sc.length; k++) sc[k] = Math.tanh((k / (sc.length - 1) * 2 - 1) * 1.5) / 1.5;   // the loop can saturate softly but never run away
+    sat.curve = sc;
+    dhp.connect(sat); sat.connect(fb); fb.connect(dr); dr.connect(dl);
     const pl = pan(-0.8), pr = pan(0.8);
     if (pl && pr) { dl.connect(pl); dr.connect(pr); pl.connect(dret); pr.connect(dret); } else { dl.connect(dret); dr.connect(dret); }
     dret.connect(out);
@@ -736,7 +740,23 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = P.lfoRate;
     const lfoG = ctx.createGain(); lfoG.gain.value = P.lfoAmt;
     lfo.connect(lfoG); lfo.start();
-    const bus = Object.assign({ inp, out, dl, dr, fb, dlp, dhp, dsend, rsend, conv, lfo, lfoG, pl, pr }, P);
+    // extra slow LFOs (60% of presses, one or two): resonance, echo feedback, echo amount, reverb amount, tape wow.
+    // every depth is capped relative to the base value, so nothing can go negative, past the feedback ceiling or into overload
+    const mods = [];
+    const bus = Object.assign({ inp, out, dl, dr, fb, sat, dlp, dhp, dsend, rsend, conv, lfo, lfoG, pl, pr, mods, resG: null }, P);
+    if (Math.random() < 0.6) {
+      const names = ['res', 'fb', 'delAmt', 'revAmt', 'wow'].sort(() => Math.random() - 0.5).slice(0, Math.random() < 0.4 ? 2 : 1);
+      names.forEach(nm => {
+        const o = ctx.createOscillator(); o.type = pick(['sine', 'sine', 'triangle']); o.frequency.value = lrnd(0.03, 0.5); o.start();
+        const g = ctx.createGain(), d = rnd(0.3, 0.9);
+        o.connect(g); mods.push(o, g);
+        if (nm === 'res') { g.gain.value = 3.5 * d; bus.resG = g; }
+        else if (nm === 'fb') { g.gain.value = d * Math.max(0, Math.min(P.delFb - 0.1, 0.86 - P.delFb)); g.connect(fb.gain); }
+        else if (nm === 'delAmt') { g.gain.value = d * 0.5 * P.delAmt; g.connect(dsend.gain); }
+        else if (nm === 'revAmt') { g.gain.value = d * 0.5 * P.revAmt; g.connect(rsend.gain); }
+        else { g.gain.value = d * 0.005; g.connect(dl.delayTime); g.connect(dr.delayTime); }
+      });
+    }
     disposeBus(lastBus);
     lastBus = bus;
     return bus;
@@ -753,10 +773,11 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
       l.frequency.setTargetAtTime(b.cut, t0 + A, 0.04 + tau * 0.3);
       b.lfoG.connect(l.detune);
     });
+    if (b.resG) b.resG.connect(lp1.Q);
     const vca = ctx.createGain(), kill = ctx.createGain();
     const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     if (pn) pn.pan.value = (Math.random() - 0.5) * b.spread;
-    const amp = (0.3 * (0.75 + 0.25 * st.vel)) / Math.sqrt(st.chord.length);
+    const amp = (0.3 * (0.75 + 0.25 * st.vel) * (1 - 0.35 * b.res / 15)) / Math.sqrt(st.chord.length);
     vca.gain.setValueAtTime(0, t0);
     vca.gain.linearRampToValueAtTime(amp, t0 + A);
     vca.gain.setTargetAtTime(0, t0 + A, tau);
@@ -776,6 +797,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     oscs[0].onended = () => {
       [lp1, lp2, vca, kill, pn].forEach(n => { try { n && n.disconnect(); } catch (e) {} });
       [lp1, lp2].forEach(l => { try { b.lfoG.disconnect(l.detune); } catch (e) {} });
+      if (b.resG) { try { b.resG.disconnect(lp1.Q); } catch (e) {} }
       oscs.forEach(o => { try { o.disconnect(); } catch (e) {} });
       const qi = queued.indexOf(v);
       if (qi >= 0) queued.splice(qi, 1);
