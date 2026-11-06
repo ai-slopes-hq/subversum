@@ -656,6 +656,119 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     });
   }
 
+  /* ---------- dub techno chords (mandala skin only) ---------- */
+  // Each press rolls a chord bus: filter, resonance, delay time/feedback/amount and reverb length/amount are all random.
+  const isDub = () => document.documentElement.dataset.skin === 'mandala';
+  let lastBus = null;
+
+  function makeIR(sec) {
+    const n = Math.floor(ctx.sampleRate * sec), b = ctx.createBuffer(2, n, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = b.getChannelData(c);
+      let lp = 0;
+      for (let i = 0; i < n; i++) {
+        const t = i / n;
+        lp += ((Math.random() * 2 - 1) - lp) * (0.06 + 0.8 * Math.exp(-4 * t)); // darker as it decays
+        d[i] = lp * Math.exp(-6.9 * t);
+      }
+    }
+    return b;
+  }
+
+  function disposeBus(b) {
+    if (!b) return;
+    try { b.out.gain.setTargetAtTime(0, ctx.currentTime, 0.4); } catch (e) {}
+    setTimeout(() => {
+      try { b.lfo.stop(); } catch (e) {}
+      [b.inp, b.out, b.dl, b.fb, b.dlp, b.dhp, b.dsend, b.rsend, b.conv, b.lfo, b.lfoG].forEach(n => { try { n.disconnect(); } catch (e) {} });
+    }, 3000);
+  }
+
+  function rollDub(stepDur) {
+    const P = {
+      cut: lrnd(350, 5200),                 // chord filter cutoff
+      res: rnd(0, 16),                      // chord filter resonance, dB
+      decay: lrnd(0.18, 1.1),
+      delT: stepDur * pick([2, 3, 3, 4, 6]),// tempo-synced delay: 1/8, dotted 1/8, 1/4, dotted 1/4
+      delFb: rnd(0.35, 0.78),
+      delAmt: Math.random() < 0.15 ? 0 : rnd(0.1, 0.9),
+      delTone: lrnd(1200, 5000),
+      revSec: rnd(1.2, 4.5),
+      revAmt: Math.random() < 0.15 ? 0.05 : rnd(0.15, 0.85),
+      lfoRate: lrnd(0.04, 0.4),
+      lfoAmt: rnd(0, 1100),                 // cents of cutoff drift
+      wave: pick(['sawtooth', 'sawtooth', 'square']),
+      det: rnd(4, 14)
+    };
+    const inp = ctx.createGain(), out = ctx.createGain();
+    out.connect(master);
+    const dry = ctx.createGain(); dry.gain.value = 0.85; inp.connect(dry); dry.connect(out);
+    const dl = ctx.createDelay(3); dl.delayTime.value = Math.min(2.9, P.delT);
+    const fb = ctx.createGain(); fb.gain.value = P.delFb;
+    const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = P.delTone;
+    const dhp = ctx.createBiquadFilter(); dhp.type = 'highpass'; dhp.frequency.value = 160;
+    const dsend = ctx.createGain(); dsend.gain.value = P.delAmt;
+    const dret = ctx.createGain(); dret.gain.value = 0.9;
+    inp.connect(dsend); dsend.connect(dl); dl.connect(dlp); dlp.connect(dhp); dhp.connect(fb); fb.connect(dl);
+    dhp.connect(dret); dret.connect(out);
+    const conv = ctx.createConvolver(); conv.buffer = makeIR(P.revSec);
+    const rsend = ctx.createGain(); rsend.gain.value = P.revAmt;
+    const rret = ctx.createGain(); rret.gain.value = 0.8;
+    inp.connect(rsend); dret.connect(rsend); rsend.connect(conv); conv.connect(rret); rret.connect(out);
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = P.lfoRate;
+    const lfoG = ctx.createGain(); lfoG.gain.value = P.lfoAmt;
+    lfo.connect(lfoG); lfo.start();
+    const bus = Object.assign({ inp, out, dl, fb, dlp, dhp, dsend, rsend, conv, lfo, lfoG }, P);
+    disposeBus(lastBus);
+    lastBus = bus;
+    return bus;
+  }
+
+  function playDub(s, st, idx, when) {
+    const b = s.dub, t0 = when + 0.012, tau = b.decay / 3, ta = t0 + 0.006;
+    const mix = ctx.createGain(); mix.gain.value = 1 / Math.sqrt(st.chord.length * 2);
+    const lpf = ctx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.Q.value = b.res;
+    const vca = ctx.createGain(), kill = ctx.createGain();
+    vca.gain.value = 0;
+    mix.connect(lpf); lpf.connect(vca); vca.connect(kill); kill.connect(b.inp);
+    b.lfoG.connect(lpf.detune);
+    const oscs = [];
+    st.chord.forEach(m => {
+      const f = 440 * Math.pow(2, (m - 69) / 12);
+      [-b.det, b.det].forEach(c => {
+        const o = ctx.createOscillator(); o.type = b.wave; o.frequency.value = f; o.detune.value = c;
+        o.connect(mix); oscs.push(o);
+      });
+    });
+    const peak = 0.55 * (1 - 0.4 * b.res / 16) * st.vel;
+    vca.gain.setValueAtTime(0, t0);
+    vca.gain.linearRampToValueAtTime(peak, ta);
+    vca.gain.setTargetAtTime(0, ta, tau);
+    const lo = Math.max(80, b.cut * 0.25);
+    lpf.frequency.setValueAtTime(lo, t0);
+    lpf.frequency.exponentialRampToValueAtTime(b.cut, ta + 0.01);
+    lpf.frequency.setTargetAtTime(lo, ta + 0.01, tau * 0.8);
+    const end = ta + tau * 8;
+    oscs.forEach(o => { o.start(t0); o.stop(end); });
+    const grp = { stop: t => oscs.forEach(o => { try { o.stop(t); } catch (e) {} }) };
+    const v = { osc: grp, mod: grp, kill, t0, cancelled: false };
+    oscs[0].onended = () => {
+      [mix, lpf, vca, kill].forEach(n => { try { n.disconnect(); } catch (e) {} });
+      try { b.lfoG.disconnect(lpf.detune); } catch (e) {}
+      oscs.forEach(o => { try { o.disconnect(); } catch (e) {} });
+      const qi = queued.indexOf(v);
+      if (qi >= 0) queued.splice(qi, 1);
+    };
+    queued.push(v);
+    atTime(t0, () => {
+      if (v.cancelled) return;
+      cur = { t0, a: 0.006, tau };
+      flashStep(idx, st.vel);
+      pulse(st.vel);
+      if (!raf) raf = requestAnimationFrame(loop);
+    });
+  }
+
   let tapPatch = null; // the patch of the last tap; a held melody keeps playing it
   function press() {
     go.classList.remove('hit');
@@ -671,6 +784,14 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
   let seq = null;
 
   function makeStep(s) {
+    if (s.dub) {
+      // dub techno: sparse stabs, each one a chord built in thirds from the scale (root, 3rd, 5th, sometimes 7th)
+      if (Math.random() < 0.45) return null;
+      s.idx = Math.max(0, Math.min(s.pool.length - 1, s.idx + pick([-2, -1, 0, 0, 1, 2])));
+      const chord = [s.pool[s.idx]];
+      [2, 4, 6].forEach((d, k) => { const m = s.pool[s.idx + d]; if (m !== undefined && (k < 2 || Math.random() < 0.5)) chord.push(m); });
+      return { midi: chord[0], chord, vel: Math.random() < 0.3 ? 1 : rnd(0.6, 0.85) };
+    }
     if (Math.random() < 0.22) return null; // rest
     if (Math.random() < 0.15) s.idx = Math.floor(Math.random() * s.pool.length);
     else s.idx = Math.max(0, Math.min(s.pool.length - 1, s.idx + pick([-3, -2, -1, -1, 0, 1, 1, 2, 3])));
@@ -685,11 +806,12 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     for (let m = LOW; m <= HIGH; m++) {
       if (sc.iv.indexOf(((m - root) % 12 + 12) % 12) !== -1) pool.push(m);
     }
-    const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0 };
+    const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0, dub: null };
+    if (isDub()) s.dub = rollDub(s.dur);
     for (let k = 0; k < STEPS; k++) s.steps.push(makeStep(s));
     ensureLfo(s.timbre);
     // the first step is always a clear note, so a quick tap catches exactly one good hit
-    if (!s.steps[0]) s.steps[0] = { midi: pool[s.idx], vel: 1 };
+    if (!s.steps[0]) s.steps[0] = s.dub ? { midi: pool[s.idx], chord: [pool[s.idx]], vel: 1 } : { midi: pool[s.idx], vel: 1 };
     s.steps[0].vel = 1;
     return s;
   }
@@ -700,6 +822,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     const st = s.steps[idx];
     s.i = (s.i + 1) % STEPS;
     if (!st) return;
+    if (s.dub) { playDub(s, st, idx, t); return; }
     const midi = st.midi;
     play(Object.assign({}, s.timbre, {
       oct: midi < 36 ? 1 : 2,
