@@ -1241,7 +1241,10 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 
   let carry = null, handoffMac = false;   // set when a swipe passes a held press on to the next world: tempo, key and scale carry over
   function makeSeq() {
-    const bpm = carry ? carry.bpm : Math.round(rnd(BPM_MIN, BPM_MAX));
+    let bpm = carry ? carry.bpm : Math.round(rnd(BPM_MIN, BPM_MAX));
+    // clouds plays at half the clock (about 55 to 68 BPM); a tempo carried over a swipe is halved or doubled to match
+    const isCl = document.documentElement.getAttribute('data-skin') === 'clouds';
+    if (isCl) { if (bpm > 90) bpm = Math.round(bpm / 2); } else if (bpm < 90) bpm *= 2;
     const root = carry ? carry.root : Math.floor(Math.random() * 12);
     const same = list => (carry && list.filter(x => x.name === carry.sc)[0]) || pick(list);
     const skin = document.documentElement.dataset.skin, dubOn = skin === 'mandala';
@@ -1564,7 +1567,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     if (d) { cut = d.cut; res = d.res; env = d.env; len = d.len; space = (d.revAmt + d.delAmt) / 2; range = (TW[root.dataset.skin] || {}).cut || [140, 3800]; }
     else { cut = p.cutoff; res = p.res; env = p.depth / DEPTH_MAX; len = lnr(p.decay, 0.12, 1.8); space = 0.1; fm = p.fmIdx / FM_MAX; }
     const bright = c01(lnr(cut, range[0], range[1]) * 0.85 + 0.15 * env), res01 = c01(res / 20);
-    const dens = sq.steps.filter(Boolean).length / STEPS, tempo = c01((sq.bpm - BPM_MIN) / (BPM_MAX - BPM_MIN));
+    const dens = sq.steps.filter(Boolean).length / STEPS, tempo = c01(((sq.bpm < 90 ? sq.bpm * 2 : sq.bpm) - BPM_MIN) / (BPM_MAX - BPM_MIN));
     const act = c01((0.3 * res01 + 0.25 * env + 0.2 * dens + 0.15 * tempo + 0.1 * (1 - len) - 0.3) / 0.5);
     const cold = c01((0.45 * bright + 0.2 * space + 0.2 * res01 + 0.15 * fm - 0.2) / 0.6);
     return { bright, act, cold };
