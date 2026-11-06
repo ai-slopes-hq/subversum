@@ -942,38 +942,54 @@ html.swap-in .stage, html.swap-in .skinsvg { animation: swapin .32s cubic-bezier
   const DEMO = [1, 0, 0.6, 0, 0.8, 0.7, 0, 0.5, 1, 0, 0.7, 0, 0.6, 0, 0.8, 0.5].map(v => v ? { vel: v } : null);
 
   function buildTopo() {
-    const wob = (r0, k, a) => r0 + (2 + k * 1.05) * Math.sin(3 * a + k * 0.55) + (1.2 + k * 0.6) * Math.sin(5 * a - k * 0.35) + (0.8 + k * 0.4) * Math.sin(2 * a + k * 0.9);
-    const ringD = (r0, k) => {
-      let d = '';
-      for (let i = 0; i <= 120; i++) { const a = i / 120 * TAU; d += (i ? 'L' : 'M') + vpt(wob(r0, k, a), a); }
-      return d + 'Z';
-    };
-    let faint = '', mid = '', idx = '';
-    for (let k = 0; k < 28; k++) {
-      if (k === 3) continue;
-      const d = ringD(70 + k * 13, k);
-      if (k % 5 === 0) idx += d; else if (k < 13) mid += d; else faint += d;
-    }
-    const gs = [['a', 'tp-f', faint], ['b', 'tp-m', mid], ['c', 'tp-i', idx]].map(([c, cls, d]) => {
+    // the contours are alive: every ring is recomputed each frame from slowly drifting phases, so the whole map flows;
+    // the music speeds the drift up and swells the relief, the 16 step arcs ride on one of the rings
+    const A = (k, a, t) => (2 + k * 1.05) * Math.sin(3 * a + k * 0.55 + t * 0.35) + (1.2 + k * 0.6) * Math.sin(5 * a - k * 0.35 - t * 0.27) + (0.8 + k * 0.4) * Math.sin(2 * a + k * 0.9 + t * 0.2);
+    const parts = [['a', 'tp-f'], ['b', 'tp-m'], ['c', 'tp-i']].map(([c, cls]) => {
       const outer = se('g', { class: 'tp-spin ' + c }), inner = se('g', {}, outer);
-      se('path', { class: cls, d }, inner);
-      return inner;
+      return se('path', { class: cls, d: '' }, inner);
     });
-    const arc = i => {
-      let d = '';
-      for (let j = 0; j <= 14; j++) { const a = (i + 0.08 + 0.84 * j / 14) / 16 * TAU; d += (j ? 'L' : 'M') + vpt(wob(94, 3, a), a); }
-      return d;
-    };
     const steps = [];
-    for (let i = 0; i < STEPS; i++) steps.push(se('path', { class: 'tp-step', d: arc(i) }));
+    for (let i = 0; i < STEPS; i++) steps.push(se('path', { class: 'tp-step', d: '' }));
+    let tt = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
+    function draw(m) {
+      const ds = ['', '', ''];
+      for (let k = 0; k < 28; k++) {
+        if (k === 3) continue;
+        const r0 = 70 + k * 13;
+        let d = '';
+        for (let i = 0; i <= 96; i++) { const a = i / 96 * TAU; d += (i ? 'L' : 'M') + vpt(r0 + m * A(k, a, tt), a); }
+        ds[k % 5 === 0 ? 2 : k < 13 ? 1 : 0] += d + 'Z';
+      }
+      parts.forEach((el, n) => el.setAttribute('d', ds[n]));
+      for (let i = 0; i < STEPS; i++) {
+        let d = '';
+        for (let j = 0; j <= 12; j++) { const a = (i + 0.08 + 0.84 * j / 12) / 16 * TAU; d += (j ? 'L' : 'M') + vpt(94 + m * A(3, a, tt), a); }
+        steps[i].setAttribute('d', d);
+      }
+    }
+    function frame(now) {
+      if (dead) return;
+      raf = requestAnimationFrame(frame);
+      const env = Math.max(0, litN) / 60, busy = seq || cur || kick > 0.01;
+      if (!busy && now - lastDraw < 42) return;        // at rest the map drifts at about 24 fps
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = lastDraw = now;
+      tt += dt * (0.8 + 3 * env + 2 * kick);
+      draw(1 + 0.5 * env + 0.6 * kick);
+    }
+    draw(1);
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      last = lastDraw = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
     SK.pattern = sq => steps.forEach((el, i) => {
       const st = sq.steps[i];
       el.setAttribute('class', 'tp-step' + (st ? ' n' : ''));
       el.style.strokeWidth = st ? (3.5 + 4 * st.vel).toFixed(1) : '1.6';
     });
     SK.note = i => popHit(steps[i], 700);
-    SK.frame = (t, env, kick) => gs.forEach((g, n) => { g.style.transform = 'scale(' + (1 + kick * 0.012 * (n + 1) + env * 0.006 * (n + 1)).toFixed(4) + ')'; });
-    SK.idle = () => gs.forEach(g => { g.style.transform = ''; });
   }
 
   function buildMatrix() {
@@ -1091,6 +1107,7 @@ html.swap-in .stage, html.swap-in .skinsvg { animation: swapin .32s cubic-bezier
     const m = document.querySelector('meta[name=theme-color]');
     if (m) m.setAttribute('content', THEME[name]);
     while (skinSvg.firstChild) skinSvg.removeChild(skinSvg.firstChild);
+    if (SK.dispose) SK.dispose();
     Object.keys(SK).forEach(k => { delete SK[k]; });
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
