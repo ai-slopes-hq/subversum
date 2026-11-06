@@ -1016,7 +1016,9 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
         const o = ctx.createOscillator(), g = ctx.createGain();
         o.type = shape || 'sine'; o.frequency.value = rate; g.gain.value = amt; o.connect(g); g.connect(target); o.start(t0);
         srcs.push(o); nodes.push(g);
+        return g;
       };
+      const pwmG = [];
       const rA = lrnd(0.03, 0.12), rB = lrnd(0.1, 0.35);
       lfo(rA, 1100, lp1.detune); lfo(rB, 500, lp2.detune);   // cutoff drift, in cents
       const curve = new Float32Array(2049);
@@ -1028,14 +1030,15 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
         if (hasCS) {
           const sh = ctx.createWaveShaper(); sh.curve = curve; sh.oversample = '2x';
           const pw = ctx.createConstantSource(); pw.offset.value = rnd(-0.2, 0.2); pw.start(t0); srcs.push(pw);
-          lfo(lrnd(0.04, 0.3), 0.6, pw.offset, pick(['sine', 'triangle']));      // pulse width drift
+          pwmG.push(lfo(lrnd(0.04, 0.3), 0.6, pw.offset, pick(['sine', 'triangle'])));      // pulse width drift
           saw.connect(sh); pw.connect(sh); sh.connect(out); nodes.push(sh);
         } else saw.connect(out);
         out.connect(lp1);
       };
       pwm(f, -5, 0.12); pwm(f, 6, 0.12); pwm(f * 1.4983, 0, 0.07);
       let prevB = 0;
-      return { xy(cut) { const n = ctx.currentTime; lp1.frequency.setTargetAtTime(cut, n, 0.08); lp2.frequency.setTargetAtTime(cut, n, 0.08); }, mod() {
+      // y sweeps the pulse width wider towards the top, never past 0.85 so the pulse never closes
+      return { xy(cut, y) { const n = ctx.currentTime; lp1.frequency.setTargetAtTime(cut, n, 0.08); lp2.frequency.setTargetAtTime(cut, n, 0.08); pwmG.forEach(g => g.gain.setTargetAtTime(0.12 + 0.73 * y, n, 0.15)); }, mod() {
         const t = ctx.currentTime - t0, a = Math.sin(TAU * rA * t), bb = Math.sin(TAU * rB * t);
         const beat = prevB < 0 && bb >= 0; prevB = bb;      // one beat per cycle of the faster cutoff LFO
         return { env: 0.5 + 0.28 * a + 0.22 * bb, phase: ((rB * t) % 1 + 1) % 1, beat };
@@ -1232,10 +1235,10 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
   /* ---------- the finger as an XY pad: every skin has its own two sound parameters ----------
      x (left to right) and y (down to up) are relative to what the press rolled, so the patch keeps its character and the finger bends it.
        amber    x brightness (cutoff)            y harmonics (FM index and fold depth)
-       mandala  x filter cutoff                  y echo (amount and feedback): the classic dub pair
+       mandala  x echo (amount and feedback)     y filter cutoff and resonance: the dub pair
        riso     x brightness of the chord        y ring length and reverb
        scope    x laser pitch (sweep and grains) y echo (amount and feedback)
-       topo     x drone filter                   y reverb
+       topo     x drone filter                   y pulse-width sweep (PWM) and reverb
        matrix   x crush depth                    y filter focus (resonance)
        ridges   x cutoff                         y resonance: the acid pair */
   const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
@@ -1243,9 +1246,9 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     const sk = skin, b = lastBus, now = ctx ? ctx.currentTime : 0;
     if (sk === 'amber') { XM.cut = Math.pow(2, nx * 1.4); XM.fm = Math.pow(2, ny * 0.9); XM.fold = Math.pow(2, ny * 0.5); return; }
     if (!ctx || !b || !b.base) return;
-    const cut = m => { b.cut = clamp(b.base.cut * Math.pow(2, nx * m), 60, 12000); };
-    const echo = () => {
-      const da = clamp(b.base.delAmt + 0.45 * ny, 0, 0.95), fbk = clamp(b.base.delFb + 0.25 * ny, 0.1, 0.8);
+    const cut = (v, m) => { b.cut = clamp(b.base.cut * Math.pow(2, v * m), 60, 12000); };
+    const echo = v => {
+      const da = clamp(b.base.delAmt + 0.45 * v, 0, 0.95), fbk = clamp(b.base.delFb + 0.25 * v, 0.1, 0.8);
       b.delAmt = da; b.dsend.gain.setTargetAtTime(da, now, 0.05);
       if (b.mg.delAmt) b.mg.delAmt.g.gain.value = b.mg.delAmt.d * 0.5 * da;
       b.delFb = fbk; b.fb.gain.setTargetAtTime(fbk, now, 0.05);
@@ -1256,12 +1259,12 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       b.revAmt = ra; b.rsend.gain.setTargetAtTime(ra, now, 0.05);
       if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * ra;
     };
-    if (sk === 'mandala') { cut(1.6); echo(); }
-    else if (sk === 'riso') { cut(1.5); b.len = clamp(b.base.len + 0.4 * ny, 0.02, 0.95); rev(); }
-    else if (sk === 'scope') { b.xt = Math.pow(2, nx * 1.2); echo(); }
-    else if (sk === 'topo') { cut(1.6); if (cont && cont.xy) cont.xy(b.cut); rev(); }
+    if (sk === 'mandala') { echo(nx); cut(ny, 1.6); b.res = clamp(b.base.res + ny * 6, 0, 16); }
+    else if (sk === 'riso') { cut(nx, 1.5); b.len = clamp(b.base.len + 0.4 * ny, 0.02, 0.95); rev(); }
+    else if (sk === 'scope') { b.xt = Math.pow(2, nx * 1.2); echo(ny); }
+    else if (sk === 'topo') { cut(nx, 1.6); if (cont && cont.xy) cont.xy(b.cut, (ny + 1) / 2); rev(); }
     else if (sk === 'matrix') { b.xc = Math.round(nx * 7); b.res = clamp(b.base.res + ny * 8, 0, 16); }
-    else if (sk === 'ridges') { cut(1.5); b.res = clamp(b.base.res + ny * 8, 1, 20); if (seq && seq.acidV) seq.acidV.setRes(b.res); }
+    else if (sk === 'ridges') { cut(nx, 1.5); b.res = clamp(b.base.res + ny * 8, 1, 20); if (seq && seq.acidV) seq.acidV.setRes(b.res); }
   }
 
   function stopMelody() {
@@ -1586,7 +1589,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       xvStep(dt);
       parts[0].style.strokeOpacity = 0.22 * (0.5 + XV.x); parts[1].style.strokeOpacity = Math.min(1, 0.5 * (0.5 + XV.x));
       parts[2].style.strokeOpacity = 0.6 + 0.35 * XV.x; parts[2].style.strokeWidth = (3.2 - 1.8 * XV.x).toFixed(2);
-      draw(1 + 0.5 * env + 0.6 * kick);
+      draw((1 + 0.5 * env + 0.6 * kick) * (0.7 + 0.8 * XV.y));   // y sweeps the pulse width: the relief swells and shrinks with it
     }
     draw(1);
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
@@ -1740,7 +1743,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
 
   function buildMandala() {
     // the flower in five layers of petals. Everything breathes: each petal sways on its own phase, the layers turn at the speed of the music, a note sends a wave of swelling out from the centre and echo rings from the finger.
-    // x = brightness and spin (the filter), y = how many echo rings follow a note (the echo). The finger also pulls a glow and shifts the layers in parallax.
+    // y = brightness and spin (the filter and resonance), x = how many echo rings follow a note (the echo). The finger also pulls a glow and shifts the layers in parallax.
     const defs = se('defs');
     const rg = se('radialGradient', { id: 'mdglow', gradientUnits: 'userSpaceOnUse', cx: 0, cy: 0, r: 300 }, defs);
     se('stop', { offset: 0, class: 'md-g0' }, rg); se('stop', { offset: 1, class: 'md-g1' }, rg);
@@ -1766,7 +1769,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       rip.push({ el: null, age: -delay, a });
     }
     function draw(dt, env, kick) {
-      const on = seq || cur, bright = 0.6 + 0.8 * XV.x, spin = (0.5 + 1.5 * XV.x) * (1 + 2.5 * env + 1.5 * kick);
+      const on = seq || cur, bright = 0.6 + 0.8 * XV.y, spin = (0.5 + 1.5 * XV.y) * (1 + 2.5 * env + 1.5 * kick);
       T += dt;
       const since = performance.now() / 1000 - noteT;
       layers.forEach((L, li) => {
@@ -1811,7 +1814,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = performance.now(); raf = requestAnimationFrame(frame); } else { open = 1; draw(0.016, 0, 0); }
     SK.note = () => {
       noteT = performance.now() / 1000;
-      const n = 1 + Math.round(2.4 * XV.y);                    // more echo, more rings
+      const n = 1 + Math.round(2.4 * XV.x);                    // more echo, more rings
       for (let k = 0; k < n; k++) echoRing(k * 0.24, 0.55 * Math.pow(0.6, k));
     };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
