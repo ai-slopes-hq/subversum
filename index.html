@@ -148,8 +148,6 @@ body {
 html[data-skin="scope"] { --sh: calc(var(--hue) * .5 + 100); --bg: hsl(var(--sh) 60% 3%); --tick: hsl(var(--sh) 70% 14%); --tick-hi: hsl(var(--sh) 60% 40%); --ink: hsl(var(--sh) 100% 76%); --accent: hsl(var(--sh) 100% 65%); }
 html[data-skin="scope"] body {
   background:
-    linear-gradient(hsl(var(--sh) 55% 12%) 1px, transparent 1px) 0 0 / 39px 39px,
-    linear-gradient(90deg, hsl(var(--sh) 55% 12%) 1px, transparent 1px) 0 0 / 39px 39px,
     radial-gradient(circle at 50% 50%, hsl(var(--sh) 60% 5%) 0%, hsl(var(--sh) 60% 3%) 70%, hsl(var(--sh) 60% 2%) 100%);
 }
 html[data-skin="scope"] body::after {
@@ -358,9 +356,14 @@ html[data-skin="ridges"] .go { inset: 33%; }
 /* no button and no sequencer ring in scope, topo, matrix and ridges: the waves start at the finger. amber, riso and mandala keep the button */
 html[data-skin="scope"] .go, html[data-skin="topo"] .go, html[data-skin="matrix"] .go, html[data-skin="ridges"] .go { display: none; }
 html[data-skin="topo"] .ring, html[data-skin="matrix"] .ring, html[data-skin="ridges"] .ring { display: none; }
-html[data-skin="scope"] .ring .ink { display: none; }
-html[data-skin="scope"] .dial { translate: var(--tx, 0px) var(--ty, 0px); transition: translate .18s ease-out; }
-html.snap[data-skin="scope"] .dial { transition: none; }
+html[data-skin="scope"] .dial { display: none; }
+html[data-skin="scope"] .skinsvg { display: block; }
+/* scope: Conway's Game of Life; age sets size and brightness */
+.lf { fill: none; stroke-linecap: round; }
+.lf0 { stroke: hsl(var(--sh, 140) 45% 15%); stroke-width: 4; }
+.lf1 { stroke: hsl(var(--sh, 140) 70% 30%); stroke-width: 8; }
+.lf2 { stroke: hsl(var(--sh, 140) 90% 48%); stroke-width: 11; }
+.lf3 { stroke: hsl(var(--sh, 140) 100% 72%); stroke-width: 13; filter: drop-shadow(0 0 3px hsl(var(--sh, 140) 100% 60%)); }
 .tp-ripple { fill: none; stroke: hsl(var(--tp, 38) 80% 78%); stroke-width: 1.6; }
 </style>
 
@@ -1439,8 +1442,6 @@ html.snap[data-skin="scope"] .dial { transition: none; }
     if (skin === 'riso') {
       root.style.setProperty('--jx', (rx * kick).toFixed(2));
       root.style.setProperty('--jy', (ry * kick).toFixed(2));
-    } else if (skin === 'scope' && ctx) {
-      drawWave(ctx.currentTime, env, kick, head);
     }
     if (SK.frame && ctx) SK.frame(ctx.currentTime, env, kick, head);
     if (seq || cur || kick > 0.01 || head >= 0) {
@@ -1450,7 +1451,6 @@ html.snap[data-skin="scope"] .dial { transition: none; }
       root.style.setProperty('--kick', 0);
       root.style.setProperty('--jx', 0);
       root.style.setProperty('--jy', 0);
-      if (skin === 'scope') drawWave(0, 0, 0, -1);
       if (SK.idle) SK.idle();
     }
   }
@@ -1620,6 +1620,53 @@ html.snap[data-skin="scope"] .dial { transition: none; }
     SK.touch = () => spawn(1.1);
   }
 
+  function buildScope() {
+    // Conway's Game of Life on a torus. Every note fires a glider (loud) or a blinker (soft) at the finger and advances the field one generation; when nothing plays it drifts slowly
+    const C = 26, R = 56, S = 15, X0 = -195 + S / 2, Y0 = -420 + S / 2;
+    let a = new Uint8Array(C * R), b = new Uint8Array(C * R);
+    const age = new Uint8Array(C * R), ghost = new Uint8Array(C * R);
+    const bins = [0, 1, 2, 3].map(n => se('path', { class: 'lf lf' + n, d: '' }));
+    const at = (c, r) => ((r + R) % R) * C + ((c + C) % C);
+    function draw() {
+      const ds = ['', '', '', ''];
+      for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+        const i = r * C + c;
+        const n = a[i] ? (age[i] < 2 ? 3 : age[i] < 4 ? 2 : 1) : ghost[i] ? 0 : -1;
+        if (n >= 0) ds[n] += 'M' + (X0 + c * S) + ' ' + (Y0 + r * S) + 'h0';
+      }
+      bins.forEach((el, n) => el.setAttribute('d', ds[n]));
+    }
+    function step() {
+      let pop = 0;
+      for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+        const i = r * C + c;
+        const n = a[at(c - 1, r - 1)] + a[at(c, r - 1)] + a[at(c + 1, r - 1)] + a[at(c - 1, r)] + a[at(c + 1, r)] + a[at(c - 1, r + 1)] + a[at(c, r + 1)] + a[at(c + 1, r + 1)];
+        b[i] = a[i] ? (n === 2 || n === 3 ? 1 : 0) : (n === 3 ? 1 : 0);
+        ghost[i] = a[i] && !b[i] ? 1 : 0;
+        age[i] = b[i] ? (a[i] ? Math.min(9, age[i] + 1) : 0) : 0;
+        pop += b[i];
+      }
+      const t = a; a = b; b = t;
+      if (pop < 14) soup(0.12);                                  // the world died out: new soup
+      else if (pop > 420) for (let i = 0; i < a.length; i++) if (a[i] && Math.random() < 0.3) a[i] = 0;   // too crowded: thin it
+    }
+    function soup(d) { for (let i = 0; i < a.length; i++) if (Math.random() < d) { a[i] = 1; age[i] = 5; } }   // the soup starts dim
+    const GL = [[1, 0], [2, 1], [0, 2], [1, 2], [2, 2]];
+    function spawn(vel) {
+      const c0 = Math.max(1, Math.min(C - 2, Math.floor((FP.vx + 195) / S))), r0 = Math.max(1, Math.min(R - 2, Math.floor((FP.vy + 420) / S)));
+      const fx = Math.random() < 0.5 ? -1 : 1, fy = Math.random() < 0.5 ? -1 : 1;
+      const cells = vel > 0.6 ? GL : (Math.random() < 0.5 ? [[0, 1], [1, 1], [2, 1]] : [[1, 0], [1, 1], [1, 2]]);
+      cells.forEach(q => { const i = at(c0 + fx * (q[0] - 1), r0 + fy * (q[1] - 1)); a[i] = 1; age[i] = 0; });
+    }
+    let lastStep = 0;
+    function tick() { step(); draw(); lastStep = performance.now(); }
+    soup(0.1); draw();
+    const timer = setInterval(() => { if (performance.now() - lastStep > 420) tick(); }, 500);
+    SK.note = (i, vel) => { spawn(vel); tick(); };
+    SK.frame = (t, env, kick) => { bins[3].style.strokeWidth = (13 + 4 * kick).toFixed(1); };
+    SK.dispose = () => clearInterval(timer);
+  }
+
   function buildMatrix() {
     const dots = [];
     for (let i = 0; i < 13; i++) for (let j = 0; j < 28; j++) dots.push([-180 + i * 30, -406 + j * 30]);
@@ -1725,7 +1772,7 @@ html.snap[data-skin="scope"] .dial { transition: none; }
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
     else root.style.removeProperty('--accent');
-    ({ topo: buildTopo, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges }[name] || (() => {}))();
+    ({ topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges }[name] || (() => {}))();
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
