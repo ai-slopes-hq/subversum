@@ -7,11 +7,11 @@
 <script>
 // the look is picked at random on every launch; ?skin=riso|scope|amber forces one
 (function () {
-  var all = ['amber', 'riso', 'scope', 'topo', 'matrix'], k = all[Math.floor(Math.random() * all.length)];
-  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
+  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges'], k = all[Math.floor(Math.random() * all.length)];
+  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
   document.documentElement.setAttribute('data-skin', k);
   var m = document.querySelector('meta[name=theme-color]');
-  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6' }[k]);
+  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E' }[k]);
 })();
 </script>
 <meta name="mobile-web-app-capable" content="yes">
@@ -312,6 +312,46 @@ html.swap-in .stage, html.swap-in .skinsvg { animation: swapin .32s cubic-bezier
 @media (prefers-reduced-motion: reduce) {
   html.swap-out .stage, html.swap-out .skinsvg, html.swap-in .stage, html.swap-in .skinsvg { animation: none; }
   .tp-spin, .dn-sugar, .tp-step.hit, .mx-dot.hit, .pp-b.hit, .dn-s.hit { animation: none; }
+}
+
+/* mandala and ridges: dark skins with their own full-screen layer */
+html[data-skin="mandala"] .skinsvg, html[data-skin="ridges"] .skinsvg { display: block; }
+html[data-skin="mandala"] .bg, html[data-skin="ridges"] .bg,
+html[data-skin="mandala"] .dial::before, html[data-skin="ridges"] .dial::before,
+html[data-skin="mandala"] .ring line, html[data-skin="ridges"] .ring line,
+html[data-skin="mandala"] .go .steps, html[data-skin="ridges"] .go .steps { display: none; }
+html[data-skin="mandala"] .go > svg, html[data-skin="ridges"] .go > svg { width: 46%; height: 46%; }
+html[data-skin="mandala"] .go::after, html[data-skin="ridges"] .go::after { background: radial-gradient(circle, hsl(var(--hue) 100% 75% / .5) 0%, transparent 72%); }
+html[data-skin="mandala"], html[data-skin="ridges"] { --accent: hsl(var(--hue) 100% 70%); --bg: hsl(var(--hue) 28% 5%); }
+html[data-skin="mandala"] body, html[data-skin="ridges"] body { background-color: var(--bg); background-image: none; }
+html[data-skin="ridges"] body { transition: none; }
+html[data-skin="mandala"] .go, html[data-skin="ridges"] .go { background: hsl(var(--hue) 35% 7%); border: 2px solid var(--accent); box-shadow: 0 0 24px hsl(var(--hue) 100% 60% / .35); }
+html[data-skin="mandala"] .go { inset: 34%; }
+html[data-skin="ridges"] .go { inset: 33%; }
+
+/* mandala */
+.md-spin { animation: mdspin 90s linear infinite; }
+.md-spin.b { animation-duration: 140s; animation-direction: reverse; }
+.md-spin.a { animation-duration: 200s; }
+@keyframes mdspin { to { transform: rotate(360deg); } }
+.md-ring { fill: none; stroke: hsl(var(--hue, 38) 80% 60% / .35); stroke-width: 2; stroke-linecap: round; }
+.md-ring.thin { stroke-dasharray: none; stroke-width: 1; stroke: hsl(var(--hue, 38) 80% 60% / .2); }
+.md-p, .md-q { transform-origin: 0px -66px; transition: transform .22s cubic-bezier(.2, .9, .3, 1.3); }
+.md-p { fill: hsl(var(--hue, 38) 100% 62% / .12); stroke: hsl(var(--hue, 38) 100% 70% / .4); stroke-width: 1.4; stroke-linejoin: round; }
+.md-p.n { fill: hsl(var(--hue, 38) 100% 62% / .34); stroke: hsl(var(--hue, 38) 100% 72%); }
+.md-q { fill: hsl(calc(var(--hue, 38) + 40) 100% 62% / .1); stroke: hsl(calc(var(--hue, 38) + 40) 100% 70% / .45); stroke-width: 1; stroke-linejoin: round; }
+.md-p.hit { animation: mdhit .7s ease-out; }
+@keyframes mdhit { 0% { fill: hsl(calc(var(--hue, 38) + 150) 100% 70% / .85); stroke: #fff; stroke-width: 3; } }
+
+/* ridges */
+.rg-bg { fill: var(--bg); }
+.rg-l { fill: var(--bg); stroke: hsl(var(--hue, 38) 100% 68%); stroke-width: 1.3; stroke-linejoin: round; }
+.rg-dot { fill: hsl(var(--hue, 38) 60% 32%); transform-box: fill-box; transform-origin: center; }
+.rg-dot.n { fill: hsl(var(--hue, 38) 100% 72%); }
+.rg-dot.hit { animation: rghit .6s cubic-bezier(.2, .9, .3, 1.3); }
+@keyframes rghit { 0% { fill: #fff; transform: scale(2.6); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .md-spin, .md-p.hit, .rg-dot.hit { animation: none; }
 }
 </style>
 
@@ -992,6 +1032,105 @@ html.swap-in .stage, html.swap-in .skinsvg { animation: swapin .32s cubic-bezier
     SK.note = i => popHit(steps[i], 700);
   }
 
+  function buildMandala() {
+    const petal = (L, w) => 'M0 -66C' + w + ' ' + (-66 - L * 0.25) + ' ' + (w * 0.8) + ' ' + (-66 - L * 0.75) + ' 0 ' + (-66 - L) +
+      'C' + (-w * 0.8) + ' ' + (-66 - L * 0.75) + ' ' + (-w) + ' ' + (-66 - L * 0.25) + ' 0 -66Z';
+    const layer = cls => { const wrap = se('g'); return { wrap, spin: se('g', { class: 'md-spin ' + cls }, wrap) }; };
+    const A = layer('a'), B = layer('b'), C = layer('c');
+    se('circle', { class: 'md-ring', r: 150, 'stroke-dasharray': '2 9' }, A.spin);
+    se('circle', { class: 'md-ring', r: 196, 'stroke-dasharray': '1 14' }, A.spin);
+    se('circle', { class: 'md-ring thin', r: 232 }, A.spin);
+    const inner = [], petals = [], sc = [];
+    for (let i = 0; i < STEPS; i++) {
+      inner.push(se('path', { class: 'md-q', d: petal(52, 8) }, se('g', { transform: 'rotate(' + ((i + 0.5) * 22.5) + ')' }, B.spin)));
+    }
+    for (let i = 0; i < STEPS; i++) {
+      petals.push(se('path', { class: 'md-p', d: petal(100, 13) }, se('g', { transform: 'rotate(' + (i * 22.5) + ')' }, C.spin)));
+      sc.push([0.5, 0.16]);
+    }
+    const put = (el, sx, sy) => { el.style.transform = 'scale(' + sx.toFixed(2) + ',' + sy.toFixed(2) + ')'; };
+    SK.pattern = sq => {
+      petals.forEach((el, i) => {
+        const st = sq.steps[i], nx = sq.steps[(i + 1) % STEPS];
+        sc[i] = st ? [0.65 + 0.35 * st.vel, 0.3 + 0.7 * st.vel] : [0.5, 0.16];
+        el.setAttribute('class', 'md-p' + (st ? ' n' : ''));
+        put(el, sc[i][0], sc[i][1]);
+        const v = ((st ? st.vel : 0) + (nx ? nx.vel : 0)) / 2;
+        put(inner[i], 0.55 + 0.45 * v, 0.2 + 0.8 * v);
+      });
+    };
+    SK.note = i => {
+      popHit(petals[i], 700);
+      put(petals[i], sc[i][0] * 1.15, sc[i][1] * 1.3);
+      clearTimeout(petals[i]._s);
+      petals[i]._s = setTimeout(() => put(petals[i], sc[i][0], sc[i][1]), 150);
+    };
+    SK.frame = (t, env, kick) => {
+      C.wrap.style.transform = 'scale(' + (1 + 0.03 * kick + 0.012 * env).toFixed(4) + ')';
+      B.wrap.style.transform = 'scale(' + (1 + 0.05 * kick).toFixed(4) + ')';
+      A.wrap.style.transform = 'scale(' + (1 + 0.08 * kick).toFixed(4) + ')';
+    };
+    SK.idle = () => [A, B, C].forEach(l => { l.wrap.style.transform = ''; });
+  }
+
+  function buildRidges() {
+    // a stack of ridgelines, hidden-line style: every note sends a bump from its own x position up through the stack
+    const N = 36, X0 = -195, X1 = 195, M = 64, DY = 17, Y0 = -300;
+    se('rect', { class: 'rg-bg', x: -2000, y: -2000, width: 4000, height: 4000 });
+    const lines = [];
+    for (let j = 0; j < N; j++) lines.push(se('path', { class: 'rg-l', d: '', 'stroke-opacity': (0.25 + 0.75 * j / (N - 1)).toFixed(2) }));
+    const dots = [];
+    for (let i = 0; i < STEPS; i++) dots.push(se('circle', { class: 'rg-dot', cx: -150 + i * 20, cy: 376, r: 3 }));
+    const pulses = [];
+    let tt = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
+    const bell = x => Math.exp(-(x * x) / (2 * 95 * 95));
+    function draw(env) {
+      for (let j = 0; j < N; j++) {
+        const y = Y0 + j * DY;
+        let d = '';
+        for (let m = 0; m <= M; m++) {
+          const x = X0 + (X1 - X0) * m / M;
+          let h = (Math.sin(x * 0.045 + j * 0.9 + tt * 0.5) * 0.6 + Math.sin(x * 0.1 - j * 0.55 + tt * 0.33) * 0.4) * (2 + 9 * env) * bell(x);
+          for (let q = 0; q < pulses.length; q++) {
+            const pu = pulses[q], pos = (N - 1 - j) - pu.p;
+            if (pos > -6 && pos < 6) {
+              const sx = 14 + pu.p * 1.4;
+              h += pu.a * 34 * Math.exp(-(pos * pos) / 9.7) * Math.exp(-((x - pu.x) * (x - pu.x)) / (2 * sx * sx)) * Math.exp(-pu.p / 18);
+            }
+          }
+          d += (m ? 'L' : 'M') + f1(x) + ' ' + f1(y - h);
+        }
+        lines[j].setAttribute('d', d + 'L' + X1 + ' 480L' + X0 + ' 480Z');
+      }
+    }
+    function frame(now) {
+      if (dead) return;
+      raf = requestAnimationFrame(frame);
+      const env = Math.max(0, litN) / 60, busy = seq || cur || kick > 0.01 || pulses.length;
+      if (!busy && now - lastDraw < 42) return;
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = lastDraw = now;
+      tt += dt * (0.8 + 2.5 * env + 1.5 * kick);
+      for (let q = pulses.length - 1; q >= 0; q--) { pulses[q].p += dt * 26; if (pulses[q].p > 34) pulses.splice(q, 1); }
+      draw(env);
+    }
+    draw(0.2);
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      last = lastDraw = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
+    SK.pattern = sq => dots.forEach((el, i) => {
+      const st = sq.steps[i];
+      el.setAttribute('r', st ? (3.4 + 3.6 * st.vel).toFixed(1) : '2');
+      el.setAttribute('class', 'rg-dot' + (st ? ' n' : ''));
+    });
+    SK.note = (i, vel) => {
+      popHit(dots[i], 600);
+      pulses.push({ x: -150 + i * 20, p: 0, a: 0.45 + 0.9 * vel });
+    };
+  }
+
   function buildMatrix() {
     const dots = [];
     for (let i = 0; i < 13; i++) for (let j = 0; j < 28; j++) {
@@ -1099,8 +1238,8 @@ html.swap-in .stage, html.swap-in .skinsvg { animation: swapin .32s cubic-bezier
   }
 
   // skins can be swapped at any time: clear the old full-screen layer, build the new one, redraw the current pattern
-  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix'];   // paper and donut are light: kept in the code, out of the rotation
-  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6' };
+  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges'];   // paper and donut are light: kept in the code, out of the rotation
+  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E' };
   function applySkin(name) {
     skin = name;
     root.setAttribute('data-skin', name);
@@ -1112,7 +1251,7 @@ html.swap-in .stage, html.swap-in .skinsvg { animation: swapin .32s cubic-bezier
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
     else root.style.removeProperty('--accent');
-    ({ topo: buildTopo, matrix: buildMatrix, paper: buildPaper, donut: buildDonut }[name] || (() => {}))();
+    ({ topo: buildTopo, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges }[name] || (() => {}))();
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
