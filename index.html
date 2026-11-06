@@ -888,7 +888,6 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   const crushCurve = lv => { const c = new Float32Array(1025); for (let k = 0; k < c.length; k++) { const x = k / 1024 * 2 - 1; c[k] = Math.round(x * lv) / lv; } return c; };
 
   const RES_GAIN = 1.8;
-  const RISO_RES = 2.2;
   let ZH = 0, zT0 = 0, zTimer = 0;   // Z: how long the finger has been held, 0..1 (one second of nothing, then it opens over about 11 s); only clouds and topo use it
   const CURVES = new Map();
   const HANN = Float32Array.from({ length: 32 }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / 31));
@@ -927,37 +926,25 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     }, 40);
   }
   const VOICES = {
-    // riso: crystal drops in the manner of colour bass. A rich low and mid body (a sub and two detuned saws that drop in pitch for a few tens of ms) is the thing that
-    // strikes a bank of high-Q chord resonators, which are pushed out in front of it: each chord note is a glassy droplet, strummed a few ms apart, ringing for the ring length.
+    // riso: a bank of resonators tuned to a major or minor chord, struck by a burst of ink noise (a bit like Rings fed with noise)
     riso: c => {
-      const { t0, vel, b, r } = c, T = 0.25 + b.len * 1.6, n = Math.min(c.chord.length, 5);
-      const rootF = 440 * Math.pow(2, (c.chord[0] + 12 - 69) / 12);
-      const saws = c.g(1), sub = c.g(0), body = c.g(1), blp = c.bq('lowpass', clamp(b.cut * 0.35, 500, 2600), 0.8), mix = c.g(1), lp = c.bq('lowpass', b.cut, 0.7);
-      const tau = 0.07 + 0.12 * T;
-      [['sine', 1, 0, sub, 0.9], ['sawtooth', 2, 9, saws, 0.4], ['sawtooth', 2, -9, saws, 0.4]].forEach(q => {
-        const o = c.osc(q[0], rootF * q[1] * 1.5, q[2]), g = c.g(0);
-        o.frequency.setValueAtTime(rootF * q[1] * 1.5, t0); o.frequency.setTargetAtTime(rootF * q[1], t0, 0.035);   // the drop
-        g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(q[4] * vel, t0 + 0.004); g.gain.setTargetAtTime(0, t0 + 0.004, tau);
-        o.connect(g); g.connect(q[0] === 'sine' ? sub : saws);
-      });
-      sub.connect(body); saws.connect(body); body.connect(blp); blp.connect(mix);
-      // the click that wakes the resonators, kept dark so it does not hiss
-      const ck = c.g(0), clp = c.bq('lowpass', 3500, 0.7); c.noise().connect(clp); clp.connect(ck); ck.gain.setValueAtTime(0, t0); ck.gain.linearRampToValueAtTime(0.5 * vel, t0 + 0.001); ck.gain.setTargetAtTime(0, t0 + 0.001, 0.004);
-      const exs = c.g(1); saws.connect(exs); ck.connect(exs);
-      const stag = 0.012 + 0.02 * r[2], rs = c.g(1);
-      c.chord.slice(0, n).forEach((m, k) => {
-        let f = 440 * Math.pow(2, (m + 36 - 69) / 12); while (f < 380) f *= 2; while (f > 2400) f /= 2;
-        [1, 2].forEach(h => {
-          const fr = f * h; if (fr > 7000) return;
-          const q = clamp(Math.PI * fr * T * 0.7 / (h === 2 ? 1.5 : 1), 14, 170), ts = t0 + k * stag;
-          const ex = c.g(0), bp = c.bq('bandpass', fr * 1.05, q), a = c.g(RISO_RES * Math.sqrt(q) / Math.sqrt(n) * (h === 2 ? 0.4 : 1));
-          ex.gain.setValueAtTime(0, ts); ex.gain.linearRampToValueAtTime(vel, ts + 0.002); ex.gain.setTargetAtTime(0, ts + 0.002, 0.03);
-          bp.frequency.setValueAtTime(fr * 1.05, ts); bp.frequency.setTargetAtTime(fr, ts, 0.03);   // each droplet falls a little into its pitch
-          exs.connect(ex); ex.connect(bp); bp.connect(a); a.connect(rs);
+      const { t0, vel, b, r } = c, T = 0.25 + b.len * 1.6;
+      const ex = c.g(0), sum = c.g(1), cr = c.shaper(crushCurve(14 + Math.floor(r[0] * 50))), lp = c.bq('lowpass', b.cut, 0.7 + b.res * 0.3);
+      ex.gain.setValueAtTime(0, t0); ex.gain.linearRampToValueAtTime(vel, t0 + 0.001); ex.gain.setTargetAtTime(0, t0 + 0.001, 0.008);
+      c.noise().connect(ex);
+      const n = c.chord.length;
+      c.chord.forEach(m => {
+        const f0 = 440 * Math.pow(2, (m - 69) / 12);
+        [1, 2, 3].forEach((h, k) => {
+          const f = f0 * h;
+          if (f > 9000) return;
+          const q = Math.max(8, Math.min(300, Math.PI * f * T / (1 + k * 0.6)));   // narrower at low pitch means longer ring
+          const bp = c.bq('bandpass', f, q), a = c.g(RES_GAIN * q / (h * h) / Math.sqrt(n));
+          ex.connect(bp); bp.connect(a); a.connect(sum);
         });
       });
-      mix.connect(lp); rs.connect(lp); lp.connect(c.out);
-      return t0 + 0.05 + Math.min(4 * T, 4);
+      sum.connect(cr); cr.connect(lp); lp.connect(c.out);
+      return t0 + 0.003 + Math.min(T * 3, 1.6);
     },
     // clouds: a kalimba tine (fundamental plus two quickly dying beam overtones and a thumb click) is struck and written into a 4 s memory
     // together with the last notes; cloudRun cuts grains out of that memory. x makes the grains small and dense, a beads-to-fog axis.
