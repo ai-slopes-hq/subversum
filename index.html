@@ -711,6 +711,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     setTimeout(() => {
       try { b.lfo.stop(); } catch (e) {}
       b.mods.forEach(n => { try { if (n.stop) n.stop(); n.disconnect(); } catch (e) {} });
+      if (b.sh) b.sh.nodes.forEach(n => { try { if (n.stop) n.stop(); n.disconnect(); } catch (e) {} });
       [b.sat, b.inp, b.out, b.dl, b.dr, b.fb, b.dlp, b.dhp, b.dsend, b.rsend, b.conv, b.lfo, b.lfoG, b.pl, b.pr].forEach(n => { try { n.disconnect(); } catch (e) {} });
     }, 3000);
   }
@@ -733,7 +734,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     scope:    { cut: [1500, 7000], len: [0.03, 0.35], fb: [0.3, 0.75], dela: [0.2, 0.8],  revSec: [1, 2.5],   reva: [0.05, 0.4],  res: [0, 10] },
     topo:     { cut: [300, 2200],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9],  res: [3, 14] },
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
-    clouds:   { cut: [3000, 11000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
+    clouds:   { shimmer: true, cut: [3000, 11000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
     ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] }
   };
 
@@ -780,13 +781,33 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     const rsend = ctx.createGain(); rsend.gain.value = P.revAmt;
     const rret = ctx.createGain(); rret.gain.value = 0.8;
     inp.connect(rsend); dret.connect(rsend); rsend.connect(conv); conv.connect(rret); rret.connect(out);
+    // shimmer (clouds): the reverb tail goes through an octave-up shifter (two delay lines whose time falls by one second per second, cross-faded by Hann windows)
+    // and comes back into the reverb, so every pass climbs an octave and melts away in the dark low pass
+    let sh = null;
+    if (tw && tw.shimmer) {
+      const W = 0.06, n = Math.round(ctx.sampleRate * W), rb = ctx.createBuffer(1, n, ctx.sampleRate), wb = ctx.createBuffer(1, n, ctx.sampleRate), rd = rb.getChannelData(0), wd = wb.getChannelData(0);
+      for (let i = 0; i < n; i++) { rd[i] = W * (1 - i / n); wd[i] = Math.pow(Math.sin(Math.PI * i / n), 2); }
+      const sum = ctx.createGain(), srcs = [];
+      [0, W / 2].forEach(off => {
+        const dly = ctx.createDelay(0.2), gg = ctx.createGain(), a = ctx.createBufferSource(), w = ctx.createBufferSource();
+        dly.delayTime.value = 0; gg.gain.value = 0;
+        a.buffer = rb; w.buffer = wb; a.loop = w.loop = true;
+        a.connect(dly.delayTime); w.connect(gg.gain);
+        conv.connect(dly); dly.connect(gg); gg.connect(sum);
+        const t = ctx.currentTime + 0.01; a.start(t, off); w.start(t, off); srcs.push(a, w, dly, gg);
+      });
+      const shlp = ctx.createBiquadFilter(); shlp.type = 'lowpass'; shlp.frequency.value = 6500; shlp.Q.value = 0.5;
+      const shfb = ctx.createGain(); shfb.gain.value = 0.3; const shout = ctx.createGain(); shout.gain.value = 0.3;
+      sum.connect(shlp); shlp.connect(shfb); shfb.connect(rsend); shlp.connect(shout); shout.connect(out);
+      sh = { shout, shfb, nodes: [sum, shlp, shfb, shout].concat(srcs) };
+    }
     const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = P.lfoRate;
     const lfoG = ctx.createGain(); lfoG.gain.value = P.lfoAmt;
     lfo.connect(lfoG); lfo.start();
     // extra slow LFOs (60% of presses, one or two): resonance, echo feedback, echo amount, reverb amount, tape wow.
     // every depth is capped relative to the base value, so nothing can go negative, past the feedback ceiling or into overload
     const mods = [];
-    const bus = Object.assign({ inp, out, dl, dr, fb, sat, dlp, dhp, dsend, rsend, conv, lfo, lfoG, pl, pr, mods, resG: null, mg: {}, xt: 1, xc: 0 }, P);
+    const bus = Object.assign({ inp, out, dl, dr, fb, sat, dlp, dhp, dsend, rsend, conv, lfo, lfoG, pl, pr, mods, resG: null, mg: {}, xt: 1, xc: 0, dry, sh }, P);
     bus.base = { cut: P.cut, res: P.res, len: P.len, delAmt: P.delAmt, delFb: P.delFb, revAmt: P.revAmt };
     if (Math.random() < 0.6) {
       const names = ['res', 'fb', 'delAmt', 'revAmt', 'wow'].sort(() => Math.random() - 0.5).slice(0, Math.random() < 0.4 ? 2 : 1);
@@ -1379,6 +1400,13 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     const ra = clamp(b.base.revAmt + 0.4 * MAC.space, 0, 0.9);
     b.revAmt = ra; b.rsend.gain.setTargetAtTime(ra, now, 0.05);
     if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * ra;
+    if (b.sh) {   // clouds: near the top of the y axis the sound goes fully wet, the dry signal melts away and the octave-up shimmer opens
+      const w = clamp((MAC.space - 0.3) / 0.7, 0, 1), sw = w * w * (3 - 2 * w);
+      b.dry.gain.setTargetAtTime(0.85 * (1 - 0.92 * sw), now, 0.08);
+      const rb = clamp(ra + 0.55 * sw, 0, 1.4); b.revAmt = rb; b.rsend.gain.setTargetAtTime(rb, now, 0.05);
+      if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * rb;
+      b.sh.shout.gain.setTargetAtTime(0.18 + 0.5 * sw, now, 0.1); b.sh.shfb.gain.setTargetAtTime(0.18 + 0.2 * sw, now, 0.1);
+    }
     if (sk === 'riso') b.len = clamp(b.base.len + 0.4 * MAC.space, 0.02, 0.95);
     b.xt = Math.pow(2, MAC.color * 1.2); b.xc = Math.round(MAC.color * 7);
     if (sk === 'topo' && cont && cont.xy) cont.xy(b.cut, (MAC.color + 1) / 2);
