@@ -701,9 +701,9 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
   const TW = {
     riso:     { cut: [1800, 9000], len: [0.05, 0.5],  fb: [0.2, 0.6],  dela: [0.1, 0.6],  revSec: [0.6, 1.6], reva: [0.05, 0.35] },
     scope:    { cut: [1500, 7000], len: [0.03, 0.35], fb: [0.3, 0.75], dela: [0.2, 0.8],  revSec: [1, 2.5],   reva: [0.05, 0.4],  res: [0, 10] },
-    topo:     { cut: [300, 2500],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9] },
+    topo:     { cut: [300, 2200],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9],  res: [3, 14] },
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
-    ridges:   { cut: [250, 2200],  len: [0.15, 0.6],  fb: [0.3, 0.7],  dela: [0.1, 0.5],  revSec: [1.5, 3.5], reva: [0.2, 0.6] },
+    ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] },
     approach: { cut: [800, 5000],  len: [0.3, 0.8],   fb: [0.4, 0.8],  dela: [0.2, 0.7],  revSec: [3, 5],     reva: [0.4, 0.9] }
   };
 
@@ -836,6 +836,8 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     return noiseBuf;
   };
+  const tanhCurve = k => { const c = new Float32Array(1025), n = Math.tanh(k); for (let i = 0; i < c.length; i++) c[i] = Math.tanh(k * (i / 1024 * 2 - 1)) / n; return c; };
+  const signCurve = () => { const c = new Float32Array(1025); for (let i = 0; i < c.length; i++) c[i] = i < 512 ? -1 : 1; return c; };
   const crushCurve = lv => { const c = new Float32Array(1025); for (let k = 0; k < c.length; k++) { const x = k / 1024 * 2 - 1; c[k] = Math.round(x * lv) / lv; } return c; };
 
   const RES_GAIN = 1.8;
@@ -860,30 +862,43 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
       sum.connect(cr); cr.connect(lp); lp.connect(c.out);
       return t0 + 0.003 + Math.min(T * 3, 1.6);
     },
-    // scope: a vector blip, pitch falls from above onto the note, light FM
+    // scope: laser zaps after the Horologium drums of touch2decay: ZAP (a sine falls from kHz onto the note through tanh), STUTTER (short FM grains), BIT (1-bit noise), plus a CLICK ping in a resonator
     scope: c => {
-      const { t0, f, vel, b, r } = c, tau = 0.03 + b.len * b.len * 0.6;
-      const k = Math.pow(2, 1 + r[0] * 3), sw = 0.02 + r[1] * 0.06;
-      const o = c.osc(r[2] < 0.5 ? 'triangle' : 'sine', f);
-      o.frequency.setValueAtTime(f * k, t0); o.frequency.exponentialRampToValueAtTime(f, t0 + sw);
-      const ratio = [1, 2, 3, 0.5][Math.floor(r[3] * 4)], m = c.osc('sine', f * ratio), mg = c.g(0);
-      mg.gain.setValueAtTime(f * ratio * b.env * 3, t0); mg.gain.setTargetAtTime(0, t0, tau * 0.5);
-      m.connect(mg); mg.connect(o.frequency);
-      const lp = c.bq('lowpass', b.cut * 3, 0.7 + b.res * 0.5), v = c.g(0);
-      v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(0.4 * vel, t0 + 0.002); v.gain.setTargetAtTime(0, t0 + 0.002, tau);
-      o.connect(lp); lp.connect(v); v.connect(c.out);
-      return t0 + 0.002 + Math.min(tau * 6, 1.4);
-    },
-    // topo: a slow swell, soft triangles with a fifth, the filter opens like a hill
-    topo: c => {
-      const { t0, f, vel, b, r } = c, A = 0.03 + r[0] * 0.2, tau = 0.2 + b.len * 0.9;
-      const lp = c.bq('lowpass', b.cut * 0.4, 0.7 + b.res * 0.2), v = c.g(0);
-      lp.frequency.setValueAtTime(b.cut * 0.4, t0); lp.frequency.linearRampToValueAtTime(b.cut * 1.4, t0 + A + tau);
-      v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(0.26 * vel, t0 + A); v.gain.setTargetAtTime(0, t0 + A, tau);
-      [['triangle', f, -7], ['triangle', f, 7], ['sine', f * 1.4983, 0]].forEach(([ty, fr, dt]) => { const o = c.osc(ty, fr, dt); o.connect(lp); });
-      lp.connect(v); v.connect(c.out);
-      const end = t0 + A + Math.min(tau * 5, 1.8);
-      v.gain.setTargetAtTime(0, end - 0.3, 0.08);
+      const { t0, f, vel, b, r } = c;
+      const tint = 0.5 + r[0] * 1.5, tp = 0.003 + r[1] * 0.012, T60 = 0.07 + b.len * 0.5, tau = T60 / 6.9;
+      const mode = r[2] < 0.55 ? 'zap' : r[2] < 0.85 ? 'stutter' : 'bit';
+      const sum = c.g(1), drive = c.shaper(tanhCurve(2.4)), hp = c.bq('highpass', 140 + r[3] * 900, 0.7);
+      let end = t0;
+      if (mode === 'zap') {
+        const o = c.osc(r[3] < 0.5 ? 'sine' : 'sawtooth', f), e = c.g(0);
+        o.frequency.setValueAtTime(f + 8000 * tint * (0.5 + 0.5 * vel), t0); o.frequency.setTargetAtTime(f, t0, tp);
+        e.gain.setValueAtTime(0.55 * vel, t0); e.gain.setTargetAtTime(0, t0 + 0.001, tau);
+        o.connect(e); e.connect(sum);
+        end = t0 + Math.min(tau * 6, 1.2);
+      } else if (mode === 'stutter') {
+        const reps = 3 + Math.floor(b.len * 8), base = 1800 * tint;
+        let tt = t0, gap = 0.012 + r[1] * 0.012;
+        for (let k = 0; k < reps; k++) {
+          const fk = base * (1 + 0.25 * k), car = c.osc('sine', fk), mod = c.osc('sine', fk * 1.37), mg = c.g(fk * 3), e = c.g(0);
+          mod.connect(mg); mg.connect(car.frequency);
+          e.gain.setValueAtTime(0, t0); e.gain.setValueAtTime(0.6 * vel * Math.pow(0.8, k), tt); e.gain.setTargetAtTime(0, tt + 0.0005, 0.0012 + b.len * 0.004);
+          car.connect(e); e.connect(sum);
+          tt += gap; gap *= 0.7;
+        }
+        end = tt + 0.12;
+      } else {
+        const n = c.noise(), bit = c.shaper(signCurve()), bh = c.bq('highpass', 6000 * tint, 0.7), e = c.g(0);
+        e.gain.setValueAtTime(0.5 * vel, t0); e.gain.setTargetAtTime(0, t0 + 0.001, 0.004 + b.len * 0.03);
+        n.connect(bit); bit.connect(bh); bh.connect(e); e.connect(sum);
+        end = t0 + 0.25;
+      }
+      if (vel > 0.9 || r[3] > 0.6) {                         // a ping: a burst of noise into a narrow resonator
+        const n = c.noise(), bp = c.bq('bandpass', 1500 + r[1] * 4500, 60), e = c.g(0), pg = c.g(14);
+        e.gain.setValueAtTime(0.4 * vel, t0); e.gain.setTargetAtTime(0, t0, 0.002);
+        n.connect(e); e.connect(bp); bp.connect(pg); pg.connect(sum);
+        end = Math.max(end, t0 + 0.4);
+      }
+      sum.connect(drive); drive.connect(hp); hp.connect(c.out);
       return end;
     },
     // matrix: chip blips, four stuttering sub-steps, crushed and run through a stepped band-pass
@@ -897,38 +912,6 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
       for (let i = 0; i < 4; i++) { v.gain.setValueAtTime(1.6 * vel * (i ? 0.7 : 1), t0 + i * sub); v.gain.setTargetAtTime(0, t0 + i * sub, tau); }
       o.connect(cr); cr.connect(bp); bp.connect(v); v.connect(c.out);
       return t0 + 4 * sub + tau * 5;
-    },
-    // ridges: a cold bass pluck, detuned saws that chorus on their own, and a metal ring
-    ridges: c => {
-      const { t0, f, vel, b } = c, tau = 0.08 + b.len * b.len * 0.9;
-      const lp = c.bq('lowpass', b.cut, 0.7 + b.res * 0.4), v = c.g(0), peak = Math.min(5000, b.cut * Math.pow(2, b.env * 4 * vel));
-      lp.frequency.setValueAtTime(peak, t0); lp.frequency.setTargetAtTime(b.cut, t0 + 0.004, 0.05 + tau * 0.2);
-      v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(0.34 * vel, t0 + 0.004); v.gain.setTargetAtTime(0, t0 + 0.004, tau);
-      [-9, 9].forEach(d => c.osc('sawtooth', f, d).connect(lp));
-      const ring = c.osc('sine', f * 4.01), rg = c.g(0);
-      rg.gain.setValueAtTime(0.1 * vel, t0); rg.gain.setTargetAtTime(0, t0, 0.06);
-      ring.connect(rg); rg.connect(c.out);
-      lp.connect(v); v.connect(c.out);
-      return t0 + 0.004 + Math.min(tau * 5, 1.6);
-    },
-    // approach: a rush that passes by, then a bell that climbs up to its note
-    approach: c => {
-      const { t0, f, vel, b, r } = c, tau = 0.25 + b.len * 1.2;
-      const n = c.noise(), bp = c.bq('bandpass', 300, 2 + b.res * 0.3), ne = c.g(0);
-      bp.frequency.setValueAtTime(300, t0); bp.frequency.exponentialRampToValueAtTime(2500 + r[0] * 2500, t0 + 0.14);
-      ne.gain.setValueAtTime(0, t0); ne.gain.linearRampToValueAtTime(0.14 * vel, t0 + 0.09); ne.gain.setTargetAtTime(0, t0 + 0.1, 0.07);
-      n.connect(bp); bp.connect(ne); ne.connect(c.out);
-      const v = c.g(0), glide = Math.pow(2, -(2 + r[1] * 5) / 12);
-      v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(0.3 * vel, t0 + 0.012); v.gain.setTargetAtTime(0, t0 + 0.012, tau);
-      [[1, 1], [1.4983, 0.4], [2.0, 0.25]].forEach(([m, a]) => {
-        const o = c.osc('sine', f * m * glide), g = c.g(a);
-        o.frequency.setValueAtTime(f * m * glide, t0); o.frequency.exponentialRampToValueAtTime(f * m, t0 + 0.07);
-        o.connect(g); g.connect(v);
-      });
-      v.connect(c.out);
-      const end = t0 + 0.012 + Math.min(tau * 5, 1.8);
-      v.gain.setTargetAtTime(0, end - 0.3, 0.08);
-      return end;
     }
   };
 
@@ -966,6 +949,150 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     });
   }
 
+  /* ---------- held voices: approach (Shepard), topo (evolving PWM), ridges (acid 303) ---------- */
+  let cont = null;
+  function stopCont() { if (cont) { cont.stop(); cont = null; } }
+  function endSeqVoices(sq) { if (sq && sq.acidV) sq.acidV.stop(); stopCont(); }
+  // the steps of a held voice play nothing, they only drive the picture
+  function visualStep(st, idx, when) {
+    const t0 = when + 0.012;
+    atTime(t0, () => {
+      if (!seq) return;
+      cur = { t0, a: 0.004, tau: 0.12 };
+      flashStep(idx, st.vel);
+      pulse(st.vel);
+      if (!raf) raf = requestAnimationFrame(loop);
+    });
+  }
+  const CONT = {
+    // approach: a Shepard glissando, nine octave-spaced partials slide up and fade in and out under a bell-shaped window, so it climbs forever; it speeds up the longer it is held
+    approach: sq => {
+      const b = sq.dub, t0 = ctx.currentTime + 0.02, N = 9, f0 = 440 * Math.pow(2, (24 + sq.root - 69) / 12);
+      const kill = ctx.createGain();
+      kill.gain.setValueAtTime(0, t0); kill.gain.linearRampToValueAtTime(0.3, t0 + 0.07);
+      kill.connect(b.inp);
+      const type = b.r[0] < 0.5 ? 'sine' : 'triangle', sigma = 1.5 + b.r[2] * 1.2, rate0 = 0.05 + b.r[1] * 0.1, accel = 0.03 + b.r[2] * 0.06;
+      const parts = [];
+      for (let k = 0; k < N; k++) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = type; o.frequency.value = f0; g.gain.value = 0;
+        o.connect(g); g.connect(kill); o.start(t0);
+        parts.push({ o, g, k });
+      }
+      let phase = b.r[3], last = t0;
+      const fx = x => f0 * Math.pow(2, x);
+      const ax = x => { const w = Math.sin(Math.PI * x / N); return w * w * Math.exp(-((x - N / 2) * (x - N / 2)) / (2 * sigma * sigma)); };
+      const rateAt = t => rate0 * Math.min(2.5, 1 + accel * (t - t0));
+      const update = () => {
+        const now = ctx.currentTime, dt = now - last;
+        if (dt <= 0) return;
+        phase += rateAt(now) * dt; last = now;
+        const ahead = now + 0.06, ph2 = phase + rateAt(ahead) * 0.06;
+        parts.forEach(p => {
+          const x0 = (p.k + phase) % N, x1 = (p.k + ph2) % N;
+          if (x1 < x0) p.o.frequency.setValueAtTime(fx(x1), ahead); else p.o.frequency.linearRampToValueAtTime(fx(x1), ahead);
+          p.g.gain.linearRampToValueAtTime(ax(x1), ahead);
+        });
+      };
+      parts.forEach(p => { p.o.frequency.setValueAtTime(fx((p.k + phase) % N), t0); p.g.gain.setValueAtTime(ax((p.k + phase) % N), t0); });
+      const timer = setInterval(update, 25);
+      return { stop() {
+        clearInterval(timer);
+        const now = ctx.currentTime, endT = Math.max(now, t0 + 0.45);
+        kill.gain.cancelScheduledValues(now);
+        kill.gain.setTargetAtTime(0, endT, 0.12);
+        setTimeout(() => { parts.forEach(p => { try { p.o.stop(); p.o.disconnect(); p.g.disconnect(); } catch (e) {} }); try { kill.disconnect(); } catch (e) {} }, (endT - now) * 1000 + 1500);
+      } };
+    },
+    // topo: an evolving drone, two pulse waves whose widths drift on their own slow LFOs, a fifth, and a resonant low pass that breathes
+    topo: sq => {
+      const b = sq.dub, t0 = ctx.currentTime + 0.02, lo = Math.random() < 0.5 ? 24 : 36, f = 440 * Math.pow(2, (lo + sq.root - 69) / 12);
+      const kill = ctx.createGain(), nodes = [kill], srcs = [];
+      kill.gain.setValueAtTime(0, t0); kill.gain.linearRampToValueAtTime(1.6 * (1 - 0.4 * b.res / 15), t0 + 0.35);
+      kill.connect(b.inp);
+      const lp1 = ctx.createBiquadFilter(), lp2 = ctx.createBiquadFilter();
+      lp1.type = lp2.type = 'lowpass'; lp1.Q.value = Math.min(14, 3 + b.res * 0.7); lp2.Q.value = 0.7;
+      lp1.frequency.value = lp2.frequency.value = b.cut;
+      lp1.connect(lp2); lp2.connect(kill); nodes.push(lp1, lp2);
+      const lfo = (rate, amt, target, shape) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = shape || 'sine'; o.frequency.value = rate; g.gain.value = amt; o.connect(g); g.connect(target); o.start(t0);
+        srcs.push(o); nodes.push(g);
+      };
+      lfo(lrnd(0.03, 0.12), 1100, lp1.detune); lfo(lrnd(0.1, 0.35), 500, lp2.detune);   // cutoff drift, in cents
+      const curve = new Float32Array(2049);
+      for (let i = 0; i < curve.length; i++) curve[i] = i < 1024 ? -1 : 1;
+      const hasCS = !!ctx.createConstantSource;
+      const pwm = (freq, det, amp) => {
+        const saw = ctx.createOscillator(); saw.type = 'sawtooth'; saw.frequency.value = freq; saw.detune.value = det; saw.start(t0); srcs.push(saw);
+        const out = ctx.createGain(); out.gain.value = amp; nodes.push(out);
+        if (hasCS) {
+          const sh = ctx.createWaveShaper(); sh.curve = curve; sh.oversample = '2x';
+          const pw = ctx.createConstantSource(); pw.offset.value = rnd(-0.2, 0.2); pw.start(t0); srcs.push(pw);
+          lfo(lrnd(0.04, 0.3), 0.6, pw.offset, pick(['sine', 'triangle']));      // pulse width drift
+          saw.connect(sh); pw.connect(sh); sh.connect(out); nodes.push(sh);
+        } else saw.connect(out);
+        out.connect(lp1);
+      };
+      pwm(f, -5, 0.12); pwm(f, 6, 0.12); pwm(f * 1.4983, 0, 0.07);
+      return { stop() {
+        const now = ctx.currentTime, endT = Math.max(now, t0 + 0.5);
+        kill.gain.cancelScheduledValues(now);
+        kill.gain.setTargetAtTime(0, endT, 0.25);
+        setTimeout(() => { srcs.forEach(o => { try { o.stop(); } catch (e) {} }); nodes.forEach(n => { try { n.disconnect(); } catch (e) {} }); srcs.forEach(o => { try { o.disconnect(); } catch (e) {} }); }, (endT - now) * 1000 + 3000);
+      } };
+    }
+  };
+
+  // ridges: a TB-303 style acid voice, one saw or square oscillator, a resonant low pass with an accent-sensitive decay envelope, slides between tied notes and octave jumps
+  function makeAcid(sq) {
+    const b = sq.dub, now = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = b.r[0] < 0.5 ? 'sawtooth' : 'square'; o.frequency.value = 55;
+    const drv = ctx.createWaveShaper(); drv.curve = tanhCurve(1 + b.r[1] * 2.5);
+    const f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter();
+    f1.type = f2.type = 'lowpass'; f1.Q.value = Math.min(20, b.res); f2.Q.value = 0.7; f1.frequency.value = f2.frequency.value = b.cut;
+    const vca = ctx.createGain(), kill = ctx.createGain();
+    vca.gain.value = 0;
+    o.connect(drv); drv.connect(f1); f1.connect(f2); f2.connect(vca); vca.connect(kill); kill.connect(b.inp);
+    o.start(now);
+    const decay = 0.08 + b.len * 0.6, level = 0.38 * (1 - 0.45 * Math.min(20, b.res) / 20);
+    const notes = [];
+    let prevF = 0, gateOpen = false;
+    return {
+      step(t0, st, idx) {
+        const f = 440 * Math.pow(2, (st.midi - 69) / 12), acc = st.vel > 0.9;
+        const next = sq.steps[(idx + 1) % STEPS], tie = !!(next && next.slide), slide = st.slide && prevF && gateOpen;
+        const gate = sq.dur * (tie ? 1.04 : 0.6);
+        if (slide) { o.frequency.setValueAtTime(prevF, t0); o.frequency.exponentialRampToValueAtTime(f, t0 + 0.06); }
+        else {
+          o.frequency.setValueAtTime(f, t0);
+          const peak = Math.min(9000, b.cut * Math.pow(2, b.env * 4.5 * (acc ? 1.4 : 1))), tau = (acc ? 0.5 : 1) * decay / 3;
+          [f1, f2].forEach(fl => { fl.frequency.setValueAtTime(peak, t0); fl.frequency.setTargetAtTime(b.cut, t0 + 0.003, tau); });
+          vca.gain.setValueAtTime(0, t0); vca.gain.linearRampToValueAtTime(level * (acc ? 1.5 : 1), t0 + 0.004);
+        }
+        vca.gain.setTargetAtTime(0, t0 + gate, 0.012);
+        prevF = f; gateOpen = tie;
+        notes.push({ t0, off: t0 + gate });
+        if (notes.length > 8) notes.shift();
+        atTime(t0, () => {
+          if (!seq) return;
+          cur = { t0, a: 0.004, tau: Math.max(0.05, decay / 3) };
+          flashStep(idx, st.vel);
+          pulse(st.vel);
+          if (!raf) raf = requestAnimationFrame(loop);
+        });
+      },
+      stop() {
+        const t = ctx.currentTime;
+        [o.frequency, vca.gain, f1.frequency, f2.frequency].forEach(pm => pm.cancelScheduledValues(t));
+        let last = null;
+        notes.forEach(n => { if (n.t0 <= t) last = n; });
+        vca.gain.setTargetAtTime(0, Math.max(t, last ? last.off : t), 0.012);
+        setTimeout(() => { try { o.stop(); } catch (e) {} [o, drv, f1, f2, vca, kill].forEach(n => { try { n.disconnect(); } catch (e) {} }); }, 2500);
+      }
+    };
+  }
+
   let tapPatch = null; // the patch of the last tap; a held melody keeps playing it
   function press() {
     go.classList.remove('hit');
@@ -981,6 +1108,15 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
   let seq = null;
 
   function makeStep(s) {
+    if (s.acid) {
+      // acid: rests, accents, slides and octave jumps
+      if (Math.random() < 0.28) return null;
+      if (Math.random() < 0.3) s.idx = Math.floor(Math.random() * s.pool.length);
+      else s.idx = Math.max(0, Math.min(s.pool.length - 1, s.idx + pick([-2, -1, -1, 0, 1, 1, 2])));
+      let m = s.pool[s.idx];
+      if (Math.random() < 0.22) m = m + 12 <= HIGH ? m + 12 : m - 12 >= LOW ? m - 12 : m;
+      return { midi: m, vel: Math.random() < 0.28 ? 1 : 0.65, slide: Math.random() < 0.22 };
+    }
     if (s.dubChord) {
       // dub techno: sparse stabs of one chord voicing that mostly sits on the tonic and now and then slides to another scale degree
       if (Math.random() < 0.45) return null;
@@ -997,13 +1133,16 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     const root = Math.floor(Math.random() * 12);
     const skin = document.documentElement.dataset.skin, dubOn = skin === 'mandala';
     const RISO_SCALES = ['MAJOR', 'MINOR', 'DORIAN', 'MIXOLYDIAN'];
-    const sc = dubOn ? pick(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? pick(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : pick(SCALES);
+    const ACID_SCALES = ['MINOR', 'PHRYGIAN', 'HARM MINOR', 'MIN PENTA', 'BLUES', 'DORIAN'];
+    const sc = skin === 'ridges' ? pick(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? pick(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? pick(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : pick(SCALES);
     const pool = [];
     for (let m = LOW; m <= HIGH; m++) {
       if (sc.iv.indexOf(((m - root) % 12 + 12) % 12) !== -1) pool.push(m);
     }
-    const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0, dub: null, voice: null, dubChord: null };
+    const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0, dub: null, voice: null, dubChord: null, cont: null, acid: false, acidV: null };
     if (VOICES[skin]) { s.dub = rollDub(s.dur, TW[skin]); s.voice = VOICES[skin]; }
+    if (skin === 'approach' || skin === 'topo') { s.dub = rollDub(s.dur, TW[skin]); s.cont = skin; }
+    if (skin === 'ridges') { s.dub = rollDub(s.dur, TW.ridges); s.acid = true; }
     if (skin === 'riso') {
       // triads and seventh chords built on the scale degrees: major or minor depending on what the scale gives
       const lo = Math.random() < 0.5 ? 24 : 36, withSeventh = Math.random() < 0.5, has = x => sc.iv.indexOf(((x % 12) + 12) % 12) !== -1;
@@ -1020,6 +1159,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
       s.dubChord = off => { const r = lo + (root + off) % 12; return s.dub.chord.iv.map(i => r + i); };
     }
     for (let k = 0; k < STEPS; k++) s.steps.push(makeStep(s));
+    if (s.acid) s.acidV = makeAcid(s);
     ensureLfo(s.timbre);
     // the first step is always a clear note, so a quick tap catches exactly one good hit
     if (!s.steps[0]) s.steps[0] = s.dubChord ? { midi: 0, chord: s.dubChord(0), vel: 1 } : { midi: pool[s.idx], vel: 1 };
@@ -1033,6 +1173,8 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     const st = s.steps[idx];
     s.i = (s.i + 1) % STEPS;
     if (!st) return;
+    if (s.acid) { s.acidV.step(t + 0.012, st, idx); return; }
+    if (s.cont) { visualStep(st, idx, t); return; }
     if (s.voice) { hitVoice(s, st, idx, t); return; }
     if (s.dubChord) { playDub(s, st, idx, t); return; }
     const midi = st.midi;
@@ -1059,7 +1201,9 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     tapPatch = roll();
     setAccent(tapPatch);
     // every press rolls a new patch, scale, tempo and pattern
+    stopCont();
     seq = makeSeq();
+    if (seq.cont) cont = CONT[seq.cont](seq);
     renderPattern(seq);
     retireLfo(prev);
     const now = ctx.currentTime;
@@ -1072,6 +1216,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
       seq.timer = setInterval(tick, 25);
       tick();
     } else {
+      endSeqVoices(seq);
       seq = null;                 // released before the audio woke up: one hit only
       headStop = now;
     }
@@ -1080,6 +1225,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
   function stopMelody() {
     if (!seq) return;
     clearInterval(seq.timer);
+    endSeqVoices(seq);
     seq = null;
     headStop = ctx.currentTime;
     go.classList.remove('live');
