@@ -888,6 +888,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   const crushCurve = lv => { const c = new Float32Array(1025); for (let k = 0; k < c.length; k++) { const x = k / 1024 * 2 - 1; c[k] = Math.round(x * lv) / lv; } return c; };
 
   const RES_GAIN = 1.8;
+  let ZH = 0, zT0 = 0, zTimer = 0;   // Z: how long the finger has been held, 0..1 (one second of nothing, then it opens over about 11 s); only clouds and topo use it
   const CURVES = new Map();
   const HANN = Float32Array.from({ length: 32 }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / 31));
   // clouds: while notes keep arriving (and for about two seconds after the last one) a steady stream of overlapping grains is cut out of the 4 s memory,
@@ -905,8 +906,8 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       if (cl.next < now) cl.next = now;
       while (cl.next < now + 0.12) {
         const ts = cl.next + 0.005, dur = (0.22 - 0.12 * dens) * (0.6 + Math.random() * 0.8);
-        const ratio = pick([1, 1, 1, 1, 2, 0.5, 1.5]) * Math.pow(2, (Math.random() - 0.5) * 0.03), span = dur * ratio;
-        let off = Math.random() < 0.7 ? cl.head / sr + Math.random() * 0.4 : Math.random() * sec;
+        const ratio = (Math.random() < 0.35 * ZH ? pick([2, 2, 1.5, 0.5]) : pick([1, 1, 1, 1, 2, 0.5, 1.5])) * Math.pow(2, (Math.random() - 0.5) * 0.03), span = dur * ratio;
+        let off = Math.random() < 0.7 - 0.4 * ZH ? cl.head / sr + Math.random() * 0.4 : Math.random() * sec;
         off = Math.max(0, Math.min(off % sec, sec - span - 0.01));
         const pv = (Math.random() - 0.5) * 1.6;
         if (SK.grain) SK.grain(ts - now, dur, pv, ratio, dens);
@@ -1127,13 +1128,13 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       };
       const pwmG = [];
       const rA = lrnd(0.03, 0.12), rB = lrnd(0.1, 0.35);
-      lfo(rA, 1100, lp1.detune); lfo(rB, 500, lp2.detune);   // cutoff drift, in cents
+      const gA = lfo(rA, 1100, lp1.detune), gB = lfo(rB, 500, lp2.detune), saws = [], fifth = [];   // cutoff drift, in cents
       const curve = new Float32Array(2049);
       for (let i = 0; i < curve.length; i++) curve[i] = i < 1024 ? -1 : 1;
       const hasCS = !!ctx.createConstantSource;
       const pwm = (freq, det, amp) => {
-        const saw = ctx.createOscillator(); saw.type = 'sawtooth'; saw.frequency.value = freq; saw.detune.value = det; saw.start(t0); srcs.push(saw);
-        const out = ctx.createGain(); out.gain.value = amp; nodes.push(out);
+        const saw = ctx.createOscillator(); saw.type = 'sawtooth'; saw.frequency.value = freq; saw.detune.value = det; saw.start(t0); srcs.push(saw); saws.push({ saw, det });
+        const out = ctx.createGain(); out.gain.value = amp; nodes.push(out); if (freq > f * 1.2) fifth.push({ out, amp });
         if (hasCS) {
           const sh = ctx.createWaveShaper(); sh.curve = curve; sh.oversample = '2x';
           const pw = ctx.createConstantSource(); pw.offset.value = rnd(-0.2, 0.2); pw.start(t0); srcs.push(pw);
@@ -1145,7 +1146,9 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       pwm(f, -5, 0.12); pwm(f, 6, 0.12); pwm(f * 1.4983, 0, 0.07);
       let prevB = 0;
       // y sweeps the pulse width wider towards the top, never past 0.85 so the pulse never closes
-      return { xy(cut, y) { const n = ctx.currentTime; lp1.frequency.setTargetAtTime(cut, n, 0.08); lp2.frequency.setTargetAtTime(cut, n, 0.08); pwmG.forEach(g => g.gain.setTargetAtTime(0.12 + 0.73 * y, n, 0.15)); }, mod() {
+      return { xy(cut, y, z) { const n = ctx.currentTime; z = z || 0;
+        saws.forEach(o => o.saw.detune.setTargetAtTime(o.det * (1 + 3.5 * z), n, 0.3));   // the longer you hold, the wider the unison and the deeper the breathing
+        fifth.forEach(o => o.out.gain.setTargetAtTime(o.amp * (1 + 1.2 * z), n, 0.3)); gA.gain.setTargetAtTime(1100 * (1 + 0.8 * z), n, 0.3); gB.gain.setTargetAtTime(500 * (1 + 0.8 * z), n, 0.3); lp1.frequency.setTargetAtTime(cut, n, 0.08); lp2.frequency.setTargetAtTime(cut, n, 0.08); pwmG.forEach(g => g.gain.setTargetAtTime(0.12 + 0.73 * y, n, 0.15)); }, mod() {
         const t = ctx.currentTime - t0, a = Math.sin(TAU * rA * t), bb = Math.sin(TAU * rB * t);
         const beat = prevB < 0 && bb >= 0; prevB = bb;      // one beat per cycle of the faster cutoff LFO
         return { env: 0.5 + 0.28 * a + 0.22 * bb, phase: ((rB * t) % 1 + 1) % 1, beat };
@@ -1342,6 +1345,12 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     wakeFx();
     if (holding) {
       go.classList.add('live');
+      ZH = 0; zT0 = now; clearInterval(zTimer);
+      zTimer = setInterval(() => {
+        if (!seq || !ctx) return;
+        const u = clamp((ctx.currentTime - zT0 - 1) / 11, 0, 1); ZH = u * u * (3 - 2 * u);
+        if (skin === 'clouds' || skin === 'topo') applyMacros();
+      }, 100);
       seq.timer = setInterval(tick, 25);
       tick();
     } else {
@@ -1407,15 +1416,16 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       b.dry.gain.setTargetAtTime(0.85 * (1 - 0.92 * sw), now, 0.08);
       const rb = clamp(ra + 0.4 * sw, 0, 1.2); b.revAmt = rb; b.rsend.gain.setTargetAtTime(rb, now, 0.05);
       if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * rb;
-      b.sh.shout.gain.setTargetAtTime(0.18 + 0.36 * sw, now, 0.1); b.sh.shfb.gain.setTargetAtTime(0.18 + 0.14 * sw, now, 0.1);
+      b.sh.shout.gain.setTargetAtTime(Math.min(0.7, 0.18 + 0.36 * sw + 0.2 * ZH), now, 0.1); b.sh.shfb.gain.setTargetAtTime(Math.min(0.4, 0.18 + 0.14 * sw + 0.1 * ZH), now, 0.1);
     }
     if (sk === 'riso') b.len = clamp(b.base.len + 0.4 * MAC.space, 0.02, 0.95);
     b.xt = Math.pow(2, MAC.color * 1.2); b.xc = Math.round(MAC.color * 7);
-    if (sk === 'topo' && cont && cont.xy) cont.xy(b.cut, (MAC.color + 1) / 2);
+    if (sk === 'topo' && cont && cont.xy) cont.xy(b.cut, (MAC.color + 1) / 2, ZH);
     if (acid && seq && seq.acidV) seq.acidV.setRes(b.res);
   }
 
   function stopMelody() {
+    clearInterval(zTimer); ZH = 0;
     if (!seq) return;
     clearInterval(seq.timer);
     endSeqVoices(seq);
@@ -1730,7 +1740,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       if (!busy && now - lastDraw < 42) return;        // at rest the map drifts at about 24 fps
       const dt = Math.min(0.1, (now - last) / 1000);
       last = lastDraw = now;
-      tt += dt * (0.8 + 3 * env + 2 * kick) * ACT;
+      tt += dt * (0.8 + 3 * env + 2 * kick + 1.5 * ZH) * ACT;
       push = (FP.down ? 26 : 8) * (0.4 + 0.9 * env + 1.2 * kick);
       for (let q = ripples.length - 1; q >= 0; q--) {
         const o = ripples[q];
@@ -1742,13 +1752,13 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       xvStep(dt);
       const pk = Math.min(1, dt * 4);
       parts.forEach((el, n) => {
-        const o = off[n], tx = FP.down ? -FP.vx * DEPTH[n] : Math.sin(tt * 0.11 + n) * 3 * (n + 1) * 0.5, ty = FP.down ? -FP.vy * DEPTH[n] : Math.cos(tt * 0.09 + n) * 3 * (n + 1) * 0.5;
+        const o = off[n], tx = FP.down ? -FP.vx * DEPTH[n] * (1 + ZH) : Math.sin(tt * 0.11 + n) * 3 * (n + 1) * 0.5, ty = FP.down ? -FP.vy * DEPTH[n] * (1 + ZH) : Math.cos(tt * 0.09 + n) * 3 * (n + 1) * 0.5;
         o.x += (tx - o.x) * pk; o.y += (ty - o.y) * pk;
         el.par.setAttribute('transform', 'translate(' + o.x.toFixed(1) + ' ' + o.y.toFixed(1) + ')');
       });
       parts[0].style.strokeOpacity = 0.22 * (0.5 + XV.x); parts[1].style.strokeOpacity = Math.min(1, 0.5 * (0.5 + XV.x));
       parts[2].style.strokeOpacity = 0.6 + 0.35 * XV.x; parts[2].style.strokeWidth = (3.2 - 1.8 * XV.x).toFixed(2);
-      draw((1 + 0.5 * env + 0.6 * kick) * (0.7 + 0.8 * XV.y));   // y sweeps the pulse width: the relief swells and shrinks with it
+      draw((1 + 0.5 * env + 0.6 * kick) * (0.7 + 0.8 * XV.y) * (1 + 0.45 * ZH));   // y sweeps the pulse width: the relief swells and shrinks with it
     }
     draw(1);
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
@@ -1863,9 +1873,9 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     // called by the sound for every grain it schedules: delay seconds from now, dur seconds long, pan -0.8..0.8, ratio of the playback rate
     SK.grain = (delay, dur, pan, ratio, dens) => {
       if (grains.length > 160) return;
-      const reach = 70 + 130 * XV.y, n = 2 + Math.round(4 * (1 - dens)), sg = 3 + 10 * (dur / 0.22), pts = [];
+      const reach = (70 + 130 * XV.y) * (1 + 0.7 * ZH), n = 2 + Math.round(4 * (1 - dens)), sg = 3 + 10 * (dur / 0.22), pts = [];
       for (let i = 0; i < n; i++) pts.push([rnd2() * sg * 1.6, rnd2() * sg * 1.6]);
-      grains.push({ t0: performance.now() + delay * 1000, dur: dur * 1000, x: FP.vx + pan * reach * 1.2 + rnd2() * 20, y: FP.vy + rnd2() * (24 + 220 * XV.y), pts, z: dur > 0.14 ? 2 : dur > 0.08 ? 1 : 0, up: (Math.random() * 0.5 + 0.2) * (ratio >= 2 ? 1.6 : 1), boost: ratio >= 2 ? 1 : 0 });
+      grains.push({ t0: performance.now() + delay * 1000, dur: dur * 1000, x: FP.vx + pan * reach * 1.2 + rnd2() * 20, y: FP.vy + rnd2() * (24 + 220 * XV.y) * (1 + 0.5 * ZH), pts, z: dur > 0.14 ? 2 : dur > 0.08 ? 1 : 0, up: (Math.random() * 0.5 + 0.2) * (ratio >= 2 ? 1.6 : 1), boost: ratio >= 2 ? 1 : 0 });
     };
     let T = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
     function draw(dt, env, kick) {
@@ -2342,7 +2352,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   // XY: where the finger is. x, y are 0..1 over the screen (y down), nx, ny are -1..1 from the centre (ny up). Nothing is mapped to sound yet:
   // this is the groundwork for an xy pad, other code can read window.skladka.xy or listen to the 'skladka:xy' event
   const XY = { x: 0.5, y: 0.5, nx: 0, ny: 0, down: false };
-  window.skladka = { xy: XY, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // groundwork: nothing is mapped to sound yet
+  window.skladka = { xy: XY, z: () => ZH, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // groundwork: nothing is mapped to sound yet
   function place(cx, cy, snap) {
     const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844);
     XY.x = cx / W; XY.y = cy / H; XY.nx = XY.x * 2 - 1; XY.ny = 1 - XY.y * 2;
