@@ -7,7 +7,7 @@
 <script>
 // the look is picked at random on every launch; ?skin=riso|scope|amber forces one
 (function () {
-  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'paper', 'donut'], k = all[Math.floor(Math.random() * all.length)];
+  var all = ['amber', 'riso', 'scope', 'topo', 'matrix'], k = all[Math.floor(Math.random() * all.length)];
   try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
   document.documentElement.setAttribute('data-skin', k);
   var m = document.querySelector('meta[name=theme-color]');
@@ -40,7 +40,7 @@
 }
 * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 img, svg { -webkit-user-drag: none; }
-html, body { height: 100%; }
+html, body { height: 100%; overflow: hidden; }   /* glows bleed past the screen edge; clip them so the page never grows wider than the phone */
 body { transition: background-color .45s; }
 body {
   margin: 0;
@@ -298,10 +298,19 @@ html[data-skin="donut"] .go, html[data-skin="donut"] .go.down, html[data-skin="d
 .dn-s.rest { stroke: #FFF0F6; stroke-width: 4; opacity: .7; }
 .dn-s.hit { animation: dnhit .65s cubic-bezier(.2, .9, .3, 1.4); }
 @keyframes dnhit { 0% { stroke: #fff; stroke-width: 22; transform: scale(1.6); } 100% { transform: scale(1); } }
-html.swap .stage, html.swap .skinsvg { animation: swapin .38s ease-out; }
-@keyframes swapin { from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 28px)); } to { opacity: 1; transform: none; } }
+/* swipe between skins: the scene follows the finger, flies out, the next one flies in from the other side; dots show where you are */
+.stage, .skinsvg { transform: translateX(var(--sw, 0px)); opacity: var(--swo, 1); transition: transform .12s ease-out, opacity .12s; }
+html.swap-out .stage, html.swap-out .skinsvg { animation: swapout .17s ease-in forwards; }
+html.swap-in .stage, html.swap-in .skinsvg { animation: swapin .32s cubic-bezier(.2, .8, .2, 1); }
+@keyframes swapout { to { opacity: 0; transform: translateX(calc(var(--dir, 1) * -90px)) scale(.94); } }
+@keyframes swapin { from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 120px)) scale(.94); } to { opacity: 1; transform: none; } }
+.skindots { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 6; pointer-events: none; opacity: 0; transition: opacity .25s; }
+.skindots.show { opacity: 1; }
+.skindots i { display: block; width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.3); transition: width .25s, background .25s; }
+.skindots i.on { width: 22px; background: rgba(255,255,255,.95); }
 @media (prefers-reduced-motion: reduce) {
-  html.swap .stage, html.swap .skinsvg { animation: none; }
+  html.swap-out .stage, html.swap-out .skinsvg, html.swap-in .stage, html.swap-in .skinsvg { animation: none; }
   .tp-spin, .dn-sugar, .tp-step.hit, .mx-dot.hit, .pp-b.hit, .dn-s.hit { animation: none; }
 }
 </style>
@@ -313,6 +322,7 @@ html.swap .stage, html.swap .skinsvg { animation: swapin .38s ease-out; }
 </head>
 <body>
 <div class="bg" id="bg" aria-hidden="true"></div>
+<div class="skindots" id="skindots" aria-hidden="true"></div>
 <svg id="skin" class="skinsvg" viewBox="-195 -422 390 844" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
 <main class="app" role="application" aria-label="Складка">
 
@@ -1073,7 +1083,7 @@ html.swap .stage, html.swap .skinsvg { animation: swapin .38s ease-out; }
   }
 
   // skins can be swapped at any time: clear the old full-screen layer, build the new one, redraw the current pattern
-  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'paper', 'donut'];
+  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix'];   // paper and donut are light: kept in the code, out of the rotation
   const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6' };
   function applySkin(name) {
     skin = name;
@@ -1089,15 +1099,34 @@ html.swap .stage, html.swap .skinsvg { animation: swapin .38s ease-out; }
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
+  const dotsEl = $('#skindots');
+  const dotEls = SKINS.map(() => dotsEl.appendChild(document.createElement('i')));
+  let dotsTimer = 0, switching = false;
+  function showDots() {
+    dotEls.forEach((d, k) => d.classList.toggle('on', SKINS[k] === skin));
+    dotsEl.classList.add('show');
+    clearTimeout(dotsTimer);
+    dotsTimer = setTimeout(() => dotsEl.classList.remove('show'), 1500);
+  }
   function switchSkin(dir) {
-    const i = (SKINS.indexOf(skin) + dir + SKINS.length) % SKINS.length;
-    applySkin(SKINS[i]);
+    if (switching) return;
+    switching = true;
+    const next = SKINS[(SKINS.indexOf(skin) + dir + SKINS.length) % SKINS.length];
     root.style.setProperty('--dir', dir);
-    root.classList.remove('swap');
-    void root.offsetWidth;
-    root.classList.add('swap');
-    setTimeout(() => root.classList.remove('swap'), 420);
-    wakeFx();
+    root.style.setProperty('--sw', '0px');
+    root.style.setProperty('--swo', 1);
+    root.classList.add('swap-out');
+    dotEls.forEach((d, k) => d.classList.toggle('on', SKINS[k] === next));
+    dotsEl.classList.add('show');
+    clearTimeout(dotsTimer);
+    setTimeout(() => {
+      applySkin(next);
+      root.classList.remove('swap-out');
+      root.classList.add('swap-in');
+      wakeFx();
+      dotsTimer = setTimeout(() => dotsEl.classList.remove('show'), 1100);
+      setTimeout(() => { root.classList.remove('swap-in'); switching = false; }, 340);
+    }, 170);
   }
   applySkin(skin);
 
@@ -1143,12 +1172,22 @@ html.swap .stage, html.swap .skinsvg { animation: swapin .38s ease-out; }
   surface.addEventListener('pointermove', e => {
     if (!holding || swiped) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
-    if (Math.abs(dx) > 56 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+    const horizontal = Math.abs(dx) > 1.5 * Math.abs(dy);
+    if (horizontal && Math.abs(dx) > 10) {
+      // feedback while dragging: the scene follows the finger and dims, the dots appear
+      root.style.setProperty('--sw', (dx * 0.45).toFixed(1) + 'px');
+      root.style.setProperty('--swo', (1 - Math.min(0.5, Math.abs(dx) / 200)).toFixed(2));
+      showDots();
+    }
+    if (Math.abs(dx) > 56 && horizontal) {
       swiped = true;
       up();
       switchSkin(dx < 0 ? 1 : -1);
     }
   });
+  const dragReset = () => { root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); };
+  surface.addEventListener('pointerup', dragReset);
+  surface.addEventListener('pointercancel', dragReset);
   surface.addEventListener('pointerup', up);
   surface.addEventListener('pointercancel', up);
   surface.addEventListener('lostpointercapture', up);
