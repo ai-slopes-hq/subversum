@@ -697,21 +697,34 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
   const DUB_SCALES = ['MINOR', 'DORIAN', 'PHRYGIAN', 'HARM MINOR', 'MIN PENTA'];
   const DUB_DT = [2, 3, 4, 6, 8]; // delay time in sixteenths
 
-  function rollDub(stepDur) {
+  // per-skin ranges for the shared effects bus: [min, max]
+  const TW = {
+    riso:     { cut: [1800, 9000], len: [0.05, 0.5],  fb: [0.2, 0.6],  dela: [0.1, 0.6],  revSec: [0.6, 1.6], reva: [0.05, 0.35] },
+    scope:    { cut: [1500, 7000], len: [0.03, 0.35], fb: [0.3, 0.75], dela: [0.2, 0.8],  revSec: [1, 2.5],   reva: [0.05, 0.4],  res: [0, 10] },
+    topo:     { cut: [300, 2500],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9] },
+    matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
+    ridges:   { cut: [250, 2200],  len: [0.15, 0.6],  fb: [0.3, 0.7],  dela: [0.1, 0.5],  revSec: [1.5, 3.5], reva: [0.2, 0.6] },
+    approach: { cut: [800, 5000],  len: [0.3, 0.8],   fb: [0.4, 0.8],  dela: [0.2, 0.7],  revSec: [3, 5],     reva: [0.4, 0.9] }
+  };
+
+  function rollDub(stepDur, tw) {
+    const R = (k, a, b) => { const q = (tw && tw[k]) || [a, b]; return rnd(q[0], q[1]); };
+    const L = (k, a, b) => { const q = (tw && tw[k]) || [a, b]; return lrnd(q[0], q[1]); };
     const P = {
-      cut: lrnd(140, 3800),                 // chord filter cutoff after the pluck
+      cut: L('cut', 140, 3800),             // filter cutoff after the pluck
       env: rnd(0.15, 0.95),                 // how far the pluck opens the filter
-      res: rnd(0, 15),                      // filter resonance, dB
-      len: rnd(0.05, 0.75),                 // stab length: tau = 0.035 + len^2 * 1.8
+      res: R('res', 0, 15),                 // filter resonance, dB
+      len: R('len', 0.05, 0.75),            // stab length: tau = 0.035 + len^2 * 1.8
       delT: stepDur * pick(DUB_DT),
-      delFb: rnd(0.3, 0.82),
-      delAmt: Math.random() < 0.15 ? 0 : rnd(0.12, 0.95),
+      delFb: R('fb', 0.3, 0.82),
+      delAmt: Math.random() < 0.15 ? 0 : R('dela', 0.12, 0.95),
       delTone: lrnd(900, 5000),
-      revSec: rnd(1.2, 4.5),
-      revAmt: Math.random() < 0.15 ? 0.05 : rnd(0.15, 0.85),
+      revSec: R('revSec', 1.2, 4.5),
+      revAmt: Math.random() < 0.15 ? 0.05 : R('reva', 0.15, 0.85),
       lfoRate: lrnd(0.04, 0.4),
       lfoAmt: rnd(0, 900),                  // cents of cutoff drift
       spread: rnd(0, 0.8),
+      r: [Math.random(), Math.random(), Math.random(), Math.random()],   // free dice for the skin voices
       chord: pick(DUB_CHORDS)
     };
     const inp = ctx.createGain(), out = ctx.createGain();
@@ -783,7 +796,8 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     vca.gain.setTargetAtTime(0, t0 + A, tau);
     lp1.connect(lp2); lp2.connect(vca); vca.connect(kill);
     if (pn) { kill.connect(pn); pn.connect(b.inp); } else kill.connect(b.inp);
-    const end = t0 + A + tau * 6;
+    const end = t0 + A + Math.min(tau * 5, 1.6);   // voices never pile up
+    if (tau * 5 > 1.6) vca.gain.setTargetAtTime(0, end - 0.25, 0.06);
     const oscs = [];
     st.chord.forEach((m, k) => {
       const f = 440 * Math.pow(2, (m - 69) / 12);
@@ -812,6 +826,146 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     });
   }
 
+  /* ---------- skin voices: each skin outside amber has its own synth voice on the shared effects bus ---------- */
+  let noiseBuf = null;
+  const getNoise = () => {
+    if (noiseBuf) return noiseBuf;
+    const n = Math.floor(ctx.sampleRate * 2);
+    noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  };
+  const crushCurve = lv => { const c = new Float32Array(1025); for (let k = 0; k < c.length; k++) { const x = k / 1024 * 2 - 1; c[k] = Math.round(x * lv) / lv; } return c; };
+
+  const RES_GAIN = 1.8;
+  const VOICES = {
+    // riso: a bank of resonators tuned to a major or minor chord, struck by a burst of ink noise (a bit like Rings fed with noise)
+    riso: c => {
+      const { t0, vel, b, r } = c, T = 0.25 + b.len * 1.6;
+      const ex = c.g(0), sum = c.g(1), cr = c.shaper(crushCurve(14 + Math.floor(r[0] * 50))), lp = c.bq('lowpass', b.cut, 0.7 + b.res * 0.3);
+      ex.gain.setValueAtTime(0, t0); ex.gain.linearRampToValueAtTime(vel, t0 + 0.001); ex.gain.setTargetAtTime(0, t0 + 0.001, 0.008);
+      c.noise().connect(ex);
+      const n = c.chord.length;
+      c.chord.forEach(m => {
+        const f0 = 440 * Math.pow(2, (m - 69) / 12);
+        [1, 2, 3].forEach((h, k) => {
+          const f = f0 * h;
+          if (f > 9000) return;
+          const q = Math.max(8, Math.min(300, Math.PI * f * T / (1 + k * 0.6)));   // narrower at low pitch means longer ring
+          const bp = c.bq('bandpass', f, q), a = c.g(RES_GAIN * q / (h * h) / Math.sqrt(n));
+          ex.connect(bp); bp.connect(a); a.connect(sum);
+        });
+      });
+      sum.connect(cr); cr.connect(lp); lp.connect(c.out);
+      return t0 + 0.003 + Math.min(T * 3, 1.6);
+    },
+    // scope: a vector blip, pitch falls from above onto the note, light FM
+    scope: c => {
+      const { t0, f, vel, b, r } = c, tau = 0.03 + b.len * b.len * 0.6;
+      const k = Math.pow(2, 1 + r[0] * 3), sw = 0.02 + r[1] * 0.06;
+      const o = c.osc(r[2] < 0.5 ? 'triangle' : 'sine', f);
+      o.frequency.setValueAtTime(f * k, t0); o.frequency.exponentialRampToValueAtTime(f, t0 + sw);
+      const ratio = [1, 2, 3, 0.5][Math.floor(r[3] * 4)], m = c.osc('sine', f * ratio), mg = c.g(0);
+      mg.gain.setValueAtTime(f * ratio * b.env * 3, t0); mg.gain.setTargetAtTime(0, t0, tau * 0.5);
+      m.connect(mg); mg.connect(o.frequency);
+      const lp = c.bq('lowpass', b.cut * 3, 0.7 + b.res * 0.5), v = c.g(0);
+      v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(0.4 * vel, t0 + 0.002); v.gain.setTargetAtTime(0, t0 + 0.002, tau);
+      o.connect(lp); lp.connect(v); v.connect(c.out);
+      return t0 + 0.002 + Math.min(tau * 6, 1.4);
+    },
+    // topo: a slow swell, soft triangles with a fifth, the filter opens like a hill
+    topo: c => {
+      const { t0, f, vel, b, r } = c, A = 0.03 + r[0] * 0.2, tau = 0.2 + b.len * 0.9;
+      const lp = c.bq('lowpass', b.cut * 0.4, 0.7 + b.res * 0.2), v = c.g(0);
+      lp.frequency.setValueAtTime(b.cut * 0.4, t0); lp.frequency.linearRampToValueAtTime(b.cut * 1.4, t0 + A + tau);
+      v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(0.26 * vel, t0 + A); v.gain.setTargetAtTime(0, t0 + A, tau);
+      [['triangle', f, -7], ['triangle', f, 7], ['sine', f * 1.4983, 0]].forEach(([ty, fr, dt]) => { const o = c.osc(ty, fr, dt); o.connect(lp); });
+      lp.connect(v); v.connect(c.out);
+      const end = t0 + A + Math.min(tau * 5, 1.8);
+      v.gain.setTargetAtTime(0, end - 0.3, 0.08);
+      return end;
+    },
+    // matrix: chip blips, four stuttering sub-steps, crushed and run through a stepped band-pass
+    matrix: c => {
+      const { t0, f, vel, b, r } = c, sub = c.dur / 4, tau = 0.03 + b.len * b.len * 0.3, ratios = [1, 2, 1.5, 3, 4, 0.5];
+      const o = c.osc(r[0] < 0.5 ? 'square' : 'sawtooth', f);
+      for (let i = 0; i < 4; i++) o.frequency.setValueAtTime(f * (i ? pick(ratios) : 1), t0 + i * sub);
+      const cr = c.shaper(crushCurve(3 + Math.floor(r[1] * 14))), bp = c.bq('bandpass', 1000, 0.8 + b.res * 0.2), v = c.g(0);
+      for (let i = 0; i < 8; i++) bp.frequency.setValueAtTime(lrnd(300, 5000), t0 + i * sub / 2);
+      v.gain.setValueAtTime(0, t0);
+      for (let i = 0; i < 4; i++) { v.gain.setValueAtTime(1.6 * vel * (i ? 0.7 : 1), t0 + i * sub); v.gain.setTargetAtTime(0, t0 + i * sub, tau); }
+      o.connect(cr); cr.connect(bp); bp.connect(v); v.connect(c.out);
+      return t0 + 4 * sub + tau * 5;
+    },
+    // ridges: a cold bass pluck, detuned saws that chorus on their own, and a metal ring
+    ridges: c => {
+      const { t0, f, vel, b } = c, tau = 0.08 + b.len * b.len * 0.9;
+      const lp = c.bq('lowpass', b.cut, 0.7 + b.res * 0.4), v = c.g(0), peak = Math.min(5000, b.cut * Math.pow(2, b.env * 4 * vel));
+      lp.frequency.setValueAtTime(peak, t0); lp.frequency.setTargetAtTime(b.cut, t0 + 0.004, 0.05 + tau * 0.2);
+      v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(0.34 * vel, t0 + 0.004); v.gain.setTargetAtTime(0, t0 + 0.004, tau);
+      [-9, 9].forEach(d => c.osc('sawtooth', f, d).connect(lp));
+      const ring = c.osc('sine', f * 4.01), rg = c.g(0);
+      rg.gain.setValueAtTime(0.1 * vel, t0); rg.gain.setTargetAtTime(0, t0, 0.06);
+      ring.connect(rg); rg.connect(c.out);
+      lp.connect(v); v.connect(c.out);
+      return t0 + 0.004 + Math.min(tau * 5, 1.6);
+    },
+    // approach: a rush that passes by, then a bell that climbs up to its note
+    approach: c => {
+      const { t0, f, vel, b, r } = c, tau = 0.25 + b.len * 1.2;
+      const n = c.noise(), bp = c.bq('bandpass', 300, 2 + b.res * 0.3), ne = c.g(0);
+      bp.frequency.setValueAtTime(300, t0); bp.frequency.exponentialRampToValueAtTime(2500 + r[0] * 2500, t0 + 0.14);
+      ne.gain.setValueAtTime(0, t0); ne.gain.linearRampToValueAtTime(0.14 * vel, t0 + 0.09); ne.gain.setTargetAtTime(0, t0 + 0.1, 0.07);
+      n.connect(bp); bp.connect(ne); ne.connect(c.out);
+      const v = c.g(0), glide = Math.pow(2, -(2 + r[1] * 5) / 12);
+      v.gain.setValueAtTime(0, t0); v.gain.linearRampToValueAtTime(0.3 * vel, t0 + 0.012); v.gain.setTargetAtTime(0, t0 + 0.012, tau);
+      [[1, 1], [1.4983, 0.4], [2.0, 0.25]].forEach(([m, a]) => {
+        const o = c.osc('sine', f * m * glide), g = c.g(a);
+        o.frequency.setValueAtTime(f * m * glide, t0); o.frequency.exponentialRampToValueAtTime(f * m, t0 + 0.07);
+        o.connect(g); g.connect(v);
+      });
+      v.connect(c.out);
+      const end = t0 + 0.012 + Math.min(tau * 5, 1.8);
+      v.gain.setTargetAtTime(0, end - 0.3, 0.08);
+      return end;
+    }
+  };
+
+  function hitVoice(s, st, idx, when) {
+    const b = s.dub, t0 = when + 0.012, f = 440 * Math.pow(2, (st.midi - 69) / 12);
+    const kill = ctx.createGain(), pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    if (pn) pn.pan.value = (Math.random() - 0.5) * b.spread;
+    const srcs = [], nodes = [kill];
+    if (pn) { nodes.push(pn); kill.connect(pn); pn.connect(b.inp); } else kill.connect(b.inp);
+    const c = {
+      t0, f, vel: st.vel, b, r: b.r, dur: s.dur, out: kill, chord: st.chord || [st.midi],
+      osc: (type, fr, det) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = fr; if (det) o.detune.value = det; srcs.push(o); return o; },
+      noise: () => { const n = ctx.createBufferSource(); n.buffer = getNoise(); n.loop = true; srcs.push(n); return n; },
+      g: v => { const n = ctx.createGain(); n.gain.value = v === undefined ? 1 : v; nodes.push(n); return n; },
+      bq: (type, fr, q) => { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = fr; n.Q.value = q === undefined ? 1 : q; nodes.push(n); return n; },
+      shaper: curve => { const n = ctx.createWaveShaper(); n.curve = curve; nodes.push(n); return n; }
+    };
+    const end = s.voice(c);
+    srcs.forEach(o => { if (o.buffer) o.start(t0, Math.random() * 1.5); else o.start(t0); o.stop(end); });
+    const grp = { stop: t => srcs.forEach(o => { try { o.stop(t); } catch (e) {} }) };
+    const v = { osc: grp, mod: grp, kill, t0, cancelled: false };
+    srcs[0].onended = () => {
+      nodes.forEach(n => { try { n.disconnect(); } catch (e) {} });
+      srcs.forEach(o => { try { o.disconnect(); } catch (e) {} });
+      const qi = queued.indexOf(v);
+      if (qi >= 0) queued.splice(qi, 1);
+    };
+    queued.push(v);
+    atTime(t0, () => {
+      if (v.cancelled) return;
+      cur = { t0, a: 0.004, tau: Math.max(0.05, (end - t0) / 5) };
+      flashStep(idx, st.vel);
+      pulse(st.vel);
+      if (!raf) raf = requestAnimationFrame(loop);
+    });
+  }
+
   let tapPatch = null; // the patch of the last tap; a held melody keeps playing it
   function press() {
     go.classList.remove('hit');
@@ -827,7 +981,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
   let seq = null;
 
   function makeStep(s) {
-    if (s.dub) {
+    if (s.dubChord) {
       // dub techno: sparse stabs of one chord voicing that mostly sits on the tonic and now and then slides to another scale degree
       if (Math.random() < 0.45) return null;
       return { midi: 0, chord: s.dubChord(Math.random() < 0.65 ? 0 : pick(s.sc.iv)), vel: Math.random() < 0.3 ? 1 : rnd(0.6, 0.85) };
@@ -841,13 +995,25 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
   function makeSeq() {
     const bpm = Math.round(rnd(BPM_MIN, BPM_MAX));
     const root = Math.floor(Math.random() * 12);
-    const dubOn = isDub();
-    const sc = dubOn ? pick(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : pick(SCALES);
+    const skin = document.documentElement.dataset.skin, dubOn = skin === 'mandala';
+    const RISO_SCALES = ['MAJOR', 'MINOR', 'DORIAN', 'MIXOLYDIAN'];
+    const sc = dubOn ? pick(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? pick(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : pick(SCALES);
     const pool = [];
     for (let m = LOW; m <= HIGH; m++) {
       if (sc.iv.indexOf(((m - root) % 12 + 12) % 12) !== -1) pool.push(m);
     }
-    const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0, dub: null };
+    const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0, dub: null, voice: null, dubChord: null };
+    if (VOICES[skin]) { s.dub = rollDub(s.dur, TW[skin]); s.voice = VOICES[skin]; }
+    if (skin === 'riso') {
+      // triads and seventh chords built on the scale degrees: major or minor depending on what the scale gives
+      const lo = Math.random() < 0.5 ? 24 : 36, withSeventh = Math.random() < 0.5, has = x => sc.iv.indexOf(((x % 12) + 12) % 12) !== -1;
+      s.dubChord = off => {
+        const third = has(off + 4) ? 4 : 3, iv = [0, third, 7, 12, 12 + third];
+        if (withSeventh) iv.push(has(off + 11) ? 11 : 10);
+        const r = lo + (root + off) % 12;
+        return iv.map(i => r + i);
+      };
+    }
     if (dubOn) {
       s.dub = rollDub(s.dur);
       const lo = Math.random() < 0.5 ? 24 : 36;   // the roots live in one octave, 1 or 2 (C1 = 24, C2 = 36); the chord stacks upward from them
@@ -856,7 +1022,7 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     for (let k = 0; k < STEPS; k++) s.steps.push(makeStep(s));
     ensureLfo(s.timbre);
     // the first step is always a clear note, so a quick tap catches exactly one good hit
-    if (!s.steps[0]) s.steps[0] = s.dub ? { midi: 0, chord: s.dubChord(0), vel: 1 } : { midi: pool[s.idx], vel: 1 };
+    if (!s.steps[0]) s.steps[0] = s.dubChord ? { midi: 0, chord: s.dubChord(0), vel: 1 } : { midi: pool[s.idx], vel: 1 };
     s.steps[0].vel = 1;
     return s;
   }
@@ -867,7 +1033,8 @@ html[data-skin="approach"] .go { inset: 33%; background: hsl(var(--hue) 35% 7%);
     const st = s.steps[idx];
     s.i = (s.i + 1) % STEPS;
     if (!st) return;
-    if (s.dub) { playDub(s, st, idx, t); return; }
+    if (s.voice) { hitVoice(s, st, idx, t); return; }
+    if (s.dubChord) { playDub(s, st, idx, t); return; }
     const midi = st.midi;
     play(Object.assign({}, s.timbre, {
       oct: midi < 36 ? 1 : 2,
