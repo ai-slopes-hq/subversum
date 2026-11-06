@@ -557,6 +557,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     if (d <= 4) fn(); else setTimeout(fn, d);
   }
 
+  const XM = { cut: 1, fm: 1, fold: 1 };   // the finger on amber: brightness, FM index, fold depth, as multipliers of the press patch
   function play(p, when) {
     const now = when === undefined ? ctx.currentTime : when;
 
@@ -579,7 +580,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     mod.type = 'sine';
     mod.frequency.value = p.freq * p.fmRatio;
     const modG = ctx.createGain();
-    const dev = p.fmIdx * p.freq * p.fmRatio;
+    const dev = Math.min(FM_MAX, p.fmIdx * XM.fm) * p.freq * p.fmRatio;
     modG.gain.setValueAtTime(dev, t0);
     modG.gain.setTargetAtTime(dev * p.fmSweep, t0, tau * 0.7);
     mod.connect(modG);
@@ -634,8 +635,9 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     });
 
     // fold depth sweeps down while the gate closes
-    pre.gain.setValueAtTime(p.depth, t0);
-    pre.gain.setTargetAtTime(p.depth * p.sweep, t0, tau * 0.9);
+    const dep = Math.min(DEPTH_MAX, p.depth * XM.fold);
+    pre.gain.setValueAtTime(dep, t0);
+    pre.gain.setTargetAtTime(dep * p.sweep, t0, tau * 0.9);
 
     // low pass gate: one envelope opens the level and the cutoff together; the cutoff closes faster
     const fMin = 70;
@@ -644,7 +646,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     vca.gain.linearRampToValueAtTime(peak, ta);
     vca.gain.setTargetAtTime(0, ta, tau);
     lpf.frequency.setValueAtTime(fMin, t0);
-    lpf.frequency.exponentialRampToValueAtTime(p.cutoff, ta);
+    lpf.frequency.exponentialRampToValueAtTime(Math.max(fMin * 1.2, Math.min(16000, p.cutoff * XM.cut)), ta);
     lpf.frequency.setTargetAtTime(fMin, ta, tau * 0.55);
 
     const end = ta + tau * 8;
@@ -774,7 +776,8 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     // extra slow LFOs (60% of presses, one or two): resonance, echo feedback, echo amount, reverb amount, tape wow.
     // every depth is capped relative to the base value, so nothing can go negative, past the feedback ceiling or into overload
     const mods = [];
-    const bus = Object.assign({ inp, out, dl, dr, fb, sat, dlp, dhp, dsend, rsend, conv, lfo, lfoG, pl, pr, mods, resG: null }, P);
+    const bus = Object.assign({ inp, out, dl, dr, fb, sat, dlp, dhp, dsend, rsend, conv, lfo, lfoG, pl, pr, mods, resG: null, mg: {}, xt: 1, xc: 0 }, P);
+    bus.base = { cut: P.cut, res: P.res, len: P.len, delAmt: P.delAmt, delFb: P.delFb, revAmt: P.revAmt };
     if (Math.random() < 0.6) {
       const names = ['res', 'fb', 'delAmt', 'revAmt', 'wow'].sort(() => Math.random() - 0.5).slice(0, Math.random() < 0.4 ? 2 : 1);
       names.forEach(nm => {
@@ -782,9 +785,9 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
         const g = ctx.createGain(), d = rnd(0.3, 0.9);
         o.connect(g); mods.push(o, g);
         if (nm === 'res') { g.gain.value = 3.5 * d; bus.resG = g; }
-        else if (nm === 'fb') { g.gain.value = d * Math.max(0, Math.min(P.delFb - 0.1, 0.86 - P.delFb)); g.connect(fb.gain); }
-        else if (nm === 'delAmt') { g.gain.value = d * 0.5 * P.delAmt; g.connect(dsend.gain); }
-        else if (nm === 'revAmt') { g.gain.value = d * 0.5 * P.revAmt; g.connect(rsend.gain); }
+        else if (nm === 'fb') { g.gain.value = d * Math.max(0, Math.min(P.delFb - 0.1, 0.86 - P.delFb)); g.connect(fb.gain); bus.mg.fb = { g, d }; }
+        else if (nm === 'delAmt') { g.gain.value = d * 0.5 * P.delAmt; g.connect(dsend.gain); bus.mg.delAmt = { g, d }; }
+        else if (nm === 'revAmt') { g.gain.value = d * 0.5 * P.revAmt; g.connect(rsend.gain); bus.mg.revAmt = { g, d }; }
         else { g.gain.value = d * 0.005; g.connect(dl.delayTime); g.connect(dr.delayTime); }
       });
     }
@@ -883,7 +886,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     // scope: laser zaps after the Horologium drums of touch2decay: ZAP (a sine falls from kHz onto the note through tanh), STUTTER (short FM grains), BIT (1-bit noise), plus a CLICK ping in a resonator
     scope: c => {
       const { t0, f, vel, b, r } = c;
-      const tint = 0.5 + r[0] * 1.5, tp = 0.003 + r[1] * 0.012, T60 = 0.07 + b.len * 0.5, tau = T60 / 6.9;
+      const tint = (0.5 + r[0] * 1.5) * (b.xt || 1), tp = 0.003 + r[1] * 0.012, T60 = 0.07 + b.len * 0.5, tau = T60 / 6.9;
       const mode = r[2] < 0.55 ? 'zap' : r[2] < 0.85 ? 'stutter' : 'bit';
       const sum = c.g(1), drive = c.shaper(tanhCurve(2.4)), hp = c.bq('highpass', 140 + r[3] * 900, 0.7);
       let end = t0;
@@ -924,7 +927,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       const { t0, f, vel, b, r } = c, sub = c.dur / 4, tau = 0.03 + b.len * b.len * 0.3, ratios = [1, 2, 1.5, 3, 4, 0.5];
       const o = c.osc(r[0] < 0.5 ? 'square' : 'sawtooth', f);
       for (let i = 0; i < 4; i++) o.frequency.setValueAtTime(f * (i ? pick(ratios) : 1), t0 + i * sub);
-      const cr = c.shaper(crushCurve(3 + Math.floor(r[1] * 14))), bp = c.bq('bandpass', 1000, 0.8 + b.res * 0.2), v = c.g(0);
+      const cr = c.shaper(crushCurve(Math.max(2, Math.min(40, 3 + Math.floor(r[1] * 14) + (b.xc || 0))))), bp = c.bq('bandpass', 1000, 0.8 + b.res * 0.2), v = c.g(0);
       for (let i = 0; i < 8; i++) bp.frequency.setValueAtTime(lrnd(300, 5000), t0 + i * sub / 2);
       v.gain.setValueAtTime(0, t0);
       for (let i = 0; i < 4; i++) { v.gain.setValueAtTime(1.6 * vel * (i ? 0.7 : 1), t0 + i * sub); v.gain.setTargetAtTime(0, t0 + i * sub, tau); }
@@ -1032,7 +1035,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       };
       pwm(f, -5, 0.12); pwm(f, 6, 0.12); pwm(f * 1.4983, 0, 0.07);
       let prevB = 0;
-      return { mod() {
+      return { xy(cut) { const n = ctx.currentTime; lp1.frequency.setTargetAtTime(cut, n, 0.08); lp2.frequency.setTargetAtTime(cut, n, 0.08); }, mod() {
         const t = ctx.currentTime - t0, a = Math.sin(TAU * rA * t), bb = Math.sin(TAU * rB * t);
         const beat = prevB < 0 && bb >= 0; prevB = bb;      // one beat per cycle of the faster cutoff LFO
         return { env: 0.5 + 0.28 * a + 0.22 * bb, phase: ((rB * t) % 1 + 1) % 1, beat };
@@ -1060,6 +1063,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     const notes = [];
     let prevF = 0, gateOpen = false;
     return {
+      setRes(q) { f1.Q.setTargetAtTime(Math.max(0.5, Math.min(20, q)), ctx.currentTime, 0.05); },
       step(t0, st, idx) {
         const f = 440 * Math.pow(2, (st.midi - 69) / 12), acc = st.vel > 0.9;
         const next = sq.steps[(idx + 1) % STEPS], tie = !!(next && next.slide), slide = st.slide && prevF && gateOpen;
@@ -1205,6 +1209,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     seq = makeSeq();
     setAccent(tapPatch, characterOf(seq, tapPatch));
     if (seq.cont) { cont = CONT[seq.cont](seq); startMod(); }
+    applyXY(XY.nx, XY.ny);        // the press starts where the finger is
     renderPattern(seq);
     retireLfo(prev);
     const now = ctx.currentTime;
@@ -1221,6 +1226,42 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
       seq = null;                 // released before the audio woke up: one hit only
       headStop = now;
     }
+  }
+
+
+  /* ---------- the finger as an XY pad: every skin has its own two sound parameters ----------
+     x (left to right) and y (down to up) are relative to what the press rolled, so the patch keeps its character and the finger bends it.
+       amber    x brightness (cutoff)            y harmonics (FM index and fold depth)
+       mandala  x filter cutoff                  y echo (amount and feedback): the classic dub pair
+       riso     x brightness of the chord        y ring length and reverb
+       scope    x laser pitch (sweep and grains) y echo (amount and feedback)
+       topo     x drone filter                   y reverb
+       matrix   x crush depth                    y filter focus (resonance)
+       ridges   x cutoff                         y resonance: the acid pair */
+  const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
+  function applyXY(nx, ny) {
+    const sk = skin, b = lastBus, now = ctx ? ctx.currentTime : 0;
+    if (sk === 'amber') { XM.cut = Math.pow(2, nx * 1.4); XM.fm = Math.pow(2, ny * 0.9); XM.fold = Math.pow(2, ny * 0.5); return; }
+    if (!ctx || !b || !b.base) return;
+    const cut = m => { b.cut = clamp(b.base.cut * Math.pow(2, nx * m), 60, 12000); };
+    const echo = () => {
+      const da = clamp(b.base.delAmt + 0.45 * ny, 0, 0.95), fbk = clamp(b.base.delFb + 0.25 * ny, 0.1, 0.8);
+      b.delAmt = da; b.dsend.gain.setTargetAtTime(da, now, 0.05);
+      if (b.mg.delAmt) b.mg.delAmt.g.gain.value = b.mg.delAmt.d * 0.5 * da;
+      b.delFb = fbk; b.fb.gain.setTargetAtTime(fbk, now, 0.05);
+      if (b.mg.fb) b.mg.fb.g.gain.value = b.mg.fb.d * Math.max(0, Math.min(fbk - 0.1, 0.86 - fbk));   // feedback plus its own wobble can never pass 0.86
+    };
+    const rev = () => {
+      const ra = clamp(b.base.revAmt + 0.4 * ny, 0, 0.9);
+      b.revAmt = ra; b.rsend.gain.setTargetAtTime(ra, now, 0.05);
+      if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * ra;
+    };
+    if (sk === 'mandala') { cut(1.6); echo(); }
+    else if (sk === 'riso') { cut(1.5); b.len = clamp(b.base.len + 0.4 * ny, 0.02, 0.95); rev(); }
+    else if (sk === 'scope') { b.xt = Math.pow(2, nx * 1.2); echo(); }
+    else if (sk === 'topo') { cut(1.6); if (cont && cont.xy) cont.xy(b.cut); rev(); }
+    else if (sk === 'matrix') { b.xc = Math.round(nx * 7); b.res = clamp(b.base.res + ny * 8, 0, 16); }
+    else if (sk === 'ridges') { cut(1.5); b.res = clamp(b.base.res + ny * 8, 1, 20); if (seq && seq.acidV) seq.acidV.setRes(b.res); }
   }
 
   function stopMelody() {
@@ -2021,7 +2062,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
   // XY: where the finger is. x, y are 0..1 over the screen (y down), nx, ny are -1..1 from the centre (ny up). Nothing is mapped to sound yet:
   // this is the groundwork for an xy pad, other code can read window.skladka.xy or listen to the 'skladka:xy' event
   const XY = { x: 0.5, y: 0.5, nx: 0, ny: 0, down: false };
-  window.skladka = { xy: XY };   // groundwork: nothing is mapped to sound yet
+  window.skladka = { xy: XY, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM) } : { xm: Object.assign({}, XM) } };   // groundwork: nothing is mapped to sound yet
   function place(cx, cy, snap) {
     const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844);
     XY.x = cx / W; XY.y = cy / H; XY.nx = XY.x * 2 - 1; XY.ny = 1 - XY.y * 2;
@@ -2031,6 +2072,7 @@ html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-sk
     root.style.setProperty('--ty', (cy - H / 2).toFixed(1) + 'px');
     if (snap) { void root.offsetWidth; root.classList.remove('snap'); if (SK.touch) SK.touch(FP); }
     if (SK.xy) SK.xy(XY);
+    if (holding) applyXY(XY.nx, XY.ny);
     dispatchEvent(new CustomEvent('skladka:xy', { detail: XY }));
   }
   // a quick horizontal flick (within 300 ms) changes the skin: left = next, right = previous. Slower movement moves the world (xy)
