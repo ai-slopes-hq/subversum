@@ -7,11 +7,11 @@
 <script>
 // the look is picked at random on every launch; ?skin=riso|scope|amber forces one
 (function () {
-  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds', 'coral'], k = all[Math.floor(Math.random() * all.length)];
-  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|clouds|coral|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
+  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds'], k = all[Math.floor(Math.random() * all.length)];
+  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|clouds|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
   document.documentElement.setAttribute('data-skin', k);
   var m = document.querySelector('meta[name=theme-color]');
-  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12', coral: '#061317' }[k]);
+  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12' }[k]);
 })();
 </script>
 <meta name="mobile-web-app-capable" content="yes">
@@ -354,10 +354,10 @@ html[data-skin="ridges"] .go { inset: 33%; }
 
 
 /* no button and no sequencer ring in scope, topo, matrix and ridges: the waves start at the finger. amber, riso and mandala keep the button */
-html[data-skin="coral"] .go, html[data-skin="scope"] .go, html[data-skin="topo"] .go, html[data-skin="matrix"] .go, html[data-skin="ridges"] .go { display: none; }
-html[data-skin="coral"] .ring, html[data-skin="topo"] .ring, html[data-skin="matrix"] .ring, html[data-skin="ridges"] .ring { display: none; }
-html[data-skin="coral"] .dial, html[data-skin="coral"] .bg, html[data-skin="clouds"] .dial, html[data-skin="clouds"] .bg, html[data-skin="amber"] .dial, html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
-html[data-skin="coral"] .skinsvg, html[data-skin="clouds"] .skinsvg, html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
+html[data-skin="scope"] .go, html[data-skin="topo"] .go, html[data-skin="matrix"] .go, html[data-skin="ridges"] .go { display: none; }
+html[data-skin="topo"] .ring, html[data-skin="matrix"] .ring, html[data-skin="ridges"] .ring { display: none; }
+html[data-skin="clouds"] .dial, html[data-skin="clouds"] .bg, html[data-skin="amber"] .dial, html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
+html[data-skin="clouds"] .skinsvg, html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
 /* amber: night drive towards a sunset, neon grid road */
 .nd-s0 { stop-color: hsl(var(--hue, 28) 45% 3%); } .nd-s1 { stop-color: hsl(calc(var(--hue, 28) - 12) 80% 13%); } .nd-s2 { stop-color: hsl(calc(var(--hue, 28) - 4) 100% 34%); }
 .nd-u0 { stop-color: hsl(calc(var(--hue, 28) + 24) 100% 68%); } .nd-u1 { stop-color: hsl(calc(var(--hue, 28) - 22) 100% 52%); }
@@ -374,11 +374,6 @@ html[data-skin="coral"] .skinsvg, html[data-skin="clouds"] .skinsvg, html[data-s
 /* clouds: a scatter of grains */
 html[data-skin="clouds"] { --accent: hsl(var(--hue) 100% 72%); --bg: hsl(var(--hue) 30% 5%); }
 html[data-skin="clouds"] body { background-color: var(--bg); background-image: none; }
-/* coral: a colony that grows from the floor; every polyp is a note, every branch says which note it grew from */
-html[data-skin="coral"] { --accent: hsl(var(--hue) 90% 68%); --bg: hsl(var(--hue) 42% 4%); }
-html[data-skin="coral"] body { background-color: var(--bg); background-image: none; }
-.cr-b { fill: none; stroke-linecap: round; }
-.cr-g0 { stop-color: hsl(var(--hue, 200) 90% 52%); stop-opacity: .38; } .cr-g1 { stop-color: hsl(var(--hue, 200) 90% 52%); stop-opacity: 0; }
 .cl { fill: none; stroke-linecap: round; }
 .cl0 { stroke: hsl(calc(var(--hue, 200) + 60) 60% 45% / .4); }
 .cl1 { stroke: hsl(calc(var(--hue, 200) + 40) 80% 55% / .7); }
@@ -444,8 +439,6 @@ html[data-skin="ridges"] #mod { --k-ink: hsl(var(--hue) 45% 84%); --k-hi: hsl(va
 html[data-skin="clouds"] #mod { --k-ink: hsl(var(--hue) 45% 92%); --k-hi: hsl(var(--hue) 100% 80%); --k-fw: 300; --k-fs: 10px; --k-ls: .16em; --k-case: lowercase; --k-th: 3px; --k-r: 2px;
   --k-track: radial-gradient(circle, rgba(255,255,255,.34) 1px, transparent 1.4px) 0 50% / 5px 100% repeat-x; --k-mask: radial-gradient(circle, #000 1.4px, transparent 1.9px) 0 50% / 5px 100% repeat-x;
   --k-glow: 0 0 12px hsl(var(--hue) 100% 72% / .9); --k-hd: 7px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
-html[data-skin="coral"] #mod { --k-ink: hsl(var(--hue) 50% 90%); --k-hi: hsl(var(--hue) 95% 72%); --k-fw: 400; --k-fs: 10px; --k-ls: .1em; --k-case: lowercase; --k-th: 2px; --k-r: 2px;
-  --k-glow: 0 0 10px hsl(var(--hue) 100% 68% / .8); --k-hd: 6px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
 @media (prefers-reduced-motion: reduce) { #mod .md { transition: opacity .16s linear; } }
 /* debug HUD (?hud=1): the axes and their values as a game readout; never on by default */
 #hud { position: fixed; z-index: 8; left: max(8px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 150px); width: 168px; pointer-events: none; font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: #f1ece4; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; -webkit-user-select: none; user-select: none; }
@@ -881,7 +874,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     topo:     { cut: [300, 2200],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9],  res: [3, 14] },
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
     clouds:   { shimmer: true, cut: [2500, 7000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
-    coral:    { cut: [2200, 6500], len: [0.2, 0.7],  fb: [0.25, 0.6], dela: [0.15, 0.5], revSec: [2, 4],     reva: [0.3, 0.7],  res: [0, 4] },
     ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] }
   };
 
@@ -1129,20 +1121,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       });
       sum.connect(cr); cr.connect(lp); lp.connect(c.out);
       return t0 + 0.003 + Math.min(T * 3, 1.6) + att + tauE * 4;
-    },
-    // coral: a droplet on a marimba bar: a sine carrier that slides up into its pitch in 30 ms (the bloop), a short FM burst on top that dies quickly (the wood), and a soft octave.
-    // x is the material: left a dull, round wooden drop, right a bright glassy one (FM index and ratio); a P tap prunes the colony and strikes the last note wide open
-    coral: c => {
-      const { t0, vel, b, r } = c, boom = !!c.boom, F = c.f * 4, xl = clamp(Math.log2(b.xt || 1) / 1.2, -1, 1), T = 0.18 + b.len * 1.1;
-      const ratio = r[0] < 0.5 ? 4 : 3.5, idx = 0.5 + 2.4 * (xl + 1) / 2 + (boom ? 1.4 : 0);   // an inharmonic ratio gives the wooden knock, the index the glass
-      const car = c.osc('sine', F), mod = c.osc('sine', F * ratio), mg = c.g(0), env = c.g(0), body = c.osc('sine', F * 2), bg = c.g(0), lp = c.bq('lowpass', Math.min(14000, b.cut * (1.4 + 1.2 * (xl + 1))), 0.6);
-      car.frequency.setValueAtTime(F * 0.82, t0); car.frequency.exponentialRampToValueAtTime(F, t0 + 0.03);
-      mg.gain.setValueAtTime(F * ratio * idx * 0.35, t0); mg.gain.setTargetAtTime(0, t0, 0.025 + 0.05 * (1 - xl) / 2);
-      mod.connect(mg); mg.connect(car.frequency);
-      env.gain.setValueAtTime(0, t0); env.gain.linearRampToValueAtTime(0.36 * vel, t0 + 0.002); env.gain.setTargetAtTime(0, t0 + 0.002, T / 3);
-      bg.gain.setValueAtTime(0, t0); bg.gain.linearRampToValueAtTime(0.1 * vel, t0 + 0.002); bg.gain.setTargetAtTime(0, t0 + 0.002, T / 7);
-      body.connect(bg); bg.connect(lp); car.connect(env); env.connect(lp); lp.connect(c.out);
-      return t0 + 0.003 + T * 2.4;
     },
     // clouds: a kalimba tine (fundamental plus two quickly dying beam overtones and a thumb click) is struck and written into a 4 s memory
     // together with the last notes; cloudRun cuts grains out of that memory. x makes the grains small and dense, a beads-to-fog axis.
@@ -1482,51 +1460,18 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     return { midi: s.pool[s.idx], vel: Math.random() < 0.25 ? 1 : rnd(0.62, 0.85) };
   }
 
-  // coral: the pattern is a colony. The press plants three polyps, then Z grows branches: each new polyp sits on a free step near the one it grows from and plays a scale step above or below it.
-  // x is how far a branch leaps, y how crowded the colony may get (and it withers back when y drops), the P pinch is gravity (together the branches grow down, apart up), a P tap prunes the youngest tips.
-  // This is the one world whose melody changes while the finger is held: the change is the point of Z.
-  function coralGrow(s, seedOnly) {
-    const free = [];
-    for (let i = 0; i < STEPS; i++) if (!s.steps[i]) free.push(i);
-    if (!free.length || !s.nodes.length) return false;
-    const par = s.nodes[Math.min(s.nodes.length - 1, Math.floor(Math.pow(Math.random(), 0.6) * s.nodes.length))];   // young tips are more likely parents
-    let tot = 0; const w = free.map(i => { const d = Math.min((i - par.step + STEPS) % STEPS, (par.step - i + STEPS) % STEPS); const v = 1 / (1 + d * d * 0.5); tot += v; return v; });
-    let q = Math.random() * tot, k = 0; while (k < free.length - 1 && (q -= w[k]) > 0) k++;
-    const reach = seedOnly ? 0.4 : (MAC.color + 1) / 2, leap = pick(reach < 0.33 ? [1, 1, 1, 2] : reach < 0.66 ? [1, 2, 2, 3] : [2, 3, 4, 5]);
-    let dir = Math.random() < 0.5 + (seedOnly ? 0 : 0.35 * PX.d) ? 1 : -1, idx = par.idx + dir * leap;
-    if (idx < 0 || idx > s.pool.length - 1) idx = par.idx - dir * leap;
-    idx = clamp(idx, 0, s.pool.length - 1);
-    const step = free[k], node = { step, idx, par: par.step };
-    s.nodes.push(node);
-    s.steps[step] = { midi: s.pool[idx], vel: rnd(0.5, 0.88), par: par.step };
-    return true;
-  }
-  function coralPrune(s, n) {
-    let cut = 0;
-    while (cut < n && s.nodes.length > 2) { const d = s.nodes.pop(); s.steps[d.step] = null; cut++; }   // never the roots: the colony always keeps its first two polyps
-    return cut;
-  }
-  function coralTick() {
-    const s = seq;
-    if (!s || !s.nodes) return;
-    const now = performance.now(), dens = (MAC.space + 1) / 2;
-    const target = 3 + Math.round(ZH * (3 + 9 * dens));   // three polyps at first, 6 to 15 once Z is full (y decides)
-    if (s.nodes.length < target && now - (s.lastGrow || 0) > 450 + 900 * (1 - dens)) { if (coralGrow(s)) { s.lastGrow = now; renderPattern(s); } }
-    else if (s.nodes.length > target + 1 && now - (s.lastGrow || 0) > 700) { if (coralPrune(s, 1)) { s.lastGrow = now; renderPattern(s); } }
-  }
-
   let carry = null, handoffMac = false;   // set when a swipe passes a held press on to the next world: tempo, key and scale carry over
   function makeSeq() {
     let bpm = carry ? carry.bpm : Math.round(rnd(BPM_MIN, BPM_MAX));
     // clouds plays at half the clock (about 55 to 68 BPM); a tempo carried over a swipe is halved or doubled to match
-    const isCl = /^(clouds|coral)$/.test(document.documentElement.getAttribute('data-skin'));
+    const isCl = document.documentElement.getAttribute('data-skin') === 'clouds';
     if (isCl) { if (bpm > 90) bpm = Math.round(bpm / 2); } else if (bpm < 90) bpm *= 2;
     const root = carry ? carry.root : Math.floor(Math.random() * 12);
     const same = list => (carry && list.filter(x => x.name === carry.sc)[0]) || pick(list);
     const skin = document.documentElement.dataset.skin, dubOn = skin === 'mandala';
     const RISO_SCALES = ['MAJOR', 'MINOR', 'DORIAN', 'MIXOLYDIAN'];
     const ACID_SCALES = ['MINOR', 'MIN PENTA', 'DORIAN'];
-    const sc = skin === 'clouds' || skin === 'coral' ? same(SCALES.filter(x => ['MAJOR', 'MINOR', 'DORIAN', 'MAJ PENTA', 'MIN PENTA'].indexOf(x.name) >= 0)) : skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
+    const sc = skin === 'clouds' ? same(SCALES.filter(x => ['MAJOR', 'MINOR', 'DORIAN', 'MAJ PENTA', 'MIN PENTA'].indexOf(x.name) >= 0)) : skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
     carry = null;
     const pool = [];
     for (let m = LOW; m <= HIGH; m++) {
@@ -1551,11 +1496,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const lo = Math.random() < 0.5 ? 24 : 36;   // the roots live in one octave, 1 or 2 (C1 = 24, C2 = 36); the chord stacks upward from them
       s.dubChord = off => { const r = lo + (root + off) % 12; return s.dub.chord.iv.map(i => r + i); };
     }
-    if (skin === 'coral') {
-      for (let k = 0; k < STEPS; k++) s.steps.push(null);
-      s.nodes = [{ step: 0, idx: s.idx, par: -1 }]; s.steps[0] = { midi: pool[s.idx], vel: 1, par: -1 };
-      coralGrow(s, true); coralGrow(s, true);   // the seed colony: three polyps, the same for the same seed
-    } else for (let k = 0; k < STEPS; k++) s.steps.push(makeStep(s));
+    for (let k = 0; k < STEPS; k++) s.steps.push(makeStep(s));
     if (s.acid) s.acidV = makeAcid(s);
     ensureLfo(s.timbre);
     // the first step is always a clear note, so a quick tap catches exactly one good hit
@@ -1629,7 +1570,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       zTimer = setInterval(() => {
         if (!seq || !ctx) return;
         const u = clamp((ctx.currentTime - zT0 - 1) / 11, 0, 1); ZH = u * u * (3 - 2 * u);
-        if (skin === 'coral') coralTick();
         applyMacros();   // every world spends Z in applyMacros
       }, 100);
       seq.timer = setInterval(tick, 25);
@@ -1651,8 +1591,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
        topo     x drone filter                   y pulse-width sweep (PWM) and reverb
        matrix   x crush depth                    y filter focus (resonance)
        ridges   x cutoff                         y resonance: the acid pair
-       clouds   x grain density and size         y reverb and brightness
-       coral    x how far a branch leaps and how bright the drop (glass)   y how crowded the colony gets and the water depth (reverb) */
+       clouds   x grain density and size         y reverb and brightness */
   const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
   // The axes do not poke at one world's knobs, they set five shared macros (cut, res, echo, space, color); every world turns them into its own sound.
   // When you swipe to another world with the finger down, the macros stay and glide to the new axes over 1.5 s, so the modulation carries over.
@@ -1664,8 +1603,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     topo:    { x: ['cut'],   y: ['color', 'space'] },
     matrix:  { x: ['color'], y: ['arp'] },
     ridges:  { x: ['cut'],   y: ['res'] },
-    clouds:  { x: ['color'], y: ['space', 'cut'] },
-    coral:   { x: ['color'], y: ['space'] }
+    clouds:  { x: ['color'], y: ['space', 'cut'] }
   };
   const MAC = { cut: 0, res: 0, echo: 0, space: 0, color: 0, lpg: 0, hit: 0, ring: 0, arp: 0 };   // -1..1 around the press patch
   let glide = null, glideTimer = 0;
@@ -1716,7 +1654,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (b.mg.delAmt) b.mg.delAmt.g.gain.value = b.mg.delAmt.d * 0.5 * da;
     b.delFb = fbk; b.fb.gain.setTargetAtTime(fbk, now, 0.05);
     if (b.mg.fb) b.mg.fb.g.gain.value = b.mg.fb.d * Math.max(0, Math.min(fbk - 0.1, 0.86 - fbk));   // feedback plus its own wobble can never pass 0.86
-    const ra = clamp(b.base.revAmt + 0.4 * MAC.space + (sk === 'riso' ? 0.15 * ZH : sk === 'coral' ? 0.12 * ZH : 0), 0, 0.9);
+    const ra = clamp(b.base.revAmt + 0.4 * MAC.space + (sk === 'riso' ? 0.15 * ZH : 0), 0, 0.9);
     b.revAmt = ra; b.rsend.gain.setTargetAtTime(ra, now, 0.05);
     if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * ra;
     if (b.sh) {   // clouds: near the top of the y axis the sound goes fully wet, the dry signal melts away and the octave-up shimmer opens
@@ -2431,91 +2369,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     SK.touch = () => spawn(1.1, FP);
   }
 
-  function buildCoral() {
-    // a colony growing from the sea floor. A polyp sits at its step across the bar (x) and its pitch (height); every branch runs from the polyp it grew from, so the picture is the melody itself.
-    // x makes the branches bow and the glow brighter, y sends the plankton up, Z (the growth) swells the polyps and the glow; a note makes its polyp pulse and drop a ring
-    const defs = se('defs');
-    const rg = se('radialGradient', { id: 'crglow', gradientUnits: 'userSpaceOnUse', cx: 0, cy: 430, r: 300 }, defs);
-    se('stop', { offset: 0, class: 'cr-g0' }, rg); se('stop', { offset: 1, class: 'cr-g1' }, rg);
-    const glow = se('rect', { x: -2000, y: -2000, width: 4000, height: 4000, fill: 'url(#crglow)' });
-    const rnd = (a, b) => a + Math.random() * (b - a);
-    const plank = [];
-    for (let i = 0; i < 22; i++) { const el = se('circle', { r: rnd(1, 2.6).toFixed(1), opacity: rnd(0.15, 0.4).toFixed(2) }); el.style.fill = 'hsl(calc(var(--hue, 200) + 30) 80% 80%)'; plank.push({ el, x: rnd(-200, 200), y: rnd(-430, 430), v: rnd(0.3, 1), ph: rnd(0, 6.28) }); }
-    const gEdge = se('g'), gNode = se('g'), gRing = se('g');
-    const nodes = new Array(STEPS).fill(null), rings = [];
-    const reduced = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-    const X = i => -165 + i * (330 / (STEPS - 1)), Yof = st => st.midi === undefined ? 100 - 200 * (st.vel || 0.5) : 330 - (st.midi - LOW) / (HIGH - LOW) * 600;
-    let T = 0, last = 0, raf = 0, dead = false;
-    const sx = (i, k) => Math.sin(T * 0.7 + i * 1.3) * 2.6 * k, sy = i => Math.cos(T * 0.5 + i * 0.9) * 2.6;
-    function drop(n) { n.el.remove(); n.edge.remove(); }
-    SK.pattern = sq => {
-      const now = performance.now();
-      let prev = -1;
-      for (let i = 0; i < STEPS; i++) {
-        const st = sq.steps[i], n = nodes[i];
-        if (st && (!n || n.die || n.midi !== st.midi)) {
-          if (n) drop(n);
-          const el = se('g', {}, gNode), halo = se('circle', { r: 0 }, el), core = se('circle', { r: 0 }, el), edge = se('path', { class: 'cr-b', d: '' }, gEdge);
-          halo.style.fill = 'hsl(calc(var(--hue, 200) + ' + (st.midi || 0) % 40 + ') 100% 65%)';
-          core.style.fill = 'hsl(calc(var(--hue, 200) + ' + (st.midi || 0) % 40 + ') 100% 80%)';
-          edge.style.stroke = 'hsl(var(--hue, 200) 75% 62%)';
-          nodes[i] = { i, midi: st.midi, vel: st.vel, par: st.par === undefined ? prev : st.par, x: X(i), y: Yof(st), born: now, die: 0, pulse: 0, el, halo, core, edge };   // a demo pattern has no parents: it chains from the left
-        } else if (!st && n && !n.die) n.die = now;
-        else if (st && n) n.vel = st.vel;
-        if (st) prev = i;
-      }
-      if (reduced) draw(0, 0);
-    };
-    function draw(dt, env) {
-      const now = performance.now(), zk = 1 + ZH;
-      for (let i = 0; i < STEPS; i++) {
-        const n = nodes[i];
-        if (!n) continue;
-        let u = reduced ? 1 : Math.min(1, (now - n.born) / 1100); u = u * (2 - u);
-        let fade = 1;
-        if (n.die) { fade = 1 - (now - n.die) / 650; if (fade <= 0) { drop(n); nodes[i] = null; continue; } }
-        n.pulse = Math.max(0, n.pulse - dt * 2.4);
-        const x = n.x + sx(i, zk), y = n.y + sy(i), par = n.par >= 0 ? nodes[n.par] : null;
-        const px = par ? par.x + sx(par.i, zk) : n.x * 0.35, py = par ? par.y + sy(par.i) : 400;   // the first branch stands on the floor, nearer the middle than its note
-        const ex = px + (x - px) * u, ey = py + (y - py) * u, bow = (par ? 26 : 14) * (0.4 + 0.6 * XV.x) * Math.sin(T * 0.4 + i);
-        n.edge.setAttribute('d', 'M' + f1(px) + ' ' + f1(py) + 'Q' + f1((px + ex) / 2 + bow) + ' ' + f1((py + ey) / 2) + ' ' + f1(ex) + ' ' + f1(ey));
-        n.edge.setAttribute('stroke-width', (1.2 + 2.2 * n.vel).toFixed(1));
-        n.edge.setAttribute('stroke-opacity', (Math.min(1, 0.3 + 0.55 * XV.x + 0.15 * ZH) * fade).toFixed(2));
-        const r = (5 + 7 * n.vel) * u * (1 + 0.6 * n.pulse + 0.2 * ZH) * (n.die ? 1 + (1 - fade) * 0.6 : 1);
-        n.el.setAttribute('transform', 'translate(' + f1(ex) + ' ' + f1(ey) + ')');
-        n.el.setAttribute('opacity', fade.toFixed(2));
-        n.core.setAttribute('r', r.toFixed(1)); n.halo.setAttribute('r', (r * (1.9 + 0.8 * n.pulse)).toFixed(1)); n.halo.setAttribute('opacity', (0.16 + 0.34 * n.pulse + 0.1 * ZH).toFixed(2));
-      }
-      for (const q of plank) {
-        q.y -= q.v * (14 + 40 * XV.y) * (1 + 1.2 * ZH) * dt; q.x += Math.sin(T + q.ph) * 4 * dt;
-        if (q.y < -440) { q.y = 440; q.x = rnd(-200, 200); }
-        q.el.setAttribute('cx', f1(q.x)); q.el.setAttribute('cy', f1(q.y));
-      }
-      for (let q = rings.length - 1; q >= 0; q--) {
-        const g = rings[q]; g.age += dt;
-        const u = g.age / (g.big ? 0.7 : 1.1);
-        if (u >= 1) { if (g.el) g.el.remove(); rings.splice(q, 1); continue; }
-        if (!g.el) { g.el = se('circle', { cx: f1(g.x), cy: f1(g.y), r: 6, fill: 'none', 'stroke-width': g.big ? 2.2 : 1.4 }, gRing); g.el.style.stroke = 'hsl(calc(var(--hue, 200) + 20) 100% 82%)'; }
-        g.el.setAttribute('r', (8 + (g.big ? 220 : 70) * Math.sqrt(u)).toFixed(1)); g.el.setAttribute('stroke-opacity', (0.7 * (1 - u)).toFixed(2));
-      }
-      rg.setAttribute('r', (240 + 140 * ZH + 60 * env).toFixed(0));
-      glow.style.opacity = (0.45 + 0.35 * XV.x + 0.2 * Math.min(1, env * 1.5)).toFixed(2);
-    }
-    function frame(now) {
-      if (dead) return;
-      raf = requestAnimationFrame(frame);
-      const env = Math.max(0, litN) / 60;
-      if (now - last < (seq || cur || kick > 0.01 || rings.length ? 16 : 40)) return;
-      const dt = Math.min(0.1, (now - last) / 1000) * ACT;
-      last = now; T += dt; xvStep(dt);
-      draw(dt, env);
-    }
-    if (!reduced) { last = performance.now(); raf = requestAnimationFrame(frame); }
-    SK.note = (i, vel) => { const n = nodes[i]; if (n && !n.die) { n.pulse = 1; if (rings.length < 14) rings.push({ x: n.x, y: n.y, age: 0, big: false, el: null }); } };
-    SK.pTap = () => rings.push({ x: FP2.vx, y: FP2.vy, age: 0, big: true, el: null });   // the snip: a wide ring from the second finger, the pruned tips fade on their own
-    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
-  }
-
   function buildScope() {
     // Conway's Game of Life on a torus. Every note fires a glider (loud) or a blinker (soft) at the finger and advances the field one generation; when nothing plays it drifts slowly
     const C = 26, R = 56, S = 15, X0 = -195 + S / 2, Y0 = -420 + S / 2;
@@ -2692,8 +2545,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   // skins can be swapped at any time: clear the old full-screen layer, build the new one, redraw the current pattern
-  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds', 'coral'];   // paper and donut are light: kept in the code, out of the rotation
-  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12', coral: '#061317' };
+  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds'];   // paper and donut are light: kept in the code, out of the rotation
+  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12' };
   function applySkin(name) {
     skin = name;
     root.setAttribute('data-skin', name);
@@ -2705,7 +2558,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
     else root.style.removeProperty('--accent');
-    ({ amber: buildAmber, riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges, clouds: buildClouds, coral: buildCoral }[name] || (() => {}))();
+    ({ amber: buildAmber, riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges, clouds: buildClouds }[name] || (() => {}))();
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
@@ -2913,7 +2766,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
   let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
-  const P_WORLDS = { coral: true, clouds: true, ridges: true, amber: true, riso: true, mandala: true, scope: true, matrix: true, topo: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
+  const P_WORLDS = { clouds: true, ridges: true, amber: true, riso: true, mandala: true, scope: true, matrix: true, topo: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
   const setFP2 = (x, y) => { const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844); pX = x; pY = y; FP2.vx = (x - W / 2) / sc; FP2.vy = (y - H / 2) / sc; };   // the second finger in the skin's coordinates, so a world can animate it like the first
   function pinch() {
     const raw = Math.log2(Math.max(24, Math.hypot(pX - P1.x, pY - P1.y)) / pDist0);
@@ -2933,7 +2786,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (skin === 'matrix' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.1, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // matrix: a ratchet
     if (skin === 'scope' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.3, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // scope: a shot
     if (skin === 'riso' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.25, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // riso: the last chord struck again, hard, with a wide open noise
-    if (skin === 'coral' && seq && seq.nodes) { const cut = coralPrune(seq, 3); if (cut) renderPattern(seq); if (seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.1, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004); }   // coral: the youngest tips are snipped off, the colony starts to grow back
     if (SK.pTap) SK.pTap();
   }
   function endP() {
@@ -3027,8 +2879,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     topo:    { x: ['filter', 'dark', 'open'],      y: ['pulse', 'narrow', 'wide'],      p: ['interval'], pLive: 1,          pt: 'swell', z: ['unison', 'wider'] },
     matrix:  { x: ['bit depth', 'crushed', 'clean'], y: ['arp', 'plain', 'busy'],       p: ['arp rate', 'fast', 'slow'],    pt: 'ratchet', z: ['arp', 'busier'] },
     ridges:  { x: ['cutoff', 'closed', 'open'],    y: ['resonance', 'calm', 'squeal'],  p: ['env depth', 'flat', 'deep'],   pt: 'stab', z: ['squeal', 'higher'] },
-    clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] },
-    coral:   { x: ['reach', 'tight', 'leaping'],   y: ['colony', 'sparse', 'dense'],     p: ['gravity', 'down', 'up'],        pt: 'prune', z: ['growth', 'grows'] }
+    clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] }
   };
   const MOD_HOLD = 800, MOD_FADE = 3200, MOD_SLOT = 30, MOD_RANK = [1, 0.6, 0.38, 0.2];   // a line stays fully lit 0.8 s after its last change, then fades over 3.2 s; the lower in the stack, the dimmer
   let modEl = null, modRaf = 0;
@@ -3096,7 +2947,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   { let want = !/[?&]mod=0/.test(location.search); try { const ls = localStorage.getItem('subversum.mod'); if (ls === '0' && !/[?&]mod=1/.test(location.search)) want = false; } catch (e) {} if (want) modStart(); }
   /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
   const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
-    amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], coral: ['REACH', 'COLONY', 'GRAVITY', 'PRUNE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
+    amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
     riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM', 'INTERVAL', 'SWELL'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW']
   };
   let hudEl = null, hudRaf = 0;
