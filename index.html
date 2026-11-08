@@ -1095,10 +1095,12 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   const VOICES = {
     // riso: a bank of resonators tuned to a major or minor chord, struck by a burst of ink noise (a bit like Rings fed with noise)
     riso: c => {
-      const { t0, vel, b, r } = c, boom = !!c.boom, T = (0.25 + b.len * 1.6) * (boom ? 1.3 : 1);
+      const { t0, vel, b, r } = c, boom = !!c.boom, T = (0.1 + b.len * 1.8) * (boom ? 1.3 : 1);   // y reaches from a dead thud (0.1 s) to a long ring
       const ex = c.g(0), sum = c.g(1), cr = c.shaper(crushCurve(14 + Math.floor(r[0] * 50))), lp = c.bq('lowpass', b.cut, 0.7 + b.res * 0.3);
       // x: what strikes the resonators: dark and soft on the left (the noise is low passed from 0,5 kHz), bright and snappy on the right (up to 6 kHz); a P tap strikes wide open
-      const hit = clamp(b.hit || 0, -1, 1), exLp = c.bq('lowpass', Math.min(16000, 500 * Math.pow(2, (hit + 1) * 3.6 + (boom ? 2 : 0))), 0.7);
+      const hit = clamp(b.hit || 0, -1, 1), exLp = c.bq('lowpass', Math.min(16000, 500 * Math.pow(2, (hit + 1) * 2.6 + (boom ? 2 : 0))), 0.7);   // the whole axis is audible now: 0.5 kHz .. 16 kHz
+      // x is also the material of the resonators: left a soft wooden block (only the lower partials, harmonic), right a struck bell (partials stretched to 1 : 2.76 : 5.4 : 8.93, the upper ones loud)
+      const mat = clamp(hit, -1, 1), BELL = [1, 2.76, 5.4, 8.93], nPart = mat > -0.3 ? 4 : 3;
       // P pinch: the envelope of the strike. Together a sharper click, apart it swells and lasts, as if the chord were bowed
       const pd = PX.d, att = boom ? 0.0005 : 0.0008 + 0.09 * Math.pow(Math.max(0, pd), 2), tauE = boom ? 0.02 : pd >= 0 ? 0.008 * Math.pow(15, pd) : 0.008 * Math.pow(2, 1.5 * pd);
       ex.gain.setValueAtTime(0, t0); ex.gain.linearRampToValueAtTime(vel / Math.sqrt(Math.max(1, tauE / 0.008)), t0 + att); ex.gain.setTargetAtTime(0, t0 + att, tauE);
@@ -1106,11 +1108,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const n = c.chord.length;
       c.chord.forEach(m => {
         const f0 = 440 * Math.pow(2, (m - 69) / 12);
-        [1, 2, 3].forEach((h, k) => {
-          const f = f0 * h;
+        [1, 2, 3, 4].slice(0, nPart).forEach((h, k) => {
+          const f = f0 * (mat > 0 ? h + (BELL[k] - h) * mat : h);
           if (f > 9000) return;
           const q = Math.max(8, Math.min(300, Math.PI * f * T / (1 + k * 0.6)));   // narrower at low pitch means longer ring
-          const bp = c.bq('bandpass', f, q), a = c.g(RES_GAIN * q / (h * h) / Math.sqrt(n));
+          const bp = c.bq('bandpass', f, q), a = c.g(RES_GAIN * q / (h * h) / Math.sqrt(n) * Math.pow(2, mat * k * 1.1));
           ex.connect(bp); bp.connect(a); a.connect(sum);
         });
       });
@@ -1647,7 +1649,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       b.sh.shout.gain.setTargetAtTime(Math.min(0.7, 0.18 + 0.36 * sw + 0.2 * ZH), now, 0.1); b.sh.shfb.gain.setTargetAtTime(Math.min(0.4, 0.18 + 0.14 * sw + 0.1 * ZH), now, 0.1);
     }
     if (sk === 'matrix') b.arp = MAC.arp;
-    if (sk === 'riso') { b.len = clamp(b.base.len + 0.55 * MAC.ring, 0.02, 0.95); b.hit = MAC.hit; }
+    if (sk === 'riso') { b.len = clamp(b.base.len + 0.75 * MAC.ring, 0.02, 0.95); b.hit = MAC.hit; b.cut = clamp(b.base.cut * Math.pow(2, MAC.ring * 1.4), 400, 12000); }   // y: damped is short and dark, ringing is long and open
     b.xt = Math.pow(2, MAC.color * 1.2); b.xc = Math.round(MAC.color * 7);
     if (sk === 'topo' && cont && cont.xy) { const sw = swellAmt(); cont.xy(b.cut * Math.pow(2, 1.3 * sw), (MAC.color + 1) / 2, ZH + 0.8 * sw); if (cont.iv) cont.iv(topoIv()[1]); }
     if (acid && seq && seq.acidV) seq.acidV.setRes(b.res);
