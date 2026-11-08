@@ -886,7 +886,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
     vector:   { cut: [2500, 9000], len: [0.2, 0.6], fb: [0.2, 0.5], dela: [0.1, 0.4], revSec: [1.2, 2.8], reva: [0.15, 0.45], res: [0, 4] },
     clouds:   { shimmer: true, cut: [2500, 7000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
-    shepard:  { cut: [2500, 8000], len: [0.3, 0.8], fb: [0.2, 0.5], dela: [0.1, 0.4], revSec: [1.5, 3.5], reva: [0.2, 0.5], res: [0, 3] },
+    shepard:  { cut: [1200, 5000], len: [0.3, 0.8], fb: [0.35, 0.65], dela: [0.25, 0.6], revSec: [2, 4], reva: [0.25, 0.55], res: [0, 3] },
     overtones: { cut: [3000, 9000], len: [0.3, 0.9], fb: [0.2, 0.5], dela: [0.15, 0.5], revSec: [2.5, 5], reva: [0.35, 0.7], res: [0, 3] },
     ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] }
   };
@@ -1143,35 +1143,37 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   function shepFc(b) { return Math.log2(300) + ((b && b.r ? b.r[1] : 0.5) - 0.5) * 0.8; }
   const shepW = (lf, fc, sg) => Math.exp(-0.5 * Math.pow((lf - fc) / sg, 2));
   const SHEP_VOICE = c => {
-    const { t0, f, vel, b } = c, boom = !!c.boom;
+    // calm techno: a soft FM bell (the patch is rolled by the seed, like amber's, but its ranges are the quiet ones) is struck as a pitch class: one copy of the bell per octave inside the window, loudness by the bell curve
+    const { t0, f, vel, b, s, idx } = c, boom = !!c.boom, sp = s.sp;
     if (SHEP.b !== b) { SHEP.b = b; SHEP.gl = 0; SHEP.t = t0; SHEP.dir = 1; }
     const rate = shepRate(b);
     SHEP.gl += (SHEP.rate || 0) * (t0 - SHEP.t); SHEP.t = t0; SHEP.rate = rate;
     const midi = Math.round(69 + 12 * Math.log2(f / 440)), pc = ((midi % 12) + 12) % 12;
-    const sg = shepSigma(), fc = shepFc(b), sp = shepSpacing(), lsp = Math.log2(sp), L = (0.9 + 0.8 * b.len) * (boom ? 0.7 : 1);
-    const lb = Math.log2(16.3516) + (pc + SHEP.gl) / 12, drift = rate / 12 * L;   // log2 Hz of the lowest C, and how far the set moves in octaves during this note
-    const parts = [];
-    let k = Math.ceil((Math.log2(20) - lb) / lsp), s2 = 0;
-    for (; parts.length < 12; k++) {
+    const sg = shepSigma(), fc = shepFc(b), lsp = Math.log2(shepSpacing()), D = sp.decay * (boom ? 1.2 : 1) * (0.8 + 0.4 * ZH), L = Math.min(2.4, D * 1.2), drift = rate / 12 * L;
+    const lb = Math.log2(16.3516) + (pc + SHEP.gl) / 12, copies = [];
+    for (let k = Math.ceil((Math.log2(40) - lb) / lsp); copies.length < 5; k++) {
       const lf = lb + k * lsp;
-      if (lf > Math.log2(11000)) break;
+      if (lf > Math.log2(5000)) break;
       const w0 = shepW(lf, fc, sg), w1 = shepW(lf + drift, fc, sg);
-      if (Math.max(w0, w1) < 0.04) continue;
-      parts.push({ lf, w0, w1 }); s2 += Math.max(w0, w1) * Math.max(w0, w1);
+      if (Math.max(w0, w1) < 0.08) continue;
+      copies.push({ lf, w0, w1 });
     }
-    const A = 0.5 * vel * (boom ? 1.15 : 1) / Math.sqrt(Math.max(1.5, s2)), e = c.g(0), tau = L / 7;
-    e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(1, t0 + 0.02); e.gain.setTargetAtTime(0, t0 + 0.14, tau);
-    e.connect(c.out);
-    parts.forEach(p => {
-      const fHz = Math.pow(2, p.lf), o = c.osc('sine', fHz), g = c.g(0);
-      if (Math.abs(rate) > 1e-4) { o.frequency.setValueAtTime(fHz, t0); o.frequency.exponentialRampToValueAtTime(fHz * Math.pow(2, drift), t0 + L); }
-      if (Math.abs(rate) > 1e-4) {   // the bell moves with the note: a partial that climbs out of it fades while it climbs
-        const cv = new Float32Array(10); for (let i = 0; i < 10; i++) cv[i] = A * shepW(p.lf + drift * i / 9, fc, sg);
-        g.gain.setValueCurveAtTime(cv, t0, L);
-      } else g.gain.value = A * p.w0;
-      o._end = t0 + L + 0.05; o.connect(g); g.connect(e);
+    let s2 = 0; copies.forEach(q => { const w = Math.max(q.w0, q.w1); s2 += w * w; });
+    const beat = idx % 4 === 0 ? 1 : 0.8, A = 0.48 * vel * beat * (boom ? 1.2 : 1) / Math.sqrt(Math.max(1, s2)), tau = D / 3.2, bri = Math.pow(2, 0.6 * MAC.color);
+    copies.forEach(q => {
+      const fHz = Math.pow(2, q.lf), fr = sp.fmRatio * (PX.d > 0.2 ? 1 + 0.02 * PX.d : 1), car = c.osc(sp.wave, fHz), mod = c.osc('sine', fHz * fr), mg = c.g(0), lp = c.bq('lowpass', 800, 0.5 + sp.res), vca = c.g(0), wg = c.g(0);
+      const dev = sp.fmIdx * fHz * fr * Math.min(1.6, bri);
+      mg.gain.setValueAtTime(dev, t0); mg.gain.setTargetAtTime(dev * sp.fmSweep, t0, tau * 0.8);   // the FM index falls as the gate closes
+      mod.connect(mg); mg.connect(car.frequency);
+      if (Math.abs(rate) > 1e-4) { const f1 = fHz * Math.pow(2, drift); car.frequency.setValueAtTime(fHz, t0); car.frequency.exponentialRampToValueAtTime(f1, t0 + L); mod.frequency.setValueAtTime(fHz * fr, t0); mod.frequency.exponentialRampToValueAtTime(f1 * fr, t0 + L); }
+      const cut = Math.min(9000, Math.max(300, fHz * sp.cutMul * bri));   // the low pass gate: it opens with the level and closes faster
+      lp.frequency.setValueAtTime(Math.max(120, fHz * 0.8), t0); lp.frequency.linearRampToValueAtTime(cut, t0 + sp.attack + 0.01); lp.frequency.setTargetAtTime(Math.max(120, fHz * 1.1), t0 + sp.attack + 0.01, tau * 0.6);
+      vca.gain.setValueAtTime(0, t0); vca.gain.linearRampToValueAtTime(1, t0 + sp.attack); vca.gain.setTargetAtTime(0, t0 + sp.attack, tau);
+      if (Math.abs(rate) > 1e-4) { const cv = new Float32Array(10); for (let i = 0; i < 10; i++) cv[i] = A * shepW(q.lf + drift * i / 9, fc, sg); wg.gain.setValueCurveAtTime(cv, t0, L); } else wg.gain.value = A * q.w0;
+      car.connect(lp); lp.connect(vca); vca.connect(wg); wg.connect(c.out);
+      car._end = mod._end = t0 + sp.attack + tau * 7 + 0.05;
     });
-    return t0 + L + 0.06;
+    return t0 + sp.attack + tau * 7 + 0.1;
   };
 
   /* ---------- overtones: a quiet drone of the harmonic series and a melody sung on its upper harmonics ---------- */
@@ -1650,7 +1652,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   function makeSeq() {
     let bpm = carry ? carry.bpm : Math.round(rnd(BPM_MIN, BPM_MAX));
     // clouds plays at half the clock (about 55 to 68 BPM); a tempo carried over a swipe is halved or doubled to match
-    const sk0 = document.documentElement.getAttribute('data-skin'), isCl = sk0 === 'clouds' || sk0 === 'vector' || sk0 === 'shepard' || sk0 === 'overtones';
+    const sk0 = document.documentElement.getAttribute('data-skin'), isCl = sk0 === 'clouds' || sk0 === 'vector' || sk0 === 'overtones';
     if (isCl) { if (bpm > 90) bpm = Math.round(bpm / 2); } else if (bpm < 90) bpm *= 2;
     const root = carry ? carry.root : Math.floor(Math.random() * 12);
     const same = list => (carry && list.filter(x => x.name === carry.sc)[0]) || pick(list);
@@ -1690,6 +1692,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     s.steps[0].vel = 1;
     if (skin === 'overtones') {   // the pool position of every step decides which harmonic of the seed's set it sings; the key and the scale name belong to the drone
       s.hset = pick(HSETS); s.steps.forEach(st => { if (st) st.k = (st.midi - LOW) / (HIGH - LOW); }); s.sc = { name: 'HARMONICS', iv: sc.iv };
+    }
+    if (skin === 'shepard') {   // a calm patch rolled by the seed: a sine or triangle carrier, a consonant FM ratio and a low index, a soft low pass gate, a gentle attack
+      s.sp = { wave: pick(['sine', 'triangle', 'triangle']), fmRatio: pick([0.5, 1, 1, 2, 2, 3, 4]), fmIdx: rnd(0.05, 1.1), fmSweep: rnd(0.1, 0.8), decay: lrnd(0.35, 1.3), attack: rnd(0.006, 0.04), cutMul: rnd(2, 6), res: rnd(0, 2.5) };
     }
     return s;
   }
