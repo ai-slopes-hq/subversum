@@ -1148,53 +1148,66 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     return end + 0.1;
   };
 
-  /* ---------- overtones: a quiet drone of the harmonic series and a melody sung on its upper harmonics ---------- */
-  const OV = { base: 0, f0: 0, hn: [], drone: null };   // f0: the fundamental now (Hz), base: where the press began, hn: the harmonic each step sings
+  /* ---------- overtones: spectral. A drone of 24 partials that comes in one by one and breathes, a formant that sings the melody out of it, chords of harmonics ----------
+     The drone is the harmonic series on one fundamental. Every press it begins with the fundamental alone and the upper partials join one after another (an additive process), each partial breathes on its own slow clock.
+     A narrow formant (a bump over the logarithm of the partial number) sweeps along the series and stands on the harmonic the melody sings, as in overtone singing, so the drone itself sings the tune and a clear voice doubles it.
+     Z is the morph: the partials stretch from the pure series towards a bell (inharmonicity grows and falls back on a slow cycle). X the tilt of the spectrum, Y the register, the P pinch the density of the harmonics, the P tap moves the ground to the harmonic that was just sung. */
+  const OV = { base: 0, f0: 0, fc: 0, hn: [], drone: null, c: 12, cT: 12, B: 0, lastN: 0, lastNs: null };   // f0: the fundamental to go to (Hz), fc: where the drone is now, c: the formant (a partial number), B: the inharmonicity
   const HSETS = [[8, 9, 10, 11, 12, 13, 14, 15, 16], [8, 9, 10, 12, 14, 15, 16, 18, 20], [9, 11, 13, 15, 17, 19, 21, 23], [8, 10, 12, 13, 15, 16, 18, 20, 24], [8, 9, 10, 12, 15, 16, 18, 20, 24], [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]];
+  const ovInh = h => h * Math.sqrt(1 + OV.B * h * h);   // the ratio of partial h to the fundamental, stretched by the morph
   function ovList(sq) { const st = PX.d < -0.33 ? 3 : PX.d > 0.33 ? 1 : 2; return sq.hset.filter((_, i) => i % st === 0); }   // the P pinch: every third, every second or every harmonic of the set
-  function ovPick(sq, k) {   // the harmonic for a step: its place in the pool, moved by Y (register) and Z (the melody climbs)
-    const l = ovList(sq), i = clamp(Math.round(k * (l.length - 1)) + Math.round(3 * MAC.ring) + Math.round(4 * ZH), 0, l.length - 1);
-    return l[i];
-  }
-  const ovMode = n => { const nn = Math.max(3, Math.round(n / 2.4)); let m = 1 + (n % 3); if (m >= nn) m = nn - 1; return [nn, m]; };   // the plate pattern a harmonic draws
+  const ovMode = h => { const nn = clamp(Math.round(h * 0.62), 4, 16); let m = 1 + (h * 5) % (nn - 1); if (m >= nn) m = nn - 1; return [nn, m]; };   // the plate figure a harmonic draws
   const OV_VOICE = c => {
-    const { t0, vel, b, st, s, idx } = c, boom = !!c.boom, n = boom && OV.lastN ? OV.lastN : ovPick(s, st.k);
-    OV.hn[idx] = n; OV.lastN = n;
-    const f = OV.f0 * n, T = (0.35 + 0.7 * b.len) * (boom ? 1.2 : 1), tau = T / 4, e = c.g(0);
-    e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.3 * vel * (boom ? 1.3 : 1), t0 + 0.018); e.gain.setTargetAtTime(0, t0 + 0.03, tau);
-    e.connect(c.out);
-    [[1, 1, 0], [1, 0.5, 5], [2, 0.1, 0], [3, 0.035, 0]].forEach(p => {   // a clear sine, a slightly detuned twin for a slow beat, and two faint overtones
-      if (f * p[0] > 11000) return;
-      const o = c.osc('sine', f * p[0], p[2]), g = c.g(p[1]); o._end = t0 + T + 0.05; o.connect(g); g.connect(e);
+    const { t0, vel, b, st, s, idx } = c, boom = !!c.boom, l = ovList(s), i0 = clamp(Math.round(st.k * (l.length - 1)) + Math.round(3 * MAC.ring), 0, l.length - 1), ch = st.ch || 1;
+    const ns = boom && OV.lastNs ? OV.lastNs : [l[i0], ch > 1 ? l[Math.min(l.length - 1, i0 + 2)] : 0, ch > 2 ? l[Math.min(l.length - 1, i0 + 4)] : 0].filter((n, k, a) => n && a.indexOf(n) === k);   // a chord of harmonics, just
+    OV.lastNs = ns; OV.lastN = ns[0]; OV.hn[idx] = ns; OV.cT = ns[0];
+    const T = (0.35 + 0.7 * b.len) * (boom ? 1.2 : 1), tau = T / 4;
+    ns.forEach(n => {
+      const f = OV.f0 * ovInh(n), e = c.g(0);
+      e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.2 * vel * (boom ? 1.3 : 1) / Math.sqrt(ns.length), t0 + 0.018); e.gain.setTargetAtTime(0, t0 + 0.03, tau);
+      e.connect(c.out);
+      [[1, 1, 0], [1, 0.5, 5], [2, 0.1, 0]].forEach(p => {   // a clear sine, a slightly detuned twin for a slow beat, a faint octave
+        if (f * p[0] > 11000) return;
+        const o = c.osc('sine', f * p[0], p[2]), g = c.g(p[1]); o._end = t0 + T + 0.05; o.connect(g); g.connect(e);
+      });
+      const nz = c.noise(), bp = c.bq('bandpass', f, 25), ng = c.g(0.08 * vel);   // breath on the harmonic
+      nz._end = t0 + T * 0.5; nz.connect(bp); bp.connect(ng); ng.connect(e);
     });
-    const ns = c.noise(), bp = c.bq('bandpass', f, 25), ng = c.g(0.1 * vel);   // breath on the harmonic
-    ns._end = t0 + T * 0.5; ns.connect(bp); bp.connect(ng); ng.connect(e);
     return t0 + T + 0.06;
   };
   function ovDrone(sq) {
-    const b = sq.dub, t0 = ctx.currentTime + 0.02, base = 440 * Math.pow(2, (36 + sq.root - 69) / 12), NH = 12;
-    OV.base = OV.f0 = base; OV.hn = [];
-    const kill = ctx.createGain(); kill.gain.setValueAtTime(0, t0); kill.gain.linearRampToValueAtTime(1, t0 + 1.2); kill.connect(b.inp);
+    const b = sq.dub, t0 = ctx.currentTime + 0.02, base = 440 * Math.pow(2, (36 + sq.root - 69) / 12), NH = 24;
+    OV.base = OV.f0 = OV.fc = base; OV.hn = []; OV.c = OV.cT = 12; OV.B = 0; OV.lastN = 0; OV.lastNs = null;
+    const kill = ctx.createGain(); kill.gain.setValueAtTime(0, t0); kill.gain.linearRampToValueAtTime(1, t0 + 1.5); kill.connect(b.inp);
     const nodes = [kill], parts = [];
     for (let h = 1; h <= NH; h++) {
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = 'sine'; o.frequency.value = base * h; o.detune.value = (Math.random() - 0.5) * 6; g.gain.value = 0;
-      o.connect(g); g.connect(kill); o.start(t0); nodes.push(g); parts.push({ o, g, h, m: 1 });
+      o.connect(g); g.connect(kill); o.start(t0); nodes.push(g); parts.push({ o, g, h, m: 0.8, mt: 0.8, a: 0, as: 0 });
     }
-    let tilt = 1.0;
-    const setAmps = () => {
-      const now = ctx.currentTime; let s2 = 0; parts.forEach(p => { const a = Math.pow(p.h, -tilt) * p.m; p.a = a; s2 += a * a; });
-      const k = 0.2 / Math.sqrt(Math.max(0.2, s2));
-      parts.forEach(p => p.g.gain.setTargetAtTime(p.a * k, now, 0.2));
+    let tilt = 1.0, last = t0;
+    const upd = () => {
+      const now = ctx.currentTime, tt = now - t0, dt = Math.min(0.2, now - last); last = now;
+      OV.c += (OV.cT - OV.c) * (1 - Math.exp(-dt / 0.3));
+      OV.fc += (OV.f0 - OV.fc) * (1 - Math.exp(-dt / 0.45));   // the ground glides to a new harmonic
+      OV.B = 0.0028 * ZH * (0.5 + 0.5 * Math.sin(tt / 3.2 - 1.6));   // the morph: out towards a bell and back to the pure series, a cycle of about 20 s
+      const lc = Math.log2(Math.max(1, OV.c)); let s2 = 0;
+      parts.forEach(p => {
+        if (Math.random() < 0.012) p.mt = 0.25 + Math.random() * 1.0;   // every partial breathes on its own clock
+        p.m += (p.mt - p.m) * 0.03;
+        const app = clamp((tt - (p.h - 1) * 0.3) / 1.5, 0, 1), bump = Math.exp(-0.5 * Math.pow((Math.log2(p.h) - lc) / 0.16, 2));
+        p.a = Math.pow(p.h, -tilt) * p.m * app * (1 + 7 * bump); s2 += p.a * p.a;
+      });
+      const k = 0.22 / Math.sqrt(Math.max(0.2, s2));
+      parts.forEach(p => { p.as += (p.a * k - p.as) * 0.35; p.g.gain.value = p.as; p.o.frequency.value = OV.fc * ovInh(p.h); });
     };
-    setAmps();
-    const timer = setInterval(() => { for (let i = 0; i < 3; i++) parts[1 + Math.floor(Math.random() * (NH - 1))].m = 0.35 + Math.random() * 0.95; setAmps(); }, 400);   // the upper partials breathe on their own
+    const timer = setInterval(upd, 60);
     const d = {
-      xy(x01) { tilt = 1.7 - 1.2 * x01; setAmps(); },   // x: left a dark drone (the fundamental and the first partials), right a bright one
-      jump(n) {   // modulation by the overtone ratio: the drone glides to the harmonic that was just sung (folded into one octave round where it began)
+      xy(x01) { tilt = 1.7 - 1.2 * x01; },   // x: left a dark drone (the fundamental and the first partials), right a bright one
+      jump(n) {   // modulation by the overtone ratio: the ground glides to the harmonic that was just sung (folded into one octave round where it began)
         let r = n / Math.pow(2, Math.floor(Math.log2(n))), nf = OV.f0 * r;
         while (nf > OV.base * 1.42) nf /= 2; while (nf < OV.base / 1.42) nf *= 2;
-        OV.f0 = nf; const now = ctx.currentTime; parts.forEach(p => p.o.frequency.setTargetAtTime(nf * p.h, now, 0.3));
+        OV.f0 = nf;
       },
       stop() {
         clearInterval(timer); const now = ctx.currentTime;
@@ -1663,7 +1676,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (!s.steps[0]) s.steps[0] = s.dubChord ? { midi: 0, chord: s.dubChord(0), vel: 1 } : { midi: pool[s.idx], vel: 1 };
     s.steps[0].vel = 1;
     if (skin === 'overtones') {   // the pool position of every step decides which harmonic of the seed's set it sings; the key and the scale name belong to the drone
-      s.hset = pick(HSETS); s.steps.forEach(st => { if (st) st.k = (st.midi - LOW) / (HIGH - LOW); }); s.sc = { name: 'HARMONICS', iv: sc.iv };
+      s.hset = pick(HSETS); s.steps.forEach(st => { if (st) { st.k = (st.midi - LOW) / (HIGH - LOW); const q = Math.random(); st.ch = q < 0.2 ? 3 : q < 0.5 ? 2 : 1; } });   // some steps sing a chord of two or three harmonics s.sc = { name: 'HARMONICS', iv: sc.iv };
     }
     if (skin === 'shepard') {   // a soft subtractive patch rolled by the seed: a saw, square or triangle pair, a 24 dB low pass with its own ADSR, a gentle attack, a short key
       s.sp = { det: rnd(3, 11), cut: lrnd(350, 1400), env0: rnd(0.3, 1.0), res: rnd(0, 6), a: rnd(0.002, 0.007), d: rnd(0.07, 0.22), s: rnd(0, 0.1), r: rnd(0.06, 0.18), gate: rnd(0.3, 0.7) };   // a pluck: a click of an attack, a quick decay to almost nothing, a short key
@@ -2537,50 +2550,51 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   function buildOvertones() {
-    // a Chladni plate. The drone is a few slow figures, every harmonic the melody sings draws its own (n, m) figure that rings and dies away, the figures add up on one plate.
-    // Two colours by the sign of the swing, ultraviolet and amber, and the sand lines (where the plate rests) glow gold.
+    // a Chladni plate drawn by the formant of the drone. The partial the formant stands on draws its figure, and while the formant glides from one partial to the next the two figures cross-fade,
+    // every harmonic the melody sings strikes its own figure that rings and dies away. The figures do not move, they only come and go (as sand on a plate does), and the sand lines glow gold.
+    // Two colours by the sign of the swing, ultraviolet and amber.
     const wrap = document.createElement('div'); wrap.className = 'skinsvg'; wrap.id = 'ovwrap'; wrap.style.background = '#06040c';
     const cv = document.createElement('canvas'), ov = document.createElement('canvas');
     cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'; ov.style.cssText = cv.style.cssText;
-    const vg = document.createElement('div'); vg.style.cssText = 'position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 38%, rgba(0,0,0,.62) 100%)';
+    const vg = document.createElement('div'); vg.style.cssText = 'position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 40%, rgba(0,0,0,.6) 100%)';
     wrap.appendChild(cv); wrap.appendChild(vg); wrap.appendChild(ov);
     skinSvg.parentNode.insertBefore(wrap, skinSvg);
     const px2 = cv.getContext('2d', { alpha: false }), octx = ov.getContext('2d');
-    let RW = 150, RH = 320, img = null, d32 = null, OW = 1, OH = 1, osc2 = 1, dead = false, raf = 0, last = 0, lastDraw = 0, frames = 0, acc = 0, started = 0;
+    let RW = 200, RH = 430, img = null, d32 = null, OW = 1, OH = 1, osc2 = 1, dead = false, raf = 0, last = 0, lastDraw = 0, frames = 0, acc = 0, started = 0, tabs = [];
     const hslv = (h, s, l) => { h = ((h % 360) + 360) % 360 / 360; const f = n => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1))); }; return [f(0), f(8), f(4)]; };
-    const PAL = { hp: 28, hn: 262, hd: 250, s: 0.75, lp: 0.45, ln: 0.42, shift: 24, hl: [0.35, 0.2, 0.05] };
-    const Pc = hslv(PAL.hp, PAL.s, PAL.lp), Nc = hslv(PAL.hn, PAL.s, PAL.ln), P2 = hslv(PAL.hp + PAL.shift, PAL.s, PAL.lp + 0.12), N2 = hslv(PAL.hn - PAL.shift, PAL.s, PAL.ln + 0.1), Dk = hslv(PAL.hd, 0.6, 0.035);
+    const PAL = { hp: 28, hn: 262, hd: 250, s: 0.72, lp: 0.42, ln: 0.4, shift: 24, hl: [0.3, 0.17, 0.04] };
+    const Pc = hslv(PAL.hp, PAL.s, PAL.lp), Nc = hslv(PAL.hn, PAL.s, PAL.ln), P2 = hslv(PAL.hp + PAL.shift, PAL.s, PAL.lp + 0.12), N2 = hslv(PAL.hn - PAL.shift, PAL.s, PAL.ln + 0.1), Dk = hslv(PAL.hd, 0.6, 0.03);
     const LUT = new Uint32Array(512);
-    for (let q = 0; q < 512; q++) {   // the colour of the plate for the swing v in -1..1
-      const v = q / 255.5 - 1, av = Math.abs(v), C1 = v > 0 ? Pc : Nc, C2 = v > 0 ? P2 : N2, body = Math.pow(av, 0.8), k2 = Math.pow(av, 2.2), line = Math.exp(-Math.pow(av / 0.05, 2)), halo = Math.exp(-Math.pow(av / 0.2, 2)) * 0.35;
-      const ch = i => Math.min(255, 255 * (Dk[i] + C1[i] * body * 0.75 + C2[i] * k2 * 0.8 + line * [1, 0.86, 0.62][i] + halo * PAL.hl[i])) | 0;
+    for (let q = 0; q < 512; q++) {   // the colour of the plate for the swing v in -1..1: a dim body, a thin bright sand line
+      const v = q / 255.5 - 1, av = Math.abs(v), C1 = v > 0 ? Pc : Nc, C2 = v > 0 ? P2 : N2, body = Math.pow(av, 1.3) * 0.42, k2 = Math.pow(av, 2.4) * 0.8, line = Math.exp(-Math.pow(av / 0.04, 2)), halo = Math.exp(-Math.pow(av / 0.16, 2)) * 0.3;
+      const ch = i => Math.min(255, 255 * (Dk[i] + C1[i] * body * 0.75 + C2[i] * k2 * 0.7 + line * [1, 0.86, 0.62][i] + halo * PAL.hl[i])) | 0;
       LUT[q] = (255 << 24) | (ch(2) << 16) | (ch(1) << 8) | ch(0);
     }
+    const MAXM = 9;
+    function alloc() { tabs = []; for (let i = 0; i < MAXM; i++) tabs.push({ a: new Float32Array(RW), b: new Float32Array(RW), c: new Float32Array(RH), d: new Float32Array(RH) }); img = px2.createImageData(RW, RH); d32 = new Uint32Array(img.data.buffer); cv.width = RW; cv.height = RH; }
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      RW = clamp(Math.round(innerWidth * 0.42 * dpr), 120, 200); RH = Math.round(RW * innerHeight / innerWidth);
-      cv.width = RW; cv.height = RH; img = px2.createImageData(RW, RH); d32 = new Uint32Array(img.data.buffer);
+      RW = clamp(Math.round(innerWidth * 0.62 * dpr), 160, 260); RH = Math.round(RW * innerHeight / innerWidth);
       osc2 = Math.min(dpr, 1.5); OW = Math.round(innerWidth * osc2); OH = Math.round(innerHeight * osc2); ov.width = OW; ov.height = OH;
+      alloc();
     }
     addEventListener('resize', resize); resize();
-    const BG = [[2, 1], [3, 2], [5, 2]];
-    const modes = BG.map((b, k) => ({ n: b[0], m: b[1], a: 0, p: k * 1.7, q: k * 0.9, vp: 0.07 + 0.03 * k, vq: -0.05 - 0.02 * k, base: [0.3, 0.24, 0.18][k], sing: false }));
-    let x01 = 0.5, touch = 0, flash = 0, kickP = 0, fx2 = 0, fy2 = 0;
-    const tabs = []; for (let i = 0; i < 4; i++) tabs.push(null);
-    const MAXM = 12, cxA = [], cyA = [], cxB = [], cyB = []; for (let i = 0; i < MAXM; i++) { cxA.push(new Float32Array(260)); cyA.push(new Float32Array(560)); cxB.push(new Float32Array(260)); cyB.push(new Float32Array(560)); }
+    let x01 = 0.5, touch = 0, flash = 0, amp = 0.3; const sing = [];
     function plate() {
-      const act = modes.filter(m => m.a > 0.004).slice(0, MAXM); let sum = 0;
-      const S = Math.PI * 1.05 / RW;
-      act.forEach((m, k) => {
-        sum += m.a;
-        const p = m.p + (m.sing ? 0 : kickP * 1.6), q = m.q;
-        for (let x = 0; x < RW; x++) { const X = x * S; cxA[k][x] = Math.cos(m.n * X + p); cxB[k][x] = Math.cos(m.m * X + q); }
-        for (let y = 0; y < RH; y++) { const Y = y * S; cyA[k][y] = Math.cos(m.m * Y + q); cyB[k][y] = Math.cos(m.n * Y + p); }
+      const modes = [], c = clamp(OV.c, 8, 24), hl = Math.floor(c), fr = c - hl;   // the drone: the two partials the formant lies between
+      modes.push([hl, (1 - fr) * amp]); if (fr > 0.02) modes.push([hl + 1, fr * amp]);
+      sing.forEach(m => { if (modes.length < MAXM) modes.push([m.h, m.a]); });
+      let sum = 0;
+      const S = Math.PI / RW;
+      modes.forEach((q, k) => {
+        const mm = ovMode(q[0]), t = tabs[k], n = mm[0], m = mm[1]; sum += q[1]; q[2] = mm;
+        for (let x = 0; x < RW; x++) { t.a[x] = Math.cos(n * S * x); t.b[x] = Math.cos(m * S * x); }
+        for (let y = 0; y < RH; y++) { t.c[y] = Math.cos(m * S * y); t.d[y] = Math.cos(n * S * y); }
       });
-      const inv = 1.5 / Math.max(0.9, sum), na = act.length;
+      const inv = 1.4 / Math.max(0.9, sum), na = modes.length;
       for (let y = 0, o = 0; y < RH; y++) for (let x = 0; x < RW; x++, o++) {
         let u = 0;
-        for (let k = 0; k < na; k++) u += act[k].a * (cxA[k][x] * cyA[k][y] - cxB[k][x] * cyB[k][y]);
+        for (let k = 0; k < na; k++) { const t = tabs[k]; u += modes[k][1] * (t.a[x] * t.c[y] - t.b[x] * t.d[y]); }
         let v = u * inv; v = v > 1 ? 1 : v < -1 ? -1 : v;
         d32[o] = LUT[((v + 1) * 255.5) | 0];
       }
@@ -2588,49 +2602,43 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     }
     function drawFinger() {
       octx.clearRect(0, 0, OW, OH);
-      const ring = (x, y, r, a, hot) => {
+      const ring = (x, y, r, a) => {
         const gr = octx.createRadialGradient(x, y, 0, x, y, r * 2.2);
-        gr.addColorStop(0, 'rgba(255,214,140,' + (0.22 * a) + ')'); gr.addColorStop(1, 'rgba(255,214,140,0)');
+        gr.addColorStop(0, 'rgba(255,214,140,' + (0.2 * a) + ')'); gr.addColorStop(1, 'rgba(255,214,140,0)');
         octx.fillStyle = gr; octx.beginPath(); octx.arc(x, y, r * 2.2, 0, 6.2832); octx.fill();
         octx.strokeStyle = 'rgba(255,226,170,' + (0.7 * a) + ')'; octx.lineWidth = 1.5 * osc2; octx.beginPath(); octx.arc(x, y, r * 0.5, 0, 6.2832); octx.stroke();
       };
       if (touch > 0.02) ring(XY.x * OW, XY.y * OH, 0.07 * OW, touch);
       if (PX.on) ring(pX / innerWidth * OW, pY / innerHeight * OH, 0.05 * OW, 0.8 * touch);
-      if (flash > 0.02) { octx.fillStyle = 'rgba(255,200,120,' + (0.16 * flash).toFixed(3) + ')'; octx.fillRect(0, 0, OW, OH); }
+      if (flash > 0.02) { octx.fillStyle = 'rgba(255,200,120,' + (0.14 * flash).toFixed(3) + ')'; octx.fillRect(0, 0, OW, OH); }
     }
     function frame(tn) {
       if (dead) return;
       raf = requestAnimationFrame(frame);
       const live = !!seq;
-      if (!live && tn - lastDraw < 50) return;
+      if (!live && tn - lastDraw < 66) return;
       const dt = Math.min(0.05, (tn - last) / 1000); last = lastDraw = tn;
       x01 += ((MAC.color + 1) / 2 - x01) * (1 - Math.exp(-dt * 8));
       touch += ((XY.down || holding ? 1 : 0) - touch) * (1 - Math.exp(-dt * 10));
-      flash *= Math.exp(-dt * 5); kickP *= Math.exp(-dt / 0.8);
-      for (let i = modes.length - 1; i >= 0; i--) {
-        const m = modes[i];
-        m.p += m.vp * dt; m.q += m.vq * dt;
-        if (m.sing) {
-          if (m.rise > 0) { m.a += (m.top - m.a) * (1 - Math.exp(-dt * 25)); m.rise -= dt; } else m.a *= Math.exp(-dt / 0.55);
-          if (m.a < 0.01 && m.rise <= 0) modes.splice(i, 1);
-        } else {   // the drone's figures: brighter drone, more of them; they swell a little with the live drone
-          const tgt = live ? m.base * (0.55 + 0.9 * x01) : m.base * 0.5;
-          m.a += (tgt - m.a) * (1 - Math.exp(-dt * 2));
-        }
+      flash *= Math.exp(-dt * 5);
+      amp += ((live ? 0.55 + 0.35 * x01 : 0.3) - amp) * (1 - Math.exp(-dt * 2));
+      for (let i = sing.length - 1; i >= 0; i--) {
+        const m = sing[i];
+        if (m.rise > 0) { m.a += (m.top - m.a) * (1 - Math.exp(-dt * 30)); m.rise -= dt; } else m.a *= Math.exp(-dt / 0.45);
+        if (m.a < 0.02 && m.rise <= 0) sing.splice(i, 1);
       }
       plate(); drawFinger();
       if (!started) started = tn;
-      if (tn - started > 2500) { acc += dt; frames++; if (frames === 60) { if (acc / frames * 1000 > 26 && RW > 120) { RW = Math.max(120, Math.round(RW * 0.85)); RH = Math.round(RW * innerHeight / innerWidth); cv.width = RW; cv.height = RH; img = px2.createImageData(RW, RH); d32 = new Uint32Array(img.data.buffer); } frames = 0; acc = 0; } }
+      if (tn - started > 2500) { acc += dt; frames++; if (frames === 60) { if (acc / frames * 1000 > 28 && RW > 150) { RW = Math.max(150, Math.round(RW * 0.85)); RH = Math.round(RW * innerHeight / innerWidth); alloc(); } frames = 0; acc = 0; } }
     }
     last = lastDraw = performance.now(); plate();
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) raf = requestAnimationFrame(frame);
     SK.note = (i, vel) => {
-      const n = OV.hn[i]; if (!n) return;
-      const nm = ovMode(n), v = Math.random() < 0.5 ? 1 : -1;
-      modes.push({ n: nm[0], m: nm[1], a: 0, top: Math.min(1.1, 0.55 + 0.6 * vel), rise: 0.12, p: Math.random() * 6.28, q: Math.random() * 6.28, vp: v * (0.12 + 0.2 * Math.random()), vq: -v * (0.1 + 0.15 * Math.random()), sing: true });
-      while (modes.filter(m => m.sing).length > 6) { const k = modes.findIndex(m => m.sing); modes.splice(k, 1); }
+      const ns = OV.hn[i]; if (!ns) return;
+      ns.forEach(h => { sing.push({ h, a: 0, top: Math.min(0.9, 0.4 + 0.5 * vel), rise: 0.1 }); });
+      while (sing.length > 5) sing.shift();
     };
-    SK.pTap = () => { flash = 1; kickP = 1; };
+    SK.pTap = () => { flash = 1; };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
   }
 
@@ -3420,7 +3428,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     ridges:  { x: ['cutoff', 'closed', 'open'],    y: ['resonance', 'calm', 'squeal'],  p: ['env depth', 'flat', 'deep'],   pt: 'stab', z: ['squeal', 'higher'] },
     clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] },
     shepard: { x: ['wave', 'saw', 'square'],       y: ['cutoff', 'closed', 'open'],      p: ['env + reso', 'short', 'long'],   pt: 'hit', z: ['filter env', 'deeper'] },
-    overtones: { x: ['drone', 'dark', 'bright'],   y: ['register', 'low', 'high'],       p: ['harmonics', 'sparse', 'dense'], pt: 'jump', z: ['climb', 'higher'] },
+    overtones: { x: ['drone', 'dark', 'bright'],   y: ['register', 'low', 'high'],       p: ['harmonics', 'sparse', 'dense'], pt: 'jump', z: ['morph', 'bell'] },
     vector:  { x: ['timbre', 'soft', 'bright'],    y: ['body', 'short', 'long'],         p: ['border', 'soft', 'sharp'],    pt: 'snap', z: ['orbit', 'wider'] }
   };
   const MOD_HOLD = 800, MOD_FADE = 3200, MOD_SLOT = 30, MOD_RANK = [1, 0.6, 0.38, 0.2];   // a line stays fully lit 0.8 s after its last change, then fades over 3.2 s; the lower in the stack, the dimmer
