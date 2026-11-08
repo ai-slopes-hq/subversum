@@ -2775,10 +2775,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   function buildWavetable() {
-    // "Waves": eleven flat layers of land in a dusk haze. The screen is the table itself: the height on the screen is the place in the table (the top is the last, brightest frame, the bottom the first,
-    // the same as the Y axis), and every layer draws the frame that belongs to its height. The layer the sound is at (the real, smoothed position, not the finger) swells and shows the wave that is really heard:
-    // the table, the FM, the bend, the fold. Two thin ghost rims of that layer drift against each other at the real beat of the voices (Z pulls them apart). The finger is a warm source inside the wave:
-    // X leans the swell and the bend towards it. The far layers are pale and low in contrast, the near ones dark, one dusk colour per press. The P tap lights the haze, the P pinch is the fold.
+    // "Waves": lines of land across the whole screen, edge to edge and top to bottom, like the ridges, but flat layers that hide each other. The height on the screen is the place in the table (the top is the
+    // last frame, the bottom the first, the same as the Y axis) and every layer draws the frame of its own height. The colour is one dim pastel gradient between two inks from the bottom to the top of the
+    // screen, so every layer has its own step of it. X goes from the pure colour of a layer to a mix with its neighbours (the more to the right, the wider the mix). The layer the sound is at (the real,
+    // smoothed position) swells and shows the wave that is heard: the table, the FM, the bend, the fold; two thin ghost edges of it drift at the real beat of the other voices (Z pulls them apart).
+    // The finger is a warm source inside the wave. There is no sun: the state is read in the lines. The P tap lights the layers for a moment.
     const wrap = document.createElement('div'); wrap.className = 'skinsvg'; wrap.id = 'wtwrap';
     const cv = document.createElement('canvas');
     cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
@@ -2786,19 +2787,12 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     skinSvg.parentNode.insertBefore(wrap, skinSvg);
     const g = cv.getContext('2d', { alpha: false });
     const hex = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; }, mixc = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t)), css = c => 'rgb(' + c.join(',') + ')';
-    const PALS = [   // one dusk per press: the sky (top, middle, horizon), the far and near land, the lit edge, the warm haze, the sun
-      { sky: ['#171033', '#5C3A7A', '#F29A78'], far: '#B987A8', near: '#120A22', warm: '#F6B08C', rim: '255,220,180', sun: '255,225,190' },
-      { sky: ['#06161F', '#1D4F5C', '#F2B27A'], far: '#7FB3B0', near: '#05141A', warm: '#F4C08A', rim: '255,226,184', sun: '255,232,196' },
-      { sky: ['#1E0F2A', '#7A3358', '#FFB07A'], far: '#D08AA0', near: '#1A0A1C', warm: '#FFB890', rim: '255,214,176', sun: '255,222,186' },
-      { sky: ['#0B1030', '#2E3C86', '#F7C27A'], far: '#8E9BD0', near: '#090B22', warm: '#F8CE90', rim: '255,230,190', sun: '255,236,200' },
-      { sky: ['#1A0C14', '#6B2A3A', '#F58F5A'], far: '#C97C78', near: '#16080F', warm: '#F8A878', rim: '255,208,170', sun: '255,214,176' },
-      { sky: ['#07201C', '#1F6B60', '#F0C891'], far: '#86C2AE', near: '#06171A', warm: '#F2D4A0', rim: '255,230,196', sun: '255,238,206' }
-    ].map(p => ({ sky: p.sky, far: hex(p.far), near: hex(p.near), warm: hex(p.warm), dark: hex('#07040E'), rim: p.rim, sun: p.sun }));
-    const DEMO = rollWT(0);   // a table for the empty screen
-    let W = 0, H = 0, dpr = 1, dead = false, raf = 0, last = 0, lastDraw = 0, T = 0, lens = 0, fx = 0.5, fy = 0.5, flash = 0, pal = PALS[0], sunX = 0.3, lookBus = null;
+    const PALS = [['#7F78C0', '#E0A07F'], ['#6FA8A6', '#D6B070'], ['#A07EB8', '#7FC0A0'], ['#7A92D0', '#D98FA4'], ['#C0976E', '#6FA0C8'], ['#8CB67A', '#C07FA8']].map(p => ({ a: hex(p[0]), b: hex(p[1]) }));   // a dim pastel pair per press: the bottom ink and the top ink
+    const BG = [10, 9, 16], WHITE = [255, 248, 238], DEMO = rollWT(0);   // a table for the empty screen
+    let W = 0, H = 0, dpr = 1, dead = false, raf = 0, last = 0, lastDraw = 0, T = 0, lens = 0, fx = 0.5, fy = 0.5, flash = 0, mixU = 0.3, pal = PALS[0], lookBus = null;
     function resize() { dpr = Math.min(window.devicePixelRatio || 1, 2); cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr); W = innerWidth; H = innerHeight; }
     addEventListener('resize', resize); resize();
-    const L = 11, M = 200, TH = WT_TANH;
+    const L = 18, M = 200, TH = WT_TANH, base0 = new Array(L), cols = new Array(L);
     function paint() {
       const on = WT.on && WT.cfg, cfg = on ? WT.cfg : DEMO, lut = cfg.lut, NF = lut.length, nm = NF - 1;
       const pos = clamp(on ? WT.pos : nm * (0.5 + 0.34 * Math.sin(T * 0.12)), 0, nm), B = on ? WT.B : 0.12, I = on ? WT.I : 0, depth = on ? WT.depth : 0.14, fr = cfg.fr, bs = cfg.bs;
@@ -2806,25 +2800,28 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const tv = (f, p) => { p -= Math.floor(p); const x = p * 256, k = x | 0, r = x - k, k2 = (k + 1) & 255; f = clamp(f, 0, nm - 1e-6); const a = lut[f | 0], c = lut[(f | 0) + 1], w = f - (f | 0); return (a[k] * (1 - r) + a[k2] * r) * (1 - w) + (c[k] * (1 - r) + c[k2] * r) * w; };
       const heard = (f, p) => Math.sin(Math.PI * 5 * depth * Math.tanh(1.5 * (0.7 * tv(f, p + I / TAU * Math.sin(TAU * fr * p)) + 0.24 * B * bs)) / TH);
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      g.fillStyle = pal.sky[2]; g.fillRect(0, 0, W, H);
-      const sky = g.createLinearGradient(0, 0, 0, H * 0.5); sky.addColorStop(0, pal.sky[0]); sky.addColorStop(0.6, pal.sky[1]); sky.addColorStop(1, pal.sky[2]); g.fillStyle = sky; g.fillRect(0, 0, W, H * 0.5);
-      const sr = 95 * (1 + 0.3 * ZH + 0.5 * flash), sun = g.createRadialGradient(W * sunX, H * 0.12, 0, W * sunX, H * 0.12, sr);
-      sun.addColorStop(0, 'rgba(' + pal.sun + ',' + (0.38 + 0.25 * flash).toFixed(3) + ')'); sun.addColorStop(1, 'rgba(' + pal.sun + ',0)'); g.fillStyle = sun; g.fillRect(0, 0, W, H);
+      g.fillStyle = css(mixc(BG, pal.a, 0.08)); g.fillRect(0, 0, W, H);
+      for (let i = 0; i < L; i++) cols[i] = mixc(pal.a, pal.b, 1 - i / (L - 1));   // the layer at the top of the screen (i = 0) has the top ink
+      const rad = mixU * 3.5, sig = rad / 2 + 0.001, mixed = cols.map((c, i) => {   // X: the colour of a layer, pure or mixed with the layers around it
+        let r = 0, gg = 0, bb = 0, sw = 0;
+        for (let j = 0; j < L; j++) { const d = j - i, w = Math.exp(-d * d / (2 * sig * sig)); r += cols[j][0] * w; gg += cols[j][1] * w; bb += cols[j][2] * w; sw += w; }
+        return [r / sw, gg / sw, bb / sw].map(Math.round);
+      });
       g.lineJoin = 'round';
-      const farC = mixc(pal.far, hex(pal.sky[2]), 0.55), sg = 0.3 * W, pts = new Float32Array(2 * (M + 1));
+      const sg = 0.3 * W, pts = new Float32Array(2 * (M + 1));
       for (let i = 0; i < L; i++) {
-        const t = i / (L - 1), base = H * (0.24 + 0.066 * i), f = (1 - base / H) * nm, A = H * (0.032 + 0.03 * t), dy = base / H - yPos, ws = Math.exp(-dy * dy / (2 * 0.09 * 0.09)) * (0.3 + 0.7 * lens);
-        const col = mixc(farC, pal.near, Math.pow(t, 0.65)), sw = ws > 0.1;
+        const t = i / (L - 1), base = H * (0.03 + 0.97 * i / (L - 1)) + 0.5, f = (1 - base / H) * nm, A = H * (0.045 + 0.02 * t), dy = base / H - yPos, ws = Math.exp(-dy * dy / (2 * 0.06 * 0.06)) * (0.3 + 0.7 * lens);
+        const col = mixed[i], sw = ws > 0.1;
         for (let m = 0; m <= M; m++) {
           const x = W * m / M, p = (x / W) * 1.15, d = (x - fx * W) / sg, wx = Math.exp(-d * d / 2) * ws;
           pts[2 * m] = x; pts[2 * m + 1] = base - A * (tv(f, p) * (1 - wx) + heard(f, p) * wx) * (1 + wx * (1 + 0.25 * flash));
         }
-        const gr = g.createLinearGradient(0, base - A * 1.3, 0, base + H * 0.12);
-        gr.addColorStop(0, css(mixc(col, pal.warm, 0.4 * (1 - t) + 0.15 * ws))); gr.addColorStop(1, css(mixc(col, pal.dark, 0.8)));
+        const gr = g.createLinearGradient(0, base - A * 1.2, 0, base + H * 0.07);
+        gr.addColorStop(0, css(mixc(col, WHITE, 0.03 + 0.08 * ws + 0.12 * flash))); gr.addColorStop(1, css(mixc(col, BG, 0.78)));
         g.beginPath(); g.moveTo(pts[0], pts[1]); for (let m = 1; m <= M; m++) g.lineTo(pts[2 * m], pts[2 * m + 1]);
         g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.fillStyle = gr; g.fill();
         g.beginPath(); g.moveTo(pts[0], pts[1]); for (let m = 1; m <= M; m++) g.lineTo(pts[2 * m], pts[2 * m + 1]);
-        g.lineWidth = 1 + 1.6 * ws; g.strokeStyle = 'rgba(' + pal.rim + ',' + clamp(0.28 + 0.2 * (1 - t) + 0.55 * ws + 0.2 * flash * ws, 0, 1).toFixed(3) + ')'; g.stroke();
+        g.lineWidth = 1 + 1.8 * ws; g.strokeStyle = 'rgba(' + mixc(col, WHITE, 0.45 + 0.4 * ws).join(',') + ',' + clamp(0.5 + 0.5 * ws, 0, 1).toFixed(3) + ')'; g.stroke();
         if (sw) {   // the two other voices of the drone: the same wave, a little out of step, at the real beat
           [s1, s2].forEach(sh => {
             g.beginPath();
@@ -2832,17 +2829,17 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
               const x = W * m / M, p = (x / W) * 1.15 + sh, d = (x - fx * W) / sg, wx = Math.exp(-d * d / 2) * ws, y = base - A * (tv(f, p) * (1 - wx) + heard(f, p) * wx) * (1 + wx * (1 + 0.25 * flash));
               if (m) g.lineTo(x, y); else g.moveTo(x, y);
             }
-            g.lineWidth = 1; g.strokeStyle = 'rgba(' + pal.rim + ',' + (0.2 * ws).toFixed(3) + ')'; g.stroke();
+            g.lineWidth = 1; g.strokeStyle = 'rgba(' + mixc(col, WHITE, 0.6).join(',') + ',' + (0.3 * ws).toFixed(3) + ')'; g.stroke();
           });
         }
       }
       if (lens > 0.02) {   // the finger: a warm source inside the wave
         const gl = g.createRadialGradient(fx * W, fy * H, 0, fx * W, fy * H, 150);
-        gl.addColorStop(0, 'rgba(' + pal.rim + ',' + (0.3 * lens).toFixed(3) + ')'); gl.addColorStop(1, 'rgba(' + pal.rim + ',0)'); g.fillStyle = gl; g.fillRect(0, 0, W, H);
+        gl.addColorStop(0, 'rgba(255,236,214,' + (0.22 * lens).toFixed(3) + ')'); gl.addColorStop(1, 'rgba(255,236,214,0)'); g.fillStyle = gl; g.fillRect(0, 0, W, H);
       }
-      if (flash > 0.02) { g.fillStyle = 'rgba(' + pal.sun + ',' + (flash * 0.1).toFixed(3) + ')'; g.fillRect(0, 0, W, H); }
+      if (flash > 0.02) { g.fillStyle = 'rgba(255,248,238,' + (flash * 0.1).toFixed(3) + ')'; g.fillRect(0, 0, W, H); }
     }
-    function setPal() { const r = (lastBus && lastBus.r) || [0.2, 0.3]; pal = PALS[Math.floor(r[0] * PALS.length) % PALS.length]; sunX = 0.2 + 0.6 * (r[1] == null ? 0.3 : r[1]); wrap.style.background = pal.sky[2]; }
+    function setPal() { const r = (lastBus && lastBus.r) || [0.2]; pal = PALS[Math.floor(r[0] * PALS.length) % PALS.length]; wrap.style.background = css(mixc(BG, pal.a, 0.08)); }
     function frame(tn) {
       if (dead) return;
       raf = requestAnimationFrame(frame);
@@ -2853,6 +2850,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const down = (XY.down || holding) && seq;
       lens += ((down ? 1 : 0) - lens) * (1 - Math.exp(-dt * 6));
       if (down) { fx += (XY.x - fx) * (1 - Math.exp(-dt * 12)); fy += (XY.y - fy) * (1 - Math.exp(-dt * 12)); }
+      const mu = seq ? clamp((MAC.bend + 1) / 2, 0, 1) : 0.25 + 0.2 * Math.sin(T * 0.2);   // X: 0 pure, 1 a wide mix
+      mixU += (mu - mixU) * (1 - Math.exp(-dt * 4));
       flash *= Math.exp(-dt * 4);
       paint();
     }
