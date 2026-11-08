@@ -1222,13 +1222,17 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const ar = clamp(b.arp || 0, -1, 1), pool = ar < -0.6 ? [1] : ar < -0.2 ? [1, 1, 2] : ar < 0.3 ? [1, 2, 1.5, 3, 4, 0.5] : ar < 0.7 ? [2, 3, 4, 1.5, 0.5, 6] : [3, 4, 6, 8, 0.5, 0.25];
       const jump = () => { if (boom) return 1; const q = pick(pool); return f * q > 9000 ? 1 : q; };
       const o = c.osc(r[0] < 0.5 ? 'square' : 'sawtooth', f), ns = boom ? 4 : n;
-      for (let i = 0; i < ns; i++) o.frequency.setValueAtTime(f * (i ? jump() : 1), t0 + i * sub);
-      const cr = c.shaper(crushCurve(Math.max(2, Math.min(40, 3 + Math.floor(r[1] * 14) + (b.xc || 0))))), bp = c.bq('bandpass', 1000, 0.8 + b.res * 0.2), v = c.g(0);
+      const js = []; for (let i = 0; i < ns; i++) js.push(i ? jump() : 1);
+      for (let i = 0; i < ns; i++) o.frequency.setValueAtTime(f * js[i], t0 + i * sub);
+      // x is the colour of the chip: left it grows a square octave below and the filter hops stay low (a dark fat bass); right a saw an octave above joins and the hops climb to 14 kHz (a thin bright lead)
+      const tl = clamp(Math.log2(b.xt || 1) / 1.2, -1, 1), layer = (type, mul, amt) => { const o2 = c.osc(type, f * mul), g2 = c.g(amt); for (let i = 0; i < ns; i++) o2.frequency.setValueAtTime(f * mul * js[i], t0 + i * sub); o2.connect(g2); return g2; };
+      const extra = tl > 0.15 ? layer('sawtooth', 2, 0.9 * tl) : tl < -0.15 ? layer('square', 0.5, -1.0 * tl) : null;
+      const cr = c.shaper(crushCurve(Math.max(2, Math.min(40, 3 + Math.floor(r[1] * 14) + (b.xc || 0))))), bp = c.bq('bandpass', 1000, 0.8 + b.res * 0.2 + 3 * Math.max(0, ar)), v = c.g(0);
       const hops = ns * 2 * (ar > 0.3 ? 2 : 1);
-      for (let i = 0; i < hops; i++) bp.frequency.setValueAtTime(lrnd(300, 5000), t0 + i * (ns * sub) / hops);
+      for (let i = 0; i < hops; i++) bp.frequency.setValueAtTime(lrnd(Math.max(80, 300 * Math.pow(2, tl * 1.3)), Math.min(14000, 5000 * Math.pow(2, tl * 1.6))), t0 + i * (ns * sub) / hops);
       v.gain.setValueAtTime(0, t0);
       for (let i = 0; i < ns; i++) { v.gain.setValueAtTime((boom ? 2 : 1.6) * vel * (i ? 0.7 : 1), t0 + i * sub); v.gain.setTargetAtTime(0, t0 + i * sub, tau); }
-      o.connect(cr); cr.connect(bp); bp.connect(v); v.connect(c.out);
+      o.connect(cr); if (extra) extra.connect(cr); cr.connect(bp); bp.connect(v); v.connect(c.out);
       return t0 + ns * sub + tau * 5;
     }
   };
