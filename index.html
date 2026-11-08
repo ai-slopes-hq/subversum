@@ -1121,21 +1121,21 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     return w.map(v => v / s);
   }
   const VOICES = {
-    // vector: one note through four materials, each in its own octave (the pool is one octave, C1..B1: fog x4, wood x8, metal x16, glass x32). Layers under 3 % are not started.
+    // vector: one note through four materials, each in its own octave (the pool is the two octaves of every world, C1..B2: fog x2, wood x4, metal x8, glass x16). Layers under 3 % are not started.
     vector: c => {
       const { t0, f, vel } = c, ws = vecWeights(vecMix(true)), D = c.dur;
       let end = t0 + 0.2;
-      const BAL = [2, 0.85, 0.55, 1.5], lay = k => { const g = c.g(Math.sqrt(ws[k]) * 0.9 * BAL[k]); g.connect(c.out); return g; };   // levelled by ear of the analyser: fog was quiet, wood loud
-      if (ws[0] >= 0.03) {   // fog: three detuned saws, a slow attack through a soft low pass, a long tail
-        const f0 = f * 4, g = lay(0), e = c.g(0), lp = c.bq('lowpass', 500, 0.4), hold = Math.max(D, 0.3), te = t0 + 0.12 + hold + 1.3;
+      const BAL = [1.4, 0.95, 0.85, 1.5], lay = k => { const g = c.g(Math.sqrt(ws[k]) * 0.9 * BAL[k]); g.connect(c.out); return g; };   // levelled by ear of the analyser: fog was quiet, wood loud
+      if (ws[0] >= 0.03) {   // fog: five widely detuned saws, a slow attack through a soft low pass, a long tail
+        const f0 = f * 2, g = lay(0), e = c.g(0), lp = c.bq('lowpass', 500, 0.4), hold = Math.max(D, 0.3), te = t0 + 0.12 + hold + 1.3;
         lp.frequency.setValueAtTime(500, t0); lp.frequency.linearRampToValueAtTime(1100, t0 + 0.6);
-        e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.2 * vel, t0 + 0.12); e.gain.setValueAtTime(0.2 * vel, t0 + 0.12 + hold); e.gain.setTargetAtTime(0, t0 + 0.12 + hold, 0.32);
+        e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.155 * vel, t0 + 0.12); e.gain.setValueAtTime(0.155 * vel, t0 + 0.12 + hold); e.gain.setTargetAtTime(0, t0 + 0.12 + hold, 0.32);
         lp.connect(e); e.connect(g);
-        [-12, 0, 12].forEach(d => { const o = c.osc('sawtooth', f0, d); o._end = te; o.connect(lp); });
+        [-34, -17, 0, 17, 34].forEach(d => { const o = c.osc('sawtooth', f0, d); o._end = te; o.connect(lp); });
         end = Math.max(end, te);
       }
       if (ws[2] >= 0.03) {   // wood: a marimba bar, the fundamental and two quickly dying overtones, plus the click of the mallet
-        const f0 = f * 8, g = lay(2);
+        const f0 = f * 4, g = lay(2);
         [[1, 1, 0.6], [4, 0.38, 0.16], [9.9, 0.14, 0.07]].forEach(p => {
           if (f0 * p[0] > 12000) return;
           const e = c.g(0), o = c.osc('sine', f0 * p[0]), te = t0 + p[2] * 1.3 + 0.1;
@@ -1146,7 +1146,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         ne.gain.setValueAtTime(0.25 * vel, t0); ne.gain.setTargetAtTime(0, t0, 0.008); ns._end = t0 + 0.05; ns.connect(bp); bp.connect(ne); ne.connect(g);
       }
       if (ws[1] >= 0.03) {   // glass: an FM bell, modulator at 3.5 times the carrier, the index falls fast
-        const f0 = f * 32, g = lay(1), e = c.g(0), car = c.osc('sine', f0), mod = c.osc('sine', f0 * 3.5), mg = c.g(0), te = t0 + 1.4;
+        const f0 = f * 16, g = lay(1), e = c.g(0), car = c.osc('sine', f0), mod = c.osc('sine', f0 * 3.5), mg = c.g(0), te = t0 + 1.4;
         e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.5 * vel, t0 + 0.003); e.gain.setTargetAtTime(0, t0 + 0.003, 0.35);
         mg.gain.setValueAtTime(f0 * 3.5 * 3.2, t0); mg.gain.setTargetAtTime(f0 * 3.5 * 0.15, t0, 0.1);
         mod.connect(mg); mg.connect(car.frequency); car.connect(e); e.connect(g);
@@ -1155,7 +1155,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         car._end = mod._end = te; end = Math.max(end, te);
       }
       if (ws[3] >= 0.03) {   // metal: the six squares of a 808 hat tuned to the note, band and high passed, a short ring, a sine for the pitch
-        const f0 = f * 16, g = lay(3), bp = c.bq('bandpass', Math.min(f0 * 4, 9000), 1.2), hp = c.bq('highpass', 1500, 0.7), e = c.g(0), te = t0 + 0.45;
+        const f0 = f * 8, g = lay(3), bp = c.bq('bandpass', Math.min(f0 * 4, 9000), 1.2), hp = c.bq('highpass', 1500, 0.7), e = c.g(0), te = t0 + 0.45;
         e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.12 * vel, t0 + 0.001); e.gain.setTargetAtTime(0, t0 + 0.001, 0.09);
         bp.connect(hp); hp.connect(e); e.connect(g);
         [1, 1.483, 1.8, 2.546, 2.63, 3.9].forEach(r => { if (f0 * 2 * r > 12000) return; const o = c.osc('square', f0 * 2 * r); o._end = te; o.connect(bp); });
@@ -1544,11 +1544,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const sc = skin === 'clouds' || skin === 'vector' ? same(SCALES.filter(x => ['MAJOR', 'MINOR', 'DORIAN', 'MAJ PENTA', 'MIN PENTA'].indexOf(x.name) >= 0)) : skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
     carry = null;
     const pool = [];
-    for (let m = LOW; m <= (skin === 'vector' ? LOW + 11 : HIGH); m++) {   // vector: one octave, the materials stack the octaves
+    for (let m = LOW; m <= HIGH; m++) {
       if (sc.iv.indexOf(((m - root) % 12 + 12) % 12) !== -1) pool.push(m);
     }
     const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0, dub: null, voice: null, dubChord: null, cont: null, acid: false, acidV: null };
-    if (VOICES[skin]) { s.dub = rollDub(s.dur, TW[skin]); s.voice = VOICES[skin]; if (skin === 'clouds') s.rev = revPattern(); if (skin === 'vector') s.turing = true; }
+    if (VOICES[skin]) { s.dub = rollDub(s.dur, TW[skin]); s.voice = VOICES[skin]; if (skin === 'clouds') s.rev = revPattern(); }
     if (skin === 'topo') { s.dub = rollDub(s.dur, TW[skin]); s.cont = skin; }
     if (skin === 'ridges') { s.dub = rollDub(s.dur, TW.ridges); s.acid = true; }
     if (skin === 'riso') {
@@ -1578,7 +1578,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   function stepNote(s, t) {
     // nothing is re-rolled while the screen is held: same patch, same 16 steps, looped
     const idx = s.i;
-    if (s.turing && idx !== 0 && Math.random() < 0.015 + 0.3 * ZH) s.steps[idx] = makeStep(s);   // vector: the longer the finger rests, the more steps of the pattern are replaced (a shift register that mutates)
     const st = s.steps[idx];
     s.i = (s.i + 1) % STEPS;
     if (s.rev && s.dub) { const m = s.dub.revMap || (s.dub.revMap = []); m.push({ t, rev: s.rev[idx] }); if (m.length > 24) m.shift(); }
