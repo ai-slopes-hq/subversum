@@ -1038,7 +1038,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   const PX = { on: false, d: 0, base: 0 };   // d stays where the fingers left it until the next press, patch or swipe; base is d at the moment the second finger landed
   const P1 = { x: 0, y: 0 };   // the playing finger in screen pixels
   const FP2 = { vx: 0, vy: 0 };   // the second finger in the coordinates of the skin layer, like FP
-  let ZH = 0, zT0 = 0, zTimer = 0;   // Z: how long the finger has been held, 0..1 (one second of nothing, then it opens over about 11 s); only clouds and topo use it
+  let ZH = 0, zT0 = 0, zTimer = 0;   // Z: how long the finger has been held, 0..1 (one second of nothing, then it opens over about 11 s); every world spends it its own way (see applyMacros)
   const CURVES = new Map();
   // a backwards grain swells slowly and stops short, like a reversed pluck; the last tenth is a quick fade so it does not click
   const HREV = Float32Array.from({ length: 32 }, (_, i) => { const t = i / 31; return Math.pow(t, 1.8) * (t > 0.9 ? (1 - t) / 0.1 : 1) * 0.85; });
@@ -1570,7 +1570,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       zTimer = setInterval(() => {
         if (!seq || !ctx) return;
         const u = clamp((ctx.currentTime - zT0 - 1) / 11, 0, 1); ZH = u * u * (3 - 2 * u);
-        if (skin === 'clouds' || skin === 'topo') applyMacros();
+        applyMacros();   // every world spends Z in applyMacros
       }, 100);
       seq.timer = setInterval(tick, 25);
       tick();
@@ -1628,15 +1628,22 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       XM.fm = u < 0.5 ? 2 * u : 1 + 0.5 * (2 * u - 1);
       XM.fold = u < 0.5 ? sm(0.12, 0.5, u) : 1 + 1.5 * (2 * u - 1);
       XM.cut = Math.pow(2, MAC.color * 0.8);
+      // Z: the longer the finger stays, the longer the gate rings, the FM index climbs and the filter opens a little
+      XM.dec *= Math.pow(2, 0.9 * ZH); XM.fm *= 1 + 0.35 * ZH; XM.cut *= Math.pow(2, 0.4 * ZH);
       return;
     }
     if (!ctx || !b || !b.base) return;
-    b.cut = clamp(b.base.cut * Math.pow(2, MAC.cut * (sk === 'mandala' ? 1.6 : sk === 'topo' || sk === 'clouds' ? 2.2 : 1.5)), 60, sk === 'clouds' ? 7500 : 12000);
     const acid = sk === 'ridges';
+    // Z (how long the finger has been held) is a slow extra on top of X and Y, and every world spends it its own way:
+    //   mandala and scope: the echo piles up (more repeats, more feedback)   riso: the chord rings longer and the room opens
+    //   ridges: the filter opens and the resonance climbs                     matrix: the arpeggio gets busier and the filter focus sharper
+    //   clouds and topo have their own Z (grain memory, shimmer, unison) further down
+    b.cut = clamp(b.base.cut * Math.pow(2, MAC.cut * (sk === 'mandala' ? 1.6 : sk === 'topo' || sk === 'clouds' ? 2.2 : 1.5) + (acid ? 0.6 * ZH : 0)), 60, sk === 'clouds' ? 7500 : 12000);
     const km = sk === 'mandala', tm = clamp((MAC.cut - 0.35) / 0.65, 0, 1);   // mandala: the resonance does not move with the cutoff, it only joins near the top and starts to whistle
-    b.res = clamp(b.base.res + (km ? 7 * tm * tm * (3 - 2 * tm) : MAC.res * (acid || sk === 'matrix' ? 8 : 6)), acid ? 1 : 0, acid ? 20 : 16);
+    b.res = clamp(b.base.res + (km ? 7 * tm * tm * (3 - 2 * tm) : MAC.res * (acid || sk === 'matrix' ? 8 : 6)) + (acid ? 3 * ZH : sk === 'matrix' ? 2 * ZH : 0), acid ? 1 : 0, acid ? 20 : 16);
     const th = km ? thrAmt() : 0;   // the P throw: the echo opens wide for a moment and the dry chord ducks
-    const da = clamp(b.base.delAmt + (km ? 0.55 : 0.45) * MAC.echo + 0.5 * th, 0, 0.95), fbk = clamp(b.base.delFb + (km ? 0.3 : 0.25) * MAC.echo + 0.2 * th, 0.1, 0.8);
+    const zEcho = km ? 1 : sk === 'scope' ? 1.2 : 0;   // Z on the echo worlds: how much more echo and feedback the held finger gathers
+    const da = clamp(b.base.delAmt + (km ? 0.55 : 0.45) * MAC.echo + 0.5 * th + 0.12 * zEcho * ZH, 0, 0.95), fbk = clamp(b.base.delFb + (km ? 0.3 : 0.25) * MAC.echo + 0.2 * th + 0.14 * zEcho * ZH, 0.1, 0.8);
     if (km) {
       b.dry.gain.setTargetAtTime(0.85 * (1 - 0.45 * Math.max(0, MAC.echo)) * (1 - 0.65 * clamp(1 - (performance.now() - thrT) / 350, 0, 1)), now, 0.04);
       // P pinch: the echo time, together short, apart long; it glides slowly, like a tape, so the repeats bend in pitch while it moves
@@ -1647,7 +1654,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (b.mg.delAmt) b.mg.delAmt.g.gain.value = b.mg.delAmt.d * 0.5 * da;
     b.delFb = fbk; b.fb.gain.setTargetAtTime(fbk, now, 0.05);
     if (b.mg.fb) b.mg.fb.g.gain.value = b.mg.fb.d * Math.max(0, Math.min(fbk - 0.1, 0.86 - fbk));   // feedback plus its own wobble can never pass 0.86
-    const ra = clamp(b.base.revAmt + 0.4 * MAC.space, 0, 0.9);
+    const ra = clamp(b.base.revAmt + 0.4 * MAC.space + (sk === 'riso' ? 0.15 * ZH : 0), 0, 0.9);
     b.revAmt = ra; b.rsend.gain.setTargetAtTime(ra, now, 0.05);
     if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * ra;
     if (b.sh) {   // clouds: near the top of the y axis the sound goes fully wet, the dry signal melts away and the octave-up shimmer opens
@@ -1657,8 +1664,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * rb;
       b.sh.shout.gain.setTargetAtTime(Math.min(0.7, 0.18 + 0.36 * sw + 0.2 * ZH), now, 0.1); b.sh.shfb.gain.setTargetAtTime(Math.min(0.4, 0.18 + 0.14 * sw + 0.1 * ZH), now, 0.1);
     }
-    if (sk === 'matrix') b.arp = MAC.arp;
-    if (sk === 'riso') { b.len = clamp(b.base.len + 0.75 * MAC.ring, 0.02, 0.95); b.hit = MAC.hit; b.cut = clamp(b.base.cut * Math.pow(2, MAC.ring * 1.4), 400, 12000); }   // y: damped is short and dark, ringing is long and open
+    if (sk === 'matrix') b.arp = clamp(MAC.arp + 0.7 * ZH, -1, 1);
+    if (sk === 'riso') { b.len = clamp(b.base.len + 0.75 * MAC.ring + 0.2 * ZH, 0.02, 0.95); b.hit = MAC.hit; b.cut = clamp(b.base.cut * Math.pow(2, MAC.ring * 1.4), 400, 12000); }   // y: damped is short and dark, ringing is long and open
     b.xt = Math.pow(2, MAC.color * 1.2); b.xc = Math.round(MAC.color * 7);
     if (sk === 'topo' && cont && cont.xy) { const sw = swellAmt(); cont.xy(b.cut * Math.pow(2, 1.3 * sw), (MAC.color + 1) / 2, ZH + 0.8 * sw, MAC.cut); if (cont.iv) cont.iv(topoIv()[1]); }
     if (acid && seq && seq.acidV) seq.acidV.setRes(b.res);
@@ -2054,13 +2061,13 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     function draw(dt, env, kick) {
       const tx = FP.down ? (PX.on ? (FP.vx + FP2.vx) / 2 : FP.vx) * 0.55 : vx * 0.97, ty = hy0 + (FP.down ? FP.vy * 0.12 : (hy - hy0) * 0.97);
       vx += (tx - vx) * Math.min(1, dt * 4); hy += (ty - hy) * Math.min(1, dt * 4);
-      sun.setAttribute('cx', f1(vx * 0.6)); sun.setAttribute('cy', f1(hy - 6)); sun.setAttribute('r', (130 * (1 + 0.025 * kick + 0.02 * env)).toFixed(1));
-      stripes.forEach((r, j) => { r.setAttribute('y', f1(hy - 60 + j * 17 + (3 + 18 * XV.y) * Math.sin(phase * 0.6 + j))); });
+      sun.setAttribute('cx', f1(vx * 0.6)); sun.setAttribute('cy', f1(hy - 6)); sun.setAttribute('r', (130 * (1 + 0.025 * kick + 0.02 * env + 0.1 * ZH)).toFixed(1));   // Z: the sun slowly swells
+      stripes.forEach((r, j) => { r.setAttribute('y', f1(hy - 60 + j * 17 + (3 + 18 * XV.y + 9 * ZH) * Math.sin(phase * 0.6 + j))); });
       city.setAttribute('transform', 'translate(' + f1(vx * 0.35) + ' ' + f1(hy + 1) + ')'); wins.setAttribute('transform', 'translate(' + f1(vx * 0.35) + ' ' + f1(hy + 1) + ')');
       ground.setAttribute('y', f1(hy));
       for (let n = 0; n < 3; n++) {
         hg[n].setAttribute('stroke-opacity', Math.min(0.6, (0.12 + 0.1 * n) * (0.4 + 1.4 * XV.x)).toFixed(2));
-        hc[n].setAttribute('stroke-opacity', Math.min(1, (0.3 + 0.3 * n) * (0.5 + 1.0 * XV.x)).toFixed(2));
+        hc[n].setAttribute('stroke-opacity', Math.min(1, (0.3 + 0.3 * n) * (0.5 + 1.0 * XV.x) * (1 + 0.4 * ZH)).toFixed(2));
       }
       vg.setAttribute('y1', f1(hy)); vg.setAttribute('y2', B);
       const N = 13, hd = ['', '', ''];
@@ -2088,7 +2095,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (now - last < (seq || cur || kick > 0.01 ? 16 : 33)) return;
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
-      phase += dt * (0.5 + 1.8 * env + 1.2 * kick) * ACT;
+      phase += dt * (0.5 + 1.8 * env + 1.2 * kick) * (1 + 0.6 * ZH) * ACT;   // Z: the road speeds up
       xvStep(dt);
       draw(dt, env, kick);
     }
@@ -2188,7 +2195,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const el = se('circle', { class: 'rs-c', r: 10 });
       el.style.fill = '#F2EBDC';
       // the P pinch (the strike envelope) stays visible: apart the spots swell slowly and last, together they are short and sharp
-      flashes.push({ el, x: o.vx, y: o.vy, r: 24 + 70 * vel, age: 0, life: (0.6 + 1.6 * XV.y) * (PX.d > 0 ? 1 + 1.6 * PX.d : 1 + 0.45 * PX.d), col: COL[i % 3] });
+      flashes.push({ el, x: o.vx, y: o.vy, r: 24 + 70 * vel, age: 0, life: (0.6 + 1.6 * XV.y) * (PX.d > 0 ? 1 + 1.6 * PX.d : 1 + 0.45 * PX.d) * (1 + 0.8 * ZH), col: COL[i % 3] });
       const near = discs.reduce((m, d) => Math.hypot(d.x - o.vx, d.y - o.vy) < Math.hypot(m.x - o.vx, m.y - o.vy) ? d : m, discs[0]);
       near.pop = 1;
     }
@@ -2199,7 +2206,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         if (d.x < -230 || d.x > 230) d.vx = -d.vx;
         if (d.y < -450 || d.y > 450) d.vy = -d.vy;
         d.pop = Math.max(0, d.pop - dt * 2.2);
-        const k = 1 + 0.1 * kick + 0.22 * d.pop + 0.05 * env;
+        const k = 1 + 0.1 * kick + 0.22 * d.pop + 0.05 * env + 0.16 * ZH;   // Z: the discs slowly grow
         d.el.setAttribute('cx', d.x.toFixed(1)); d.el.setAttribute('cy', d.y.toFixed(1)); d.el.setAttribute('r', (d.r * k).toFixed(1));
         d.el.style.opacity = Math.min(1, d.o * (0.55 + 0.9 * XV.x)).toFixed(2);
       }
@@ -2217,7 +2224,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       raf = requestAnimationFrame(frame);
       const env = Math.max(0, litN) / 60, busy = seq || cur || kick > 0.01 || flashes.length;
       if (now - lastDraw < (busy ? 16 : 42)) return;
-      const dt = Math.min(0.1, (now - last) / 1000) * (0.6 + 1.6 * env) * ACT;
+      const dt = Math.min(0.1, (now - last) / 1000) * (0.6 + 1.6 * env) * (1 + 0.7 * ZH) * ACT;   // Z: the drift speeds up
       last = lastDraw = now;
       xvStep(0.03);
       draw(dt, env, kick);
@@ -2257,13 +2264,13 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       rip.push({ el: null, age: -delay, a, o: o || FP });
     }
     function draw(dt, env, kick) {
-      const on = seq || cur, bright = 0.6 + 0.8 * XV.y, spin = (0.5 + 1.5 * XV.y) * (1 + 2.5 * env + 1.5 * kick);
+      const on = seq || cur, bright = 0.6 + 0.8 * XV.y, spin = (0.5 + 1.5 * XV.y) * (1 + 2.5 * env + 1.5 * kick) * (1 + 0.8 * ZH);   // Z: the layers turn faster
       T += dt;
       const since = performance.now() / 1000 - noteT;
       layers.forEach((L, li) => {
         const o = Math.max(0, Math.min(1, open * 1.4 - li * 0.12));
         const age = since - li * 0.07, pl = age > 0 ? Math.exp(-age * 3.5) * Math.min(1, age * 25) : 0;   // the swell travels outwards layer by layer
-        const k = (0.18 + 0.82 * o) * (1 + 0.035 * Math.sin(T * 0.9 + li) + 0.06 * pl + 0.012 * env);
+        const k = (0.18 + 0.82 * o) * (1 + 0.035 * Math.sin(T * 0.9 + li) + 0.06 * pl + 0.012 * env + 0.07 * ZH * (1 + li * 0.15));   // Z: the flower opens wider, the outer layers most
         L.ang += L.dir * L.sp * spin * dt * 57.3;
         L.spin.setAttribute('transform', 'rotate(' + L.ang.toFixed(2) + ')');
         L.bloom.setAttribute('transform', 'scale(' + k.toFixed(3) + ')');
@@ -2275,7 +2282,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
           q.el.setAttribute('transform', 'rotate(' + (q.a + sw * sn).toFixed(2) + ') scale(1 ' + (1 + 0.05 * Math.sin(T * 1.1 + q.ph * 1.3) + 0.12 * pl).toFixed(3) + ')');
         }
       });
-      rg.setAttribute('cx', gx.toFixed(1)); rg.setAttribute('cy', gy.toFixed(1)); rg.setAttribute('r', (210 + 120 * env + 70 * kick).toFixed(0));
+      rg.setAttribute('cx', gx.toFixed(1)); rg.setAttribute('cy', gy.toFixed(1)); rg.setAttribute('r', (210 + 120 * env + 70 * kick + 110 * ZH).toFixed(0));
       glow.style.opacity = (0.55 + 0.45 * Math.min(1, env * 1.5 + kick * 0.5)).toFixed(2);
       for (let q = rip.length - 1; q >= 0; q--) {
         const r = rip[q]; r.age += dt;
@@ -2324,7 +2331,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         let d = '';
         for (let m = 0; m <= M; m++) {
           const x = X0 + (X1 - X0) * m / M;
-          let h = (Math.sin(x * 0.045 + j * 0.9 + tt * 0.5) * 0.6 + Math.sin(x * 0.1 - j * 0.55 + tt * 0.33) * 0.4) * (2 + 9 * env) * bell(x);
+          let h = (Math.sin(x * 0.045 + j * 0.9 + tt * 0.5) * 0.6 + Math.sin(x * 0.1 - j * 0.55 + tt * 0.33) * 0.4) * (2 + 9 * env + 6 * ZH) * bell(x);   // Z: the ridges grow taller
           for (let q = 0; q < pulses.length; q++) {
             const pu = pulses[q], pos = Math.abs(j - pu.r0) - pu.p;
             if (pos > -6 && pos < 6) {
@@ -2345,7 +2352,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (!busy && now - lastDraw < 42) return;
       const dt = Math.min(0.1, (now - last) / 1000);
       last = lastDraw = now;
-      tt += dt * (0.8 + 2.5 * env + 1.5 * kick) * ACT;
+      tt += dt * (0.8 + 2.5 * env + 1.5 * kick) * (1 + 0.6 * ZH) * ACT;
       for (let q = pulses.length - 1; q >= 0; q--) { pulses[q].p += dt * 26; if (pulses[q].p > 34) pulses.splice(q, 1); }
       xvStep(dt);
       draw(env);
@@ -2412,12 +2419,12 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     // y is the echo: the more of it, the more copies of the glider follow the note
     SK.note = (i, vel) => {
       spawn(vel, FP); if (PX.on) spawn(vel * 0.9, FP2); tick();   // the second finger, while it lies, throws into the field too
-      const n = XV.y > 0.7 ? 2 : XV.y > 0.4 ? 1 : 0;
+      const n = (XV.y > 0.7 ? 2 : XV.y > 0.4 ? 1 : 0) + (ZH > 0.5 ? 1 : 0);   // Z: the echo of the glider gathers one more copy once the finger has stayed long enough
       for (let k = 1; k <= n; k++) setTimeout(() => { if (alive) spawn(vel * 0.8, FP); }, 170 * k);
     };
     SK.pTap = () => { const d = PX.d; PX.d = -1; spawn(1, FP2); spawn(1, FP2); PX.d = d; tick(); };   // the shot: two gliders from the second finger
     SK.xy = xy => skinSvg.style.setProperty('--lh', (xy.nx * 45).toFixed(0));   // x is the pitch: the colour slides from cold to hot
-    SK.frame = (t, env, kick) => { xvStep(0.03); bins[3].style.strokeWidth = (13 + 4 * kick).toFixed(1); };
+    SK.frame = (t, env, kick) => { xvStep(0.03); bins[3].style.strokeWidth = (13 + 4 * kick + 4 * ZH).toFixed(1); };   // Z: the live cells swell
     SK.dispose = () => { alive = false; clearInterval(timer); };
   }
 
@@ -2429,7 +2436,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     let burst = 0;   // the P tap (a ratchet): a ring leaves the second finger fast
     SK.pTap = () => { burst = performance.now(); };
     function draw(t, env, kick) {
-      const gain = (0.8 + 0.5 * env + 0.5 * kick) * (1 + 0.8 * XV.y), ds = ['', '', '', '', ''], lv = 2 + Math.round(3 * XV.x), sharp = 1 + 2.5 * XV.y;
+      const gain = (0.8 + 0.5 * env + 0.5 * kick) * (1 + 0.8 * XV.y) * (1 + 0.5 * ZH), ds = ['', '', '', '', ''], lv = 2 + Math.round(3 * XV.x), sharp = 1 + 2.5 * XV.y;
       // the P pinch (the arpeggio rate, in steps) shows in the rings: 8 sub-steps make them tight, 2 make them wide; they are drawn round the second finger too while it lies
       const an = PX.d < -0.33 ? 8 : PX.d > 0.33 ? 2 : 4, wl = 24 * 4 / an, bAge = burst ? (performance.now() - burst) / 1000 : 9;
       for (let n = 0; n < dots.length; n++) {
@@ -2452,7 +2459,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (now - lastDraw < (seq || cur || kick > 0.01 ? 16 : 42)) return;
       const dt = Math.min(0.1, (now - last) / 1000);
       last = lastDraw = now;
-      tt += dt * (0.7 + 2.2 * env + 1.5 * kick) * ACT;
+      tt += dt * (0.7 + 2.2 * env + 1.5 * kick) * (1 + 0.6 * ZH) * ACT;   // Z: the interference waves run faster and brighter
       xvStep(dt);
       draw(tt, env, kick);
     }
@@ -2863,15 +2870,15 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 
   /* ---------- modulation HUD: a centred stack at the top. A line shows up when its axis changes (X, Y: the finger moves; P: a tap or a pinch; Z: the countdown and the opening), or on an event (world, hold, lock).
      The newest line is bright, older ones slide down and fade slowly, and when nothing moves the stack empties. The look is the world's (--k-* in CSS). ?mod=0 hides it ---------- */
-  // per world: x and y are [what, finger left/down, finger right/up]; p is [what, fingers together, fingers apart] plus what a P tap does (pt); z is [what, how it moves] (only clouds and topo have it)
+  // per world: x and y are [what, finger left/down, finger right/up]; p is [what, fingers together, fingers apart] plus what a P tap does (pt); z is [what, how it moves] (every world has one)
   const MOD = {
-    amber:   { x: ['gate', 'pluck', 'ring'],       y: ['timbre', 'pure', 'fold'],       p: ['fm ratio', 'pure', 'bell'],    pt: 'accent' },
-    mandala: { x: ['echo', 'dry', 'wet'],          y: ['filter', 'dark', 'bright'],     p: ['echo time', 'short', 'long'],  pt: 'throw' },
-    riso:    { x: ['strike', 'soft', 'snap'],      y: ['damping', 'damped', 'ringing'], p: ['envelope', 'click', 'bow'],    pt: 'hit' },
-    scope:   { x: ['pitch', 'low', 'high'],        y: ['echo', 'dry', 'wet'],           p: ['hit type', 'zap', 'noise'],    pt: 'shot' },
+    amber:   { x: ['gate', 'pluck', 'ring'],       y: ['timbre', 'pure', 'fold'],       p: ['fm ratio', 'pure', 'bell'],    pt: 'accent', z: ['ring', 'longer'] },
+    mandala: { x: ['echo', 'dry', 'wet'],          y: ['filter', 'dark', 'bright'],     p: ['echo time', 'short', 'long'],  pt: 'throw', z: ['feedback', 'deeper'] },
+    riso:    { x: ['strike', 'soft', 'snap'],      y: ['damping', 'damped', 'ringing'], p: ['envelope', 'click', 'bow'],    pt: 'hit', z: ['ring', 'longer'] },
+    scope:   { x: ['pitch', 'low', 'high'],        y: ['echo', 'dry', 'wet'],           p: ['hit type', 'zap', 'noise'],    pt: 'shot', z: ['echo', 'deeper'] },
     topo:    { x: ['filter', 'dark', 'open'],      y: ['pulse', 'narrow', 'wide'],      p: ['interval'], pLive: 1,          pt: 'swell', z: ['unison', 'wider'] },
-    matrix:  { x: ['bit depth', 'crushed', 'clean'], y: ['arp', 'plain', 'busy'],       p: ['arp rate', 'fast', 'slow'],    pt: 'ratchet' },
-    ridges:  { x: ['cutoff', 'closed', 'open'],    y: ['resonance', 'calm', 'squeal'],  p: ['env depth', 'flat', 'deep'],   pt: 'stab' },
+    matrix:  { x: ['bit depth', 'crushed', 'clean'], y: ['arp', 'plain', 'busy'],       p: ['arp rate', 'fast', 'slow'],    pt: 'ratchet', z: ['arp', 'busier'] },
+    ridges:  { x: ['cutoff', 'closed', 'open'],    y: ['resonance', 'calm', 'squeal'],  p: ['env depth', 'flat', 'deep'],   pt: 'stab', z: ['squeal', 'higher'] },
     clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] }
   };
   const MOD_HOLD = 800, MOD_FADE = 3200, MOD_SLOT = 30, MOD_RANK = [1, 0.6, 0.38, 0.2];   // a line stays fully lit 0.8 s after its last change, then fades over 3.2 s; the lower in the stack, the dimmer
