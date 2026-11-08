@@ -2550,118 +2550,83 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   function buildOvertones() {
-    // drops of paint on glass. The whole screen is one flat colour (a different one every press) and 2-3 colours of paint lie on it as small round drops. A finger is a big drop: it runs over the glass,
-    // takes every drop it meets into itself (the mass adds up) and leaves a wet trail of small drops that dries; drawing a path between two drops makes them run together, like children joining raindrops on a window.
-    // The drops are flat metaballs with hard edges (flat, one colour). The sound moves them: every harmonic the melody sings is a new drop (its place across the screen is the number of the harmonic),
-    // X is how many drops there are, Y how big the new ones are (the drops stand still on the glass: only the finger moves them), the P pinch how liquid the paint is (together the drops swell and flow into each other, apart they hold their shape),
-    // the P tap splashes the finger's drop into a spray, Z makes every drop wobble (the bell of the morph), and the drops near the formant of the drone breathe.
-    // (Earlier pictures of this world: the Chladni plate, commit 7810c06, and the flat lava lamp, commit 5c6141a.)
-    const wrap = document.createElement('div'); wrap.className = 'skinsvg'; wrap.id = 'ovwrap'; wrap.style.background = '#2B2D6E';
-    const cv = document.createElement('canvas'), ov = document.createElement('canvas');
-    cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'; ov.style.cssText = cv.style.cssText;
-    wrap.appendChild(cv); wrap.appendChild(ov);
+    // moire. The screen is a flat dark ground and up to eight layers of stripes lie on it one over another, every layer a harmonic: its stripes are n times as dense as the first layer's and the layers
+    // are turned a little against each other, so where they cross the big slow pattern of the moire appears, which is exactly what the ear does with the beating of the partials. The layers are painted
+    // in 2-3 colours that add up where they overlap (like riso inks), one palette per press. The sound moves the picture: the partials of the drone come in one by one and so do the layers, X is the
+    // tilt of the spectrum (bright = the high layers are thick, dark = only the first ones are), Y turns the layers against each other (and a little their density), the P pinch is how many layers there
+    // are, Z detunes the stripes the way it detunes the partials (the inharmonicity), so the moire starts to crawl, the harmonic the melody sings makes its layer fat for a moment, the layers near the
+    // formant of the drone are always a bit fatter, the P tap kicks the whole pile round, and the finger is a lens: the stripes bulge under it.
+    // (Earlier pictures of this world: the Chladni plate 7810c06, the flat lava lamp 5c6141a, paint drops 69f5278.)
+    const wrap = document.createElement('div'); wrap.className = 'skinsvg'; wrap.id = 'ovwrap'; wrap.style.background = '#16162E';
+    const cv = document.createElement('canvas');
+    cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
+    wrap.appendChild(cv);
     skinSvg.parentNode.insertBefore(wrap, skinSvg);
-    const px2 = cv.getContext('2d', { alpha: false }), octx = ov.getContext('2d');
-    let RW = 200, RH = 432, asp = 2.16, img = null, d32 = null, OW = 1, OH = 1, osc2 = 1, dead = false, raf = 0, last = 0, lastDraw = 0, frames = 0, acc = 0, started = 0;
-    const PALS = [   // one ground and three paints
-      { bg: [43, 45, 110], p: [[255, 193, 7], [255, 92, 138], [77, 208, 225]] },
-      { bg: [15, 82, 87], p: [[255, 138, 101], [255, 224, 130], [179, 157, 219]] },
-      { bg: [106, 27, 77], p: [[255, 202, 40], [38, 198, 218], [255, 112, 67]] },
-      { bg: [62, 42, 99], p: [[255, 179, 0], [255, 64, 129], [105, 240, 174]] },
-      { bg: [27, 58, 87], p: [[255, 213, 79], [255, 138, 101], [128, 222, 234]] },
-      { bg: [74, 38, 30], p: [[255, 171, 64], [129, 212, 250], [244, 143, 177]] }
+    const px2 = cv.getContext('2d', { alpha: false });
+    const NL = 8;
+    let RW = 220, RH = 476, asp = 2.16, img = null, d32 = null, dead = false, raf = 0, last = 0, lastDraw = 0, frames = 0, acc = 0, started = 0;
+    const PALS = [   // a dark ground and three inks that add up
+      { bg: [16, 18, 46], p: [[255, 120, 60], [40, 200, 230], [255, 70, 140]] },
+      { bg: [10, 36, 40], p: [[255, 190, 60], [255, 100, 110], [110, 150, 255]] },
+      { bg: [40, 12, 36], p: [[255, 170, 40], [40, 220, 200], [255, 90, 120]] },
+      { bg: [26, 20, 54], p: [[255, 200, 70], [255, 80, 150], [70, 230, 170]] },
+      { bg: [14, 28, 50], p: [[255, 215, 90], [255, 130, 90], [90, 210, 240]] },
+      { bg: [34, 22, 18], p: [[255, 170, 70], [120, 200, 250], [250, 130, 170]] }
     ];
-    let pal = PALS[0], BG = pal.bg, COL = pal.p, LIGHT = COL.map(c => c.map(v => v + (255 - v) * 0.22));
-    function setPal(k) { pal = PALS[k]; BG = pal.bg; COL = pal.p; LIGHT = COL.map(c => c.map(v => v + (255 - v) * 0.22)); wrap.style.background = 'rgb(' + BG.join(',') + ')'; }
+    let BG = PALS[0].bg, COL = PALS[0].p;
+    function setPal(k) { BG = PALS[k].bg; COL = PALS[k].p; wrap.style.background = 'rgb(' + BG.join(',') + ')'; }
     function alloc() { img = px2.createImageData(RW, RH); d32 = new Uint32Array(img.data.buffer); cv.width = RW; cv.height = RH; }
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      RW = clamp(Math.round(innerWidth * 0.8 * dpr), 220, 330); asp = innerHeight / innerWidth; RH = Math.round(RW * asp);
-      osc2 = Math.min(dpr, 1.5); OW = Math.round(innerWidth * osc2); OH = Math.round(innerHeight * osc2); ov.width = OW; ov.height = OH;
+      RW = clamp(Math.round(innerWidth * 0.75 * dpr), 200, 300); asp = innerHeight / innerWidth; RH = Math.round(RW * asp);
       alloc();
     }
     addEventListener('resize', resize); resize();
-    let drops = [], T = 0, x01 = 0.5, y01 = 0.5, touch = 0, flash = 0, fd = null, lookBus = null, spawnT = 0, trailX = 0, trailY = 0, lastTouch = [0.5, 1], F = new Float32Array(1), BW = new Float32Array(1), BI = new Uint8Array(1);
+    const ph = new Float32Array(NL), ent = new Float32Array(NL), fl = new Float32Array(NL), cs = new Float32Array(NL), sn = new Float32Array(NL), fq = new Float32Array(NL), dt2 = new Float32Array(NL), ang = new Float32Array(NL);
+    let T = 0, T0 = 0, x01 = 0.5, y01 = 0.5, flash = 0, rot = 0, rotv = 0, lens = 0, fx = 0.5, fy = 0.5, a0 = 0, f0 = 6, spin = 1, lookBus = null;
     const rr = () => Math.random();
-    const mk = (x, y, m, ci, o) => Object.assign({ x, y, m, r: 0, ci, vx: 0, vy: 0, ph: rr() * 6.28, trail: false, finger: false }, o || {});
-    function scatter(r) {   // the first drops of a press: random places, not on top of each other
-      drops = []; fd = null;
-      const n = 90;
-      for (let t = 0; t < 600 && drops.length < n; t++) {
-        const m = 0.008 + Math.pow(rr(), 2.2) * 0.04, x = rr(), y = rr() * asp;
-        if (drops.every(d => Math.hypot(d.x - x, d.y - y) > (d.m + m) * 1.25)) { const d = mk(x, y, m, Math.floor(rr() * 3)); d.r = m * rr(); drops.push(d); }
-      }
-    }
-    function merge(a, b) {   // b runs into a: the area adds up, the place is the middle of the masses, the colour is the bigger one's
-      const A = a.m * a.m, Bm = b.m * b.m, S = A + Bm;
-      a.x = (a.x * A + b.x * Bm) / S; a.y = (a.y * A + b.y * Bm) / S; a.m = Math.min(0.11, Math.sqrt(S)); 
-      if (!a.finger && b.m > a.m * 0.9) a.ci = b.ci;
-      a.r += 0.006; a.trail = a.trail && b.trail;
+    function newLook(r) {
+      setPal(Math.floor(r[0] * PALS.length) % PALS.length);
+      a0 = (r[1] - 0.5) * 1.2; f0 = 2.2 + r[2] * 1.6; spin = r[3] < 0.5 ? -1 : 1; T0 = T; ent.fill(0); fl.fill(0); rot = 0; rotv = 0;
+      for (let j = 0; j < NL; j++) ph[j] = Math.random();
     }
     function step(dt) {
-      const tgt = Math.round(90 * (0.55 + 0.9 * x01));
-      // the finger: a big drop that follows it
+      const N = clamp(Math.round(5 + 2.6 * PX.d), 3, NL), tilt = 1.7 - 1.2 * x01, spread = 0.035 + 0.13 * y01, c = clamp(OV.c, 8, 24);
+      rotv += (-rot * 9 - rotv * 2.5) * dt; rot += rotv * dt;
       const down = (XY.down || holding) && seq;
-      if (down && !fd) { fd = mk(XY.x, XY.y * asp, 0.032, Math.floor(rr() * 3), { finger: true, r: 0.01 }); drops.push(fd); trailX = fd.x; trailY = fd.y; }
-      if (!down && fd) { fd.finger = false; fd = null; }
-      if (fd) {
-        lastTouch = [XY.x, XY.y * asp];
-        const k = 1 - Math.exp(-dt * 14); fd.x += (XY.x - fd.x) * k; fd.y += (XY.y * asp - fd.y) * k; fd.vx = fd.vy = 0;
-        if (Math.hypot(fd.x - trailX, fd.y - trailY) > 0.03 && drops.length < 200) {   // the wet trail: a small drop every little way, taken from the finger's own paint
-          const tm = Math.min(0.016, fd.m * 0.4); drops.push(mk(trailX, trailY, tm, fd.ci, { trail: true, r: tm })); fd.m = Math.max(0.02, Math.sqrt(fd.m * fd.m - tm * tm * 0.6)); trailX = fd.x; trailY = fd.y;
-        }
+      lens += ((down ? 1 : 0) - lens) * (1 - Math.exp(-dt * 6));
+      if (down) { fx += (XY.x - fx) * (1 - Math.exp(-dt * 12)); fy += (XY.y * asp - fy) * (1 - Math.exp(-dt * 12)); }
+      for (let j = 0; j < NL; j++) {
+        const h = j + 1, on = j < N && (T - T0) > j * 0.45 ? 1 : 0;
+        ent[j] += (on - ent[j]) * (1 - Math.exp(-dt * 2.2)); fl[j] *= Math.exp(-dt * 3);
+        const amp = Math.pow(h, -tilt), hh = 8 + 16 * (j + 0.5) / N, bump = 0.14 * Math.exp(-Math.pow((hh - c) / 3.5, 2));
+        dt2[j] = clamp((0.05 + 0.2 * amp + bump * 0.6 + fl[j]) * ent[j], 0, 0.5);
+        fq[j] = f0 * h * Math.sqrt(1 + 12 * OV.B * h * h);
+        ang[j] = a0 + rot + (j - (NL - 1) / 2) * spread + Math.sin(T * 0.6 + j * 1.7) * 0.025 * ZH;
+        cs[j] = Math.cos(ang[j]); sn[j] = Math.sin(ang[j]);
+        ph[j] += dt * 0.02 * h * spin * (j % 2 ? 1 : -1);
       }
-      // ambient: drops are born and dry so the glass is never empty
-      spawnT -= dt;
-      if (spawnT <= 0) { spawnT = 0.3; if (drops.length < tgt) { drops.push(mk(rr(), rr() * asp, 0.008 + rr() * 0.016, Math.floor(rr() * 3))); } else if (drops.length > tgt + 10) { let k = -1, mm = 1; drops.forEach((d, i) => { if (!d.finger && d.m < mm) { mm = d.m; k = i; } }); if (k >= 0) drops[k].m *= 0.5; } }
-      const c = clamp(OV.c, 8, 24), xc = 0.1 + 0.8 * (c - 8) / 16;
-      for (let i = drops.length - 1; i >= 0; i--) {
-        const d = drops[i];
-        d.r += (d.m - d.r) * (1 - Math.exp(-dt * 9)) + (d.m - d.r) * 0.0;   // grows with a little spring: it overshoots when pushed
-        
-        if (d.trail) d.m *= Math.exp(-dt / 9);
-        if (d.m < 0.004 || d.y - d.r > asp + 0.05 || d.x < -0.1 || d.x > 1.1) { if (d === fd) fd = null; drops.splice(i, 1); }
-      }
-      // drops that touch run together (not two drops of one trail, which only share the wet)
-      for (let i = 0; i < drops.length; i++) for (let j = i + 1; j < drops.length; j++) {
-        const a = drops[i], b = drops[j]; if (!a || !b || (a.trail && b.trail)) continue;
-        if (Math.hypot(a.x - b.x, a.y - b.y) < (a.r + b.r) * 0.82) {
-          const big = (a.finger || (!b.finger && a.m >= b.m)) ? a : b, small = big === a ? b : a;
-          merge(big, small); drops.splice(drops.indexOf(small), 1); if (small === fd) fd = big; j = i;   // (restart the inner loop for the changed drop)
-          if (drops[i] !== a) break;
-        }
-      }
-      return xc;
+      return N;
     }
-    function paint(xc) {
-      const n = RW * RH; if (F.length !== n) { F = new Float32Array(n); BW = new Float32Array(n); BI = new Uint8Array(n); }
-      F.fill(0); BW.fill(0);
-      const wob = 0.1 * ZH;
-      drops.forEach(d => {
-        const br = 1 + 0.2 * Math.exp(-0.5 * Math.pow((d.x - xc) / 0.16, 2)) * Math.sin(T * 3 + d.ph), rho = Math.max(0.001, d.r * (1 + wob * Math.sin(T * 2.1 + d.ph * 2)) * br);
-        d.rv = rho; const R = rho / 0.522, inv = 0.273 / (rho * rho);
-        const x0 = Math.max(0, Math.floor((d.x - R) * RW)), x1 = Math.min(RW - 1, Math.ceil((d.x + R) * RW)), y0 = Math.max(0, Math.floor((d.y - R) * RW)), y1 = Math.min(RH - 1, Math.ceil((d.y + R) * RW));
-        for (let y = y0; y <= y1; y++) {
-          const dy = (y + 0.5) / RW - d.y, dy2 = dy * dy;
-          for (let x = x0; x <= x1; x++) {
-            const dx = (x + 0.5) / RW - d.x, q = (dx * dx + dy2) * inv; if (q >= 1) continue;
-            const w = (1 - q) * (1 - q) * (1 - q) * 1.3, o = y * RW + x; F[o] += w; if (w > BW[o]) { BW[o] = w; BI[o] = d.ci; }
+    function paint(N) {
+      const bg = BG, fb = flash * 50, inv = 1 / RW;
+      for (let y = 0; y < RH; y++) {
+        const v0 = (y + 0.5) * inv;
+        for (let x = 0; x < RW; x++) {
+          let u = (x + 0.5) * inv, v = v0;
+          if (lens > 0.01) { const dx = u - fx, dy = v - fy, r2 = dx * dx + dy * dy; if (r2 < 0.12) { const g = 0.55 * lens * Math.exp(-r2 / 0.02); u -= dx * g; v -= dy * g; } }
+          let R = bg[0] + fb, G = bg[1] + fb, B = bg[2] + fb;
+          for (let j = 0; j < N; j++) {
+            const dty = dt2[j]; if (dty < 0.01) continue;
+            const q = (u * cs[j] + v * sn[j]) * fq[j] + ph[j], p = q - Math.floor(q), d = Math.abs(p - 0.5) * 2, aa = 2 * fq[j] * inv, cov = (dty - d) / aa + 0.5;
+            if (cov <= 0) continue;
+            const a = (cov > 1 ? 1 : cov) * 0.5, c = COL[j % 3];
+            R += c[0] * a; G += c[1] * a; B += c[2] * a;
           }
+          d32[y * RW + x] = (255 << 24) | ((B > 255 ? 255 : B) << 16) | ((G > 255 ? 255 : G) << 8) | (R > 255 ? 255 : R);
         }
-      });
-      const pd = PX.d, TH = pd < 0 ? 0.5 + pd * 0.18 : 0.5 + pd * 0.3, TH2 = TH + 0.55, AA = 0.05, bgp = (255 << 24) | (BG[2] << 16) | (BG[1] << 8) | BG[0];   // the pinch: together the paint is liquid (the drops swell and join), apart it holds its shape
-      for (let o = 0; o < n; o++) {
-        const f = F[o];
-        if (f <= TH - AA) { d32[o] = bgp; continue; }
-        const c = COL[BI[o]], l = LIGHT[BI[o]], a = Math.min(1, (f - (TH - AA)) / (2 * AA)), a2 = 0;   // flat: one colour, no lighter core
-        const cr = c[0] + (l[0] - c[0]) * a2, cg = c[1] + (l[1] - c[1]) * a2, cb = c[2] + (l[2] - c[2]) * a2;
-        d32[o] = (255 << 24) | (((BG[2] + (cb - BG[2]) * a) | 0) << 16) | (((BG[1] + (cg - BG[1]) * a) | 0) << 8) | ((BG[0] + (cr - BG[0]) * a) | 0);
       }
       px2.putImageData(img, 0, 0);
-    }
-    function overlay() {
-      octx.clearRect(0, 0, OW, OH);
-      if (flash > 0.02) { octx.fillStyle = 'rgba(255,255,255,' + (0.1 * flash).toFixed(3) + ')'; octx.fillRect(0, 0, OW, OH); }
     }
     function frame(tn) {
       if (dead) return;
@@ -2669,25 +2634,20 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const live = !!seq;
       if (!live && tn - lastDraw < 40) return;
       const dt = Math.min(0.05, (tn - last) / 1000); last = lastDraw = tn; T += dt;
-      if (lookBus !== lastBus) { lookBus = lastBus; const r = (lastBus && lastBus.r) || [0.2, 0.5, 0.5, 0.5]; setPal(Math.floor(r[0] * PALS.length) % PALS.length); scatter(r); }
+      if (lookBus !== lastBus) { lookBus = lastBus; newLook((lastBus && lastBus.r) || [0.2, 0.5, 0.5, 0.5]); }
       x01 += ((MAC.color + 1) / 2 - x01) * (1 - Math.exp(-dt * 3)); y01 += ((MAC.ring + 1) / 2 - y01) * (1 - Math.exp(-dt * 3));
-      flash *= Math.exp(-dt * 4);
-      const xc = step(dt); paint(xc); overlay();
+      flash *= Math.exp(-dt * 5);
+      paint(step(dt));
       if (!started) started = tn;
-      if (tn - started > 2500) { acc += dt; frames++; if (frames === 60) { if (acc / frames * 1000 > 28 && RW > 160) { RW = Math.max(160, Math.round(RW * 0.85)); RH = Math.round(RW * asp); alloc(); } frames = 0; acc = 0; } }
+      if (tn - started > 2500) { acc += dt; frames++; if (frames === 60) { if (acc / frames * 1000 > 28 && RW > 150) { RW = Math.max(150, Math.round(RW * 0.85)); RH = Math.round(RW * asp); alloc(); } frames = 0; acc = 0; } }
     }
-    last = lastDraw = performance.now(); { const r = (lastBus && lastBus.r) || [0.2, 0.5, 0.5, 0.5]; lookBus = lastBus; setPal(Math.floor(r[0] * PALS.length) % PALS.length); scatter(r); paint(0.5); overlay(); }
+    last = lastDraw = performance.now(); lookBus = lastBus; newLook((lastBus && lastBus.r) || [0.2, 0.5, 0.5, 0.5]); T0 = T - 5; try { paint(step(0.016)); } catch (e) { }   // (XY may not exist yet on the very first build)
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) raf = requestAnimationFrame(frame);
-    SK.note = (i, vel) => {   // a sung harmonic is a new drop; a chord is a little group that runs together
-      const ns = OV.hn[i]; if (!ns) return;
-      ns.forEach(h => { if (drops.length > 200) return; const m = (0.02 + 0.026 * vel) * (1.3 - 0.6 * y01); drops.push(mk(0.1 + 0.8 * clamp((h - 8) / 16, 0, 1) + (rr() - 0.5) * 0.06, (0.08 + 0.84 * rr()) * asp, m, h % 3, { r: 0 })); });
+    SK.note = (i, vel) => {   // the harmonic that is sung makes its layer fat for a moment
+      const ns = OV.hn[i]; if (!ns) return; const N = clamp(Math.round(5 + 2.6 * PX.d), 3, NL);
+      ns.forEach(h => { const j = clamp(Math.floor((h - 8) / 16 * N), 0, N - 1); fl[j] = Math.max(fl[j], 0.16 + 0.14 * vel); });
     };
-    SK.pTap = () => {   // the splash: the finger's drop (or the place it was lifted from) breaks into a spray
-      flash = 1;
-      const ox = fd ? fd.x : lastTouch[0], oy = fd ? fd.y : lastTouch[1], ci = fd ? fd.ci : 0;
-      if (fd) fd.m = Math.max(0.02, fd.m * 0.8);
-      for (let k = 0; k < 9 && drops.length < 200; k++) { const a = k / 9 * 6.2832 + rr() * 0.5, sp = 0.07 + rr() * 0.09; drops.push(mk(ox + Math.cos(a) * sp, oy + Math.sin(a) * sp, 0.008 + rr() * 0.012, ci, { r: 0 })); }
-    };
+    SK.pTap = () => { flash = 1; rotv += 1.1 * (rr() < 0.5 ? -1 : 1); for (let j = 0; j < NL; j++) ph[j] += rr(); };   // the ground jump: the whole pile is kicked round
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
   }
 
