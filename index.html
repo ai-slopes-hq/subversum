@@ -2552,7 +2552,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   function buildOvertones() {
     // drops of paint on glass. The whole screen is one flat colour (a different one every press) and 2-3 colours of paint lie on it as small round drops. A finger is a big drop: it runs over the glass,
     // takes every drop it meets into itself (the mass adds up) and leaves a wet trail of small drops that dries; drawing a path between two drops makes them run together, like children joining raindrops on a window.
-    // The drops are flat metaballs with hard edges (a lighter shade inside, a glassy glint). The sound moves them: every harmonic the melody sings is a new drop (its place across the screen is the number of the harmonic),
+    // The drops are flat metaballs with hard edges (flat, one colour). The sound moves them: every harmonic the melody sings is a new drop (its place across the screen is the number of the harmonic),
     // X is how many drops there are, Y how big the new ones are and how fast the big ones slide, the P pinch how liquid the paint is (together the drops swell and flow into each other, apart they hold their shape),
     // the P tap splashes the finger's drop into a spray, Z makes every drop wobble (the bell of the morph), and the drops near the formant of the drone breathe.
     // (Earlier pictures of this world: the Chladni plate, commit 7810c06, and the flat lava lamp, commit 5c6141a.)
@@ -2654,7 +2654,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       for (let o = 0; o < n; o++) {
         const f = F[o];
         if (f <= TH - AA) { d32[o] = bgp; continue; }
-        const c = COL[BI[o]], l = LIGHT[BI[o]], a = Math.min(1, (f - (TH - AA)) / (2 * AA)), a2 = f > TH2 - AA ? Math.min(1, (f - (TH2 - AA)) / (2 * AA)) : 0;
+        const c = COL[BI[o]], l = LIGHT[BI[o]], a = Math.min(1, (f - (TH - AA)) / (2 * AA)), a2 = 0;   // flat: one colour, no lighter core
         const cr = c[0] + (l[0] - c[0]) * a2, cg = c[1] + (l[1] - c[1]) * a2, cb = c[2] + (l[2] - c[2]) * a2;
         d32[o] = (255 << 24) | (((BG[2] + (cb - BG[2]) * a) | 0) << 16) | (((BG[1] + (cg - BG[1]) * a) | 0) << 8) | ((BG[0] + (cr - BG[0]) * a) | 0);
       }
@@ -2662,11 +2662,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     }
     function overlay() {
       octx.clearRect(0, 0, OW, OH);
-      const S = OW;   // width units to pixels
-      drops.forEach(d => {   // a glint on every drop big enough to have one, like light on a bead of water
-        const r = d.rv || d.r; if (r < 0.011) return;
-        octx.fillStyle = 'rgba(255,255,255,' + (d.finger ? 0.7 : 0.5) + ')'; octx.beginPath(); octx.ellipse((d.x - r * 0.35) * S, (d.y - r * 0.4) * S, r * 0.2 * S, r * 0.13 * S, -0.6, 0, 6.2832); octx.fill();
-      });
       if (flash > 0.02) { octx.fillStyle = 'rgba(255,255,255,' + (0.1 * flash).toFixed(3) + ')'; octx.fillRect(0, 0, OW, OH); }
     }
     function frame(tn) {
