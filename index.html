@@ -1139,8 +1139,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     return SHEP.dir * base * Math.pow(2, 1.6 * MAC.ring) * ZH;
   }
   function shepSpacing() { const d = PX.d; return Math.pow(2, 1 - (d < 0 ? d * 0.585 : d * 0.415)); }   // together: wide (up to a twelfth), apart: close (down to a fifth)
-  function shepSigma() { return 0.9 + 1.7 * (MAC.color + 1) / 2; }   // octaves: x from a narrow bell to an organ
-  function shepFc(b) { return Math.log2(300) + ((b && b.r ? b.r[1] : 0.5) - 0.5) * 0.8; }
+  function shepSigma() { return 0.8 + 1.1 * (MAC.color + 1) / 2; }   // octaves: x from a narrow bell to an organ
+  function shepFc(b) { return Math.log2(110) + ((b && b.r ? b.r[1] : 0.5) - 0.5) * 0.6; }   // the window sits low (about A2), so the notes are bass and low mid, not a reed
   const shepMorph = (sp, t) => 0.5 + 0.5 * Math.sin(6.2832 * t / sp.mp + sp.mph);   // 0 saw, 1 square
   const shepW = (lf, fc, sg) => Math.exp(-0.5 * Math.pow((lf - fc) / sg, 2));
   const SHEP_VOICE = c => {
@@ -1150,17 +1150,17 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const rate = shepRate(b);
     SHEP.gl += (SHEP.rate || 0) * (t0 - SHEP.t); SHEP.t = t0; SHEP.rate = rate;
     const midi = Math.round(69 + 12 * Math.log2(f / 440)), pc = ((midi % 12) + 12) % 12;
-    const sg = shepSigma(), fc = shepFc(b), lsp = Math.log2(shepSpacing()), L = Math.min(2.4, c.dur * sp.gate + sp.a + sp.r * 3), drift = rate / 12 * L;
+    const sg = shepSigma(), fc = shepFc(b), lsp = Math.log2(shepSpacing()), L = Math.min(2.4, c.dur * sp.gate + sp.a + sp.r * 5 + sp.d * 3), drift = rate / 12 * L;
     const lb = Math.log2(16.3516) + (pc + SHEP.gl) / 12, copies = [];
     for (let k = Math.ceil((Math.log2(40) - lb) / lsp); copies.length < 5; k++) {
       const lf = lb + k * lsp;
-      if (lf > Math.log2(5000)) break;
+      if (lf > Math.log2(1400)) break;
       const w0 = shepW(lf, fc, sg), w1 = shepW(lf + drift, fc, sg);
       if (Math.max(w0, w1) < 0.1) continue;
       copies.push({ lf, w0, w1 });
     }
     let s2 = 0; copies.forEach(q => { const w = Math.max(q.w0, q.w1); s2 += w * w; });
-    const beat = idx % 4 === 0 ? 1 : 0.85, A = 0.4 * vel * beat * (boom ? 1.2 : 1) / Math.sqrt(Math.max(1, s2)), bri = Math.pow(2, 0.6 * MAC.color);
+    const beat = idx % 4 === 0 ? 1 : 0.85, A = 0.55 * vel * beat * (boom ? 1.2 : 1) / Math.sqrt(Math.max(1, s2)), bri = Math.pow(2, 0.6 * MAC.color);
     const gate = c.dur * sp.gate * (boom ? 1.4 : 1), tg = t0 + sp.a + gate, ta = t0 + sp.a, end = tg + sp.r * 5;   // gate: how long the key is held, then the release
     copies.forEach(q => {
       const fHz = Math.pow(2, q.lf), vca = c.g(0), wg = c.g(0), lp1 = c.bq('lowpass', 800, 0.4 + sp.res), lp2 = c.bq('lowpass', 800, 0.5);
@@ -1699,7 +1699,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       s.hset = pick(HSETS); s.steps.forEach(st => { if (st) st.k = (st.midi - LOW) / (HIGH - LOW); }); s.sc = { name: 'HARMONICS', iv: sc.iv };
     }
     if (skin === 'shepard') {   // a soft subtractive patch rolled by the seed: a saw, square or triangle pair, a 24 dB low pass with its own ADSR, a gentle attack, a short key
-      s.sp = { mp: rnd(5, 14), mph: rnd(0, 6.28), det: rnd(3, 11), cutMul: rnd(1.6, 5), env: rnd(0.2, 0.8), res: rnd(0, 3), a: rnd(0.006, 0.05), d: rnd(0.12, 0.5), s: rnd(0.15, 0.55), r: rnd(0.12, 0.45), gate: rnd(0.7, 1.6) };
+      s.sp = { mp: rnd(5, 14), mph: rnd(0, 6.28), det: rnd(3, 11), cutMul: rnd(1.4, 3.5), env: rnd(0.5, 1.0), res: rnd(0, 3), a: rnd(0.002, 0.007), d: rnd(0.07, 0.22), s: rnd(0, 0.1), r: rnd(0.06, 0.18), gate: rnd(0.3, 0.7) };   // a pluck: a click of an attack, a quick decay to almost nothing, a short key
     }
     return s;
   }
@@ -2476,7 +2476,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const mulb = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
     let look = null, lookBus = null, nC = 0, CI = null, CJ = null, CX = null, CY = null, CO = null, CB = null, LIFT = null;
     const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1]];
-    let phase = 0, touch = 0, flash = 0, wS = 0, drops = [], vig = null, FILL = null, FL = null;
+    let phase = 0, touch = 0, flash = 0, wS = 0, drops = [], vig = null, FILL = null, FL = null, FALL = null, FD = null, FVY = null, LK = null, S = 0, Starget = 0;
     function rebuild(r) {   // a new press: new floor (cell size, number of steps, size of the blocks, how many directions), from the dice of the press
       const rr = mulb(Math.floor(r[0] * 4e9) ^ Math.floor(r[3] * 1e9));
       look = { s0: 36 + 20 * r[0], P: 4 + Math.floor(r[1] * 4), zk: 1.0 + 0.3 * r[2], B: 4 + Math.floor(r[3] * 3), nd: 3 + Math.floor(rr() * 4), dx: 3 + 5 * rr() };
@@ -2489,7 +2489,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         if (!(k in ori)) ori[k] = Math.floor(rr() * look.nd);
         list.push([i, j, X, Y, ori[k], ((bi * 37 + bj * 11) % 5 + 5) % 5]);
       }
-      nC = list.length; CI = new Int16Array(nC); CJ = new Int16Array(nC); CX = new Float32Array(nC); CY = new Float32Array(nC); CO = new Uint8Array(nC); CB = new Uint8Array(nC); LIFT = new Float32Array(nC); FILL = new Float32Array(nC); FL = new Float32Array(nC);
+      nC = list.length; CI = new Int16Array(nC); CJ = new Int16Array(nC); CX = new Float32Array(nC); CY = new Float32Array(nC); CO = new Uint8Array(nC); CB = new Uint8Array(nC); LIFT = new Float32Array(nC); FILL = new Float32Array(nC); FL = new Float32Array(nC); FALL = new Float32Array(nC); FD = new Float32Array(nC); FVY = new Float32Array(nC); LK = new Int16Array(nC);
+      { const Pe0 = look.P; for (let n = 0; n < nC; n++) { const o = DIRS[CO[n]]; LK[n] = Math.floor((o[0] * CI[n] + o[1] * CJ[n] - S) / Pe0); } }
       list.forEach((q, n) => { CI[n] = q[0]; CJ[n] = q[1]; CX[n] = q[2]; CY[n] = q[3]; CO[n] = q[4]; CB[n] = q[5]; });
       drops = [];
     }
@@ -2518,36 +2519,28 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = rgb(BG); g.fillRect(0, 0, W, H);
       g.setTransform(kk, 0, 0, kk, ox, oy); g.lineJoin = 'round'; g.lineWidth = 2.2;
       const x01 = (wS + 1) / 2, sgV = 0.3 + 0.22 * x01, s = look.s0, dy = s * 0.5, zh = dy * look.zk;
-      const Pe = look.P / Math.max(0.55, Math.log2(shepSpacing())), Hd = (H - oy * 2) / kk || VH;
+      const Pe = look.P, topEdge = -oy / kk, hue0 = 268, hueSpan = 128;   // violet (268) through magenta and red to amber (396 = 36)
       const fx = VW / 2 + FP.vx, fy = VH / 2 + FP.vy, f2x = VW / 2 + FP2.vx, f2y = VH / 2 + FP2.vy;
       const decay = Math.exp(-dt / 0.45), decay2 = Math.exp(-dt / 0.35);
-      const hue0 = 268, hueSpan = 128;   // violet (268) through magenta and red to amber (396 = 36)
+      // the classic endless stairs: the whole pattern slides down the steps (S grows), a step that reaches the bottom is gone and a new one falls in from above the screen onto the top of the same staircase
       for (let n = 0; n < nC; n++) {
-        const Y = CY[n], X = CX[n], vy = (Y - (-oy / kk)) / ((H / kk) || VH), win = Math.exp(-Math.pow((vy - 0.5) / sgV, 2)), wv = Math.min(1, win * 1.3);
-        if (wv < 0.02) continue;
-        const o = DIRS[CO[n]], raw = o[0] * CI[n] + o[1] * CJ[n] + phase * Pe, u = ((raw % Pe) + Pe) % Pe, fl = Math.floor(u), hgt = fl + sst(0.55, 1, u - fl);
-        let h = hgt + FILL[n] + LIFT[n];
+        const Y = CY[n], X = CX[n], vy = (Y - topEdge) / ((H / kk) || VH), win = Math.exp(-Math.pow((vy - 0.5) / sgV, 2)), wv = Math.min(1, win * 1.3);
+        const o = DIRS[CO[n]], raw = o[0] * CI[n] + o[1] * CJ[n] - S, kq = Math.floor(raw / Pe), u = raw - kq * Pe, fl = Math.floor(u);
+        if (kq < LK[n]) { LK[n] = kq; if (wv > 0.1) { FALL[n] = (Y - topEdge) / zh + Pe + 2; FVY[n] = 0; FD[n] = Math.random() * 0.7; } }   // the steps of a row do not come together: each waits a little }
+        else if (kq > LK[n]) LK[n] = kq;   // (the other way round: the stairs rose; nothing falls)
+        if (FALL[n] > 0 && FD[n] > 0) FD[n] -= dt;
+        else if (FALL[n] > 0) { FVY[n] += 180 * dt; FALL[n] -= FVY[n] * dt; if (FALL[n] <= 0) { FALL[n] = 0; FL[n] = 1; LIFT[n] -= 0.35; } }
+        let h = fl + sst(0.55, 1, u - fl) + LIFT[n];
         LIFT[n] *= decay; FL[n] *= decay2;
         if (touch > 0.02) { const dxx = X - fx, dyy = Y - fy, dd = dxx * dxx + dyy * dyy; if (dd < 14000) h += touch * 1.5 * Math.exp(-dd / 3200); }
         if (PX.on) { const dxx = X - f2x, dyy = Y - f2y, dd = dxx * dxx + dyy * dyy; if (dd < 14000) h += 1.1 * Math.exp(-dd / 3200); }
+        const vt = (Y - (h + FALL[n]) * zh - topEdge) / ((H / kk) || VH), wt = Math.max(0.0, Math.min(1, Math.exp(-Math.pow((vt - 0.5) / sgV, 2)) * 1.3));   // the window is read at the top of the step, so a step that falls in is lit as it comes
+        if (wt < 0.02 && wv < 0.02) { continue; }
         const t = clamp(u / Pe, 0, 1), hh = hue0 + hueSpan * t - CB[n] * look.dx, L = 0.58 * (0.6 + 0.55 * t) * 100;
         const cols = [hslRgb(hh, 62, L), hslRgb(hh + 10, 62, L * 0.62), hslRgb(hh - 10, 62, L * 0.38)];
-        if (FL[n] > 0.02) cols[0] = mixc(cols[0], [255, 232, 176], FL[n]);   // the cube that has just landed lights the top of its step
-        drawCell(X, Y, s, h, zh, cols, wv, (fl === look.P - 1 || fl === 0) ? hslRgb(hh + 25, 100, 82) : null);
-      }
-      // tetris: a cube falls from above the screen and lands on the lowest step in the light of the window; the floor fills from the bottom level up, and when every step of the window
-      // has a cube on it the whole floor sinks by one level, as if the picture climbed
-      const topEdge = -oy / kk;
-      for (let q = drops.length - 1; q >= 0; q--) {
-        const d = drops[q]; d.vy += 60 * dt; d.y -= d.vy * dt;
-        const X = CX[d.c], Y = CY[d.c], o = DIRS[CO[d.c]], raw = o[0] * CI[d.c] + o[1] * CJ[d.c] + phase * Pe, u = ((raw % Pe) + Pe) % Pe, fl = Math.floor(u), base = fl + sst(0.55, 1, u - fl) + FILL[d.c] + LIFT[d.c];
-        if (d.y <= 0) {
-          drops.splice(q, 1); FILL[d.c] += 1; LIFT[d.c] -= 0.5; FL[d.c] = 1;
-          let full = true; for (let n = 0; n < nC; n++) if (win0(n) > 0.5 && FILL[n] < 1) { full = false; break; }
-          if (full) for (let n = 0; n < nC; n++) if (FILL[n] >= 1) { FILL[n] -= 1; LIFT[n] += 1; }   // a full level: the floor sinks and settles
-          continue;
-        }
-        drawCell(X, Y, s, base + d.y + 1, zh, [hslRgb(40, 100, 80), hslRgb(44, 100, 52), hslRgb(34, 100, 36)], 1, hslRgb(40, 100, 94), 1);
+        if (FL[n] > 0.02) cols[0] = mixc(cols[0], [255, 232, 176], FL[n]);   // the step that has just landed lights its top
+        if (FALL[n] > 0) drawCell(X, Y, s, 0, zh, [hslRgb(hue0 - CB[n] * look.dx, 62, 20), hslRgb(hue0 + 10, 62, 12), hslRgb(hue0 - 10, 62, 8)], Math.max(wv, wt), null);   // the empty place where a step is about to land
+        drawCell(X, Y, s, h + FALL[n], zh, cols, Math.max(wv, wt), (fl === Pe - 1 || fl === 0) ? hslRgb(hh + 25, 100, 82) : null, FALL[n] > 0 ? Math.min(h + FALL[n], Pe) : 0);
       }
       g.setTransform(1, 0, 0, 1, 0, 0);
       if (flash > 0.02) { g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,170,90,' + (0.22 * flash).toFixed(3) + ')'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over'; }
@@ -2562,7 +2555,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       wS += (MAC.color - wS) * (1 - Math.exp(-dt * 8));
       touch += ((XY.down || holding ? 1 : 0) - touch) * (1 - Math.exp(-dt * 10));
       flash *= Math.exp(-dt * 5);
-      phase += (live ? shepRate(lastBus) / 12 : 0.006 * SHEP.dir) * dt;   // an octave of glide is one turn of the staircase
+      const P0 = look ? look.P : 5;
+      Starget += ((live ? 0.2 : 0.05) + (live ? Math.abs(shepRate(lastBus)) / 12 * P0 : 0)) * dt;   // the stairs slide down; the glide of the sound makes them faster (an octave of glide is one turn of the staircase)
+      S += (Starget - S) * (1 - Math.exp(-dt * 9));
       draw(dt);
       if (!started) started = tn;
       if (tn - started > 2500) {
@@ -2572,19 +2567,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     }
     last = lastDraw = performance.now(); draw(0.016);
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) raf = requestAnimationFrame(frame);
-    SK.note = (i, vel) => {
-      if (!nC || drops.length > 10) return;
-      const Pe = look.P / Math.max(0.55, Math.log2(shepSpacing())), taken = {}; drops.forEach(d => { taken[d.c] = 1; });
-      let lo = 1e9; const cand = [];
-      for (let n = 0; n < nC; n++) {   // the lowest step in the light of the window (where the cubes already on the way are counted)
-        if (win0(n) < 0.5 || taken[n]) continue;
-        const o = DIRS[CO[n]], u = (((o[0] * CI[n] + o[1] * CJ[n] + phase * Pe) % Pe) + Pe) % Pe, h = Math.floor(u) + FILL[n];
-        cand.push([n, h]); if (h < lo) lo = h;
-      }
-      const low = cand.filter(q => q[1] <= lo + 0.01); if (!low.length) return;
-      const c = low[Math.floor(Math.random() * low.length)][0], zh = look.s0 * 0.5 * look.zk;
-      drops.push({ c, y: (CY[c] + oy / kk) / zh + 3, vy: 0 });   // it starts above the top edge of the screen
-    };
+    SK.note = (i, vel) => { Starget += 0.14 + 0.1 * vel; };   // every note is a step down the stairs
     SK.pTap = () => { flash = 1; };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
   }
