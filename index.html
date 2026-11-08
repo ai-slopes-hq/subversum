@@ -400,6 +400,41 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
 </script>
 <script defer src="/_vercel/insights/script.js"></script>
+<style id="service">
+/* service layer: lock frame, the quiet strip at the bottom, the fan. Only the fan carries text; the rest of the screen stays without labels. */
+#lockframe { position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.4) 100%);
+  box-shadow: inset 0 0 0 1.5px hsl(var(--hue, 38) 85% 62% / .5), inset 0 0 64px 4px hsl(var(--hue, 38) 85% 55% / .26); }
+html.locked #lockframe { opacity: 1; }
+#lockframe.hot { opacity: 1; transition: opacity .1s;
+  box-shadow: inset 0 0 0 2.5px hsl(var(--hue, 38) 90% 68% / .95), inset 0 0 90px 12px hsl(var(--hue, 38) 90% 60% / .5); }
+html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cubic-bezier(.3, .6, .4, 1); }
+@keyframes lockshake { 0%, 100% { transform: translateX(0); } 18% { transform: translateX(calc(var(--shk, 1) * 14px)); } 42% { transform: translateX(calc(var(--shk, 1) * -10px)); } 66% { transform: translateX(calc(var(--shk, 1) * 6px)); } 84% { transform: translateX(calc(var(--shk, 1) * -3px)); } }
+#handle { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: 40px; height: 4px; margin-left: -20px; border-radius: 2px;
+  background: rgba(255,255,255,.16); z-index: 6; pointer-events: none; }
+#sabprobe { position: fixed; left: 0; top: 0; width: 0; height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); visibility: hidden; pointer-events: none; }
+#fan { position: fixed; inset: 0; z-index: 9; display: none; pointer-events: none; background: rgba(0,0,0,.64); color: #f1ece4;
+  font: 500 14px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-user-select: none; user-select: none; }
+#fan.open { display: block; animation: fanin .09s ease-out; }
+@keyframes fanin { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.fan-info { position: absolute; left: 0; right: 0; top: calc(50% - 200px); text-align: center; }
+.fan-info b { font: 600 58px/1 system-ui, -apple-system, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.fan-info i { font-style: normal; opacity: .6; margin-left: 6px; letter-spacing: .1em; font-size: 13px; }
+.fan-info span { display: block; margin-top: 8px; opacity: .85; font-size: 16px; }
+.fan-item { position: absolute; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.32);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font-size: 12px; letter-spacing: .02em;
+  transition: background .08s, border-color .08s, transform .08s, opacity .08s; }
+.fan-item svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#fanLock { left: 50%; top: 50%; }
+#fanShare { left: calc(50% + 124px); top: calc(50% + 4px); }
+#fanLock .shut, #fanLock.on .open { display: none; }
+#fanLock.on .shut { display: inline; }
+.fan-item.hot { background: hsl(var(--hue, 38) 80% 60% / .3); border-color: hsl(var(--hue, 38) 85% 70%); transform: scale(1.08); }
+.fan-item.on { border-color: hsl(var(--hue, 38) 85% 70%); color: hsl(var(--hue, 38) 90% 78%); }
+.fan-item.dis { opacity: .3; }
+.fan-help { position: absolute; left: 28px; right: 28px; top: calc(50% + 90px); margin: 0; text-align: center; font-size: 12.5px; opacity: .68; line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) { html.lock-shake .stage, html.lock-shake .skinsvg, #fan.open { animation: none; } }
+</style>
 </head>
 <body>
 <div class="bg" id="bg" aria-hidden="true"></div>
@@ -414,6 +449,21 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     </div>
   </section>
 </main>
+<div id="lockframe" aria-hidden="true"></div>
+<div id="handle" aria-hidden="true"></div>
+<div id="sabprobe" aria-hidden="true"></div>
+<div id="fan" aria-hidden="true">
+  <div class="fan-info"><b id="fanBpm">—</b><i>BPM</i><span id="fanKey"></span></div>
+  <div class="fan-item" id="fanLock" data-act="lock">
+    <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shut" d="M8 11V8a4 4 0 0 1 8 0v3"/><path class="open" d="M8 11V8a4 4 0 0 1 7.6-1.7"/></svg>
+    <span id="fanLockText">замок</span>
+  </div>
+  <div class="fan-item" id="fanShare" data-act="share">
+    <svg viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></svg>
+    <span>ссылка</span>
+  </div>
+  <p class="fan-help">свайп вбок меняет мир<br>замок держит сид и мир: нажатие играет тот же патч<br>снять: свайп вбок дважды в одну сторону</p>
+</div>
 
 <script>
 (() => {
@@ -1251,7 +1301,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   let seq = null;
   let curSeed = null;      // the seed of the press that is playing or played last
   let pendingSeed = null;  // a seed handed in (by a link) that the next press plays instead of rolling a new one
-  try { const q = /[?&]seed=([0-9a-zA-Z]+)/.exec(location.search); if (q) pendingSeed = strToSeed(q[1].toLowerCase()); } catch (e) {}
+  try { const q = /[?&]seed=([0-9a-zA-Z]+)/.exec(location.search); if (q) pendingSeed = strToSeed(q[1].toLowerCase()); const v = /[?&]v=(\d+)/.exec(location.search); if (v && +v[1] !== SEED_VERSION) pendingSeed = null; } catch (e) {}   // a link made under other rules would sound different: ignore its seed
 
   function makeStep(s) {
     if (s.acid) {
@@ -1352,12 +1402,13 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   function startSeq() {
     const prev = tapPatch;
     // every press rolls a new seed (unless a link handed one in); the seed alone decides patch, scale, key, tempo and pattern
-    const seed = pendingSeed != null ? pendingSeed : newSeed();
+    const seed = pendingSeed != null ? pendingSeed : (locked && curSeed != null ? curSeed : newSeed());   // the lock keeps the last seed
     pendingSeed = null; curSeed = seed;
     const handed = !!carry;   // a tempo, key and scale carried over a swipe are not a function of the seed alone
     stopCont();
     withSeed(seed, () => { tapPatch = roll(); seq = makeSeq(); });
     seq.seed = seed; seq.pure = !handed;
+    lastInfo = { bpm: seq.bpm, root: seq.root, sc: seq.sc.name, pure: !handed };
     setAccent(tapPatch, characterOf(seq, tapPatch));
     if (seq.cont) { cont = CONT[seq.cont](seq); startMod(); }
     // a fresh press starts from the finger; a press that continues after a swipe keeps the macros and glides to the new axes
@@ -2427,12 +2478,89 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     };
   }
 
+  /* ---------- service layer: lock, quiet strip, fan ---------- */
+  const fan = $('#fan'), fanItems = [].slice.call(document.querySelectorAll('.fan-item')), lockFrame = $('#lockframe'), probe = $('#sabprobe');
+  let locked = false, lockWin = null, attempted = false, stripId = null, stripY0 = 0, fanOpen = false, fanHover = null, frameTimer = 0, shakeTimer = 0, lastInfo = null;
+  const KEY_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+  const stripH = () => 96 + (parseFloat(getComputedStyle(probe).paddingBottom) || 0);   // the bottom strip does not play: touches there belong to the fan
+
+  function setLock(v) {
+    locked = !!v; lockWin = null;
+    document.documentElement.classList.toggle('locked', locked);
+    $('#fanLock').classList.toggle('on', locked);
+    $('#fanLockText').textContent = locked ? 'замок: вкл' : 'замок';
+  }
+  function frameHot(ms) {
+    lockFrame.classList.add('hot'); clearTimeout(frameTimer);
+    frameTimer = setTimeout(() => lockFrame.classList.remove('hot'), ms);
+  }
+  function shake(dir) {
+    const el = document.documentElement;
+    el.style.setProperty('--shk', dir);
+    el.classList.remove('lock-shake'); void el.offsetWidth; el.classList.add('lock-shake');
+    clearTimeout(shakeTimer); shakeTimer = setTimeout(() => el.classList.remove('lock-shake'), 400);
+  }
+  // a swipe while locked is refused with a shake and a brighter frame; the same swipe again within a second (a new touch) lifts the lock and goes through
+  function lockAttempt(dir) {
+    const now = performance.now();
+    if (lockWin && lockWin.dir === dir && now < lockWin.until) { setLock(false); frameHot(0); return true; }
+    lockWin = { dir, until: now + 1000 };
+    shake(dir); frameHot(1000);
+    return false;
+  }
+  function shareLink() {
+    if (curSeed == null || !lastInfo || !lastInfo.pure) return;
+    const u = new URL(location.href); u.search = ''; u.hash = '';
+    u.searchParams.set('skin', document.documentElement.dataset.skin); u.searchParams.set('seed', seedToStr(curSeed)); u.searchParams.set('v', SEED_VERSION);
+    const url = u.toString();
+    if (navigator.share) navigator.share({ title: 'Subversum', url }).catch(() => {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => frameHot(500)).catch(() => {});
+  }
+  function fillFan() {
+    $('#fanBpm').textContent = lastInfo ? (Number.isInteger(lastInfo.bpm) ? lastInfo.bpm : lastInfo.bpm.toFixed(1)) : '—';
+    $('#fanKey').textContent = lastInfo ? KEY_NAMES[lastInfo.root] + ' ' + lastInfo.sc.toLowerCase() : '';
+    $('#fanShare').classList.toggle('dis', !(lastInfo && lastInfo.pure));
+  }
+  function openFan() { fillFan(); fanOpen = true; fan.classList.add('open'); fan.setAttribute('aria-hidden', 'false'); }
+  function closeFan() { fanOpen = false; fanHover = null; fan.classList.remove('open'); fan.setAttribute('aria-hidden', 'true'); fanItems.forEach(el => el.classList.remove('hot')); }
+  function hoverAt(x, y) {
+    let best = null, bd = 76;
+    fanItems.forEach(el => {
+      if (el.classList.contains('dis')) return;
+      const r = el.getBoundingClientRect(), d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+      if (d < bd) { bd = d; best = el; }
+    });
+    fanHover = best ? best.dataset.act : null;
+    fanItems.forEach(el => el.classList.toggle('hot', el === best));
+  }
+  function stripDown(e) {
+    if (e.clientY < innerHeight - stripH()) return false;
+    if (stripId === null) { stripId = e.pointerId; stripY0 = e.clientY; try { surface.setPointerCapture(e.pointerId); } catch (err) {} }
+    return true;
+  }
+  surface.addEventListener('pointermove', e => {
+    if (e.pointerId !== stripId) return;
+    if (!fanOpen && stripY0 - e.clientY > 16) openFan();   // an upward swipe opens the fan at once
+    if (fanOpen) hoverAt(e.clientX, e.clientY);
+  });
+  const stripEnd = e => {
+    if (e.pointerId !== stripId) return;
+    const act = fanOpen && e.type === 'pointerup' ? fanHover : null;   // released over an item: do it; released elsewhere: nothing
+    closeFan(); stripId = null;
+    if (act === 'lock') setLock(!locked); else if (act === 'share') shareLink();
+  };
+  surface.addEventListener('pointerup', stripEnd);
+  surface.addEventListener('pointercancel', stripEnd);
+  Object.assign(window.subversum, { lock: setLock, locked: () => locked, fan: () => fanOpen, stripH });
+
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody (it is free for the service strip and fan)
   let activeId = null;
   surface.addEventListener('pointerdown', e => {
     e.preventDefault();
+    if (stripDown(e)) return;
     if (activeId !== null && activeId !== e.pointerId) return;
     activeId = e.pointerId;
+    attempted = false;
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
     sx = e.clientX; sy = e.clientY; swiped = false; dragging = false; tDown = performance.now();
     XY.down = FP.down = true;
@@ -2445,7 +2573,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     const dx = e.clientX - sx, dy = e.clientY - sy;
     const horizontal = Math.abs(dx) > 1.5 * Math.abs(dy);
     const early = performance.now() - tDown < 300;
-    if (early && horizontal && Math.abs(dx) > 10) {
+    if (early && horizontal && Math.abs(dx) > 10 && !locked) {
       // feedback while flicking: the scene follows the finger and dims, the dots appear
       dragging = true;
       root.style.setProperty('--sw', (dx * 0.45).toFixed(1) + 'px');
@@ -2456,8 +2584,11 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       place(e.clientX, e.clientY, false);
     }
     if (early && Math.abs(dx) > 56 && horizontal) {
-      swiped = true;
-      handoff(dx < 0 ? 1 : -1, e.clientX, e.clientY);
+      if (!locked) { swiped = true; handoff(dx < 0 ? 1 : -1, e.clientX, e.clientY); }
+      else if (!attempted) {   // locked: refuse once per touch; a repeat in the same direction within a second lifts the lock
+        attempted = true;
+        if (lockAttempt(dx < 0 ? 1 : -1)) { swiped = true; handoff(dx < 0 ? 1 : -1, e.clientX, e.clientY); }
+      }
     }
   });
   const dragReset = () => { XY.down = FP.down = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); };
