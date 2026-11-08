@@ -1487,7 +1487,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
      X the table position (a critically damped spring, about a second), Y a path: pure table, then bend (an asymmetric saturator with a DC lean), then FM at the ratios 0.5, 1, 2, 3 only.
      Z the beating: the voices pull apart from a near unison to about 1 to 1.7 Hz of beat (counted in Hz, not cents, so every note pulses the same). P pinch the fold (together clean, apart folded), P tap a burst of fold.
      A quick tap is one pass through the table: every press starts at the far end of the table and glides to its start frame. */
-  const WT = { N: 5, NH: 40, on: false, cfg: null, pos: 0, B: 0, I: 0, F: 0, depth: 0.06, beat: 0, ph1: 0, ph2: 0, kick: 0 };
+  const WT = { N: 64, NH: 40, on: false, cfg: null, pos: 0, B: 0, I: 0, F: 0, depth: 0.06, beat: 0, ph1: 0, ph2: 0, kick: 0 };
   const WT_FOLD = (() => { const c = new Float32Array(4097); for (let i = 0; i < c.length; i++) c[i] = Math.sin(Math.PI * 5 * (i / 2048 - 1)); return c; })();   // the same folder as amber: sin(pi K x), K = 5
   const WT_TANH = Math.tanh(1.5);
   const WT_BEND = (() => { const c = new Float32Array(2049); for (let i = 0; i < c.length; i++) c[i] = Math.tanh(1.5 * (i / 1024 - 1)) / WT_TANH; return c; })();
@@ -1499,7 +1499,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
   function rollWT(root) {
     const N = WT.N, NH = WT.NH, fam = pick(['tilt', 'formant', 'pulse', 'comb']), lo = Math.random() < 0.5 ? 24 : 36, f = 440 * Math.pow(2, (lo + root - 69) / 12);
-    const cLo = Math.max(2, 250 / f), cHi = Math.min(NH - 6, Math.max(cLo * 2, 1200 / f)), fr = [];
+    const cLo = Math.max(2, 250 / f), cHi = Math.min(NH - 6, Math.max(cLo * 2, 1200 / f)), fr = [], jit = [];
+    for (let h = 0; h <= NH; h++) jit.push(1 + 0.3 * (Math.random() - 0.5));   // one roughness for the whole table, so neighbouring frames stay close (64 of them are scanned)
     for (let k = 0; k < N; k++) {
       const u = k / (N - 1), re = new Float32Array(NH + 1), im = new Float32Array(NH + 1);
       for (let h = 1; h <= NH; h++) {
@@ -1508,7 +1509,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         else if (fam === 'formant') { const c = cLo * Math.pow(cHi / cLo, u); v = Math.pow(h, -1.3) * (1 + 9 * Math.exp(-0.5 * Math.pow((Math.log2(h) - Math.log2(c)) / 0.28, 2))); }
         else if (fam === 'pulse') v = Math.sin(Math.PI * h * (0.5 - 0.42 * u)) / h;
         else v = Math.pow(h, -1.1) * (0.15 + 0.85 * Math.pow(Math.abs(Math.cos(Math.PI * h / (2.2 + 3.8 * u))), 3));
-        v *= 1 + 0.3 * (Math.random() - 0.5);
+        v *= jit[h];
         if (fam === 'pulse') re[h] = v; else im[h] = v;   // the pulse is a cosine series, the rest are sine series
       }
       let s0 = 0, s1 = 0; for (let h = 1; h <= NH; h++) { const e = re[h] * re[h] + im[h] * im[h]; s0 += e; s1 += h * e; }
@@ -1595,25 +1596,25 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const waves = wt.re.map((re, k) => ctx.createPeriodicWave(re, wt.im[k]));
       const mod = ctx.createOscillator(), fmG = mk(ctx.createGain());
       mod.frequency.value = f * wt.fr; fmG.gain.value = 0; mod.connect(fmG); mod.start(t0); srcs.push(mod);
-      const far = wt.p0 < (N - 1) / 2 ? N - 1 : 0, dets = [0, 1, -1.618], vs = [];   // the three voices beat at b, 1.618 b and 2.618 b, which never line up
+      const lf = (i, t) => wt.lfo[i].a * Math.sin(TAU * wt.lfo[i].r * t + wt.lfo[i].ph);
+      const tgtOf = tt => clamp((MAC.color + 1) / 2 * (N - 1) + 3 * lf(0, tt), 0, N - 1);   // Y is the place in the table, absolute: the top of the screen is the last (brightest) frame
+      const far = tgtOf(0) < (N - 1) / 2 ? N - 1 : 0, dets = [0, 1, -1.618], vs = [];   // the three voices beat at b, 1.618 b and 2.618 b, which never line up
       let pos = far, vel = 0, last = t0, kick = 0, beatAcc = 0, prevBeat = 0, ph1 = 0, ph2 = 0;
       const f00 = Math.min(N - 2, Math.floor(pos));
-      for (let v = 0; v < 3; v++) {
+      for (let v = 0; v < 3; v++) {   // four oscillators per voice: two are heard (the pair around the position), two wait to take the next frames of a fast move
         const vg = mk(ctx.createGain()), sl = []; vg.gain.value = 0.34; vg.connect(sum);
-        for (let s = 0; s < 2; s++) {
-          const o = ctx.createOscillator(), g = mk(ctx.createGain()), fi = f00 + s;
-          o.frequency.value = f; o.setPeriodicWave(waves[fi]); g.gain.value = 0; o.connect(g); g.connect(vg); fmG.connect(o.frequency); o.start(t0); srcs.push(o); sl.push({ o, g, fr: fi });
+        for (let s = 0; s < 4; s++) {
+          const o = ctx.createOscillator(), g = mk(ctx.createGain()), fi = f00 + (s & 1);
+          o.frequency.value = f; o.setPeriodicWave(waves[fi]); g.gain.value = 0; o.connect(g); g.connect(vg); fmG.connect(o.frequency); o.start(t0); srcs.push(o); sl.push({ o, g, fr: fi, w: 0 });
         }
         vs.push(sl);
       }
-      const lf = (i, t) => wt.lfo[i].a * Math.sin(TAU * wt.lfo[i].r * t + wt.lfo[i].ph);
       let F = 0;
       const upd = () => {
         const now = ctx.currentTime, tt = Math.max(0, now - t0), dt = Math.min(0.2, Math.max(0.001, now - last)); last = now;
-        const target = clamp(wt.p0 + MAC.color * 0.5 * (N - 1) + 0.6 * lf(0, tt) + (far - wt.p0) * Math.exp(-tt / 0.8), 0, N - 1);
-        const w = 3.4; vel += (w * w * (target - pos) - 2 * w * vel) * dt;   // a critically damped spring: no jerk when a move starts, no sticking when it ends
-        let np = pos + vel * dt; if (Math.abs(np - pos) > 0.12) np = pos + Math.sign(np - pos) * 0.12;   // never skip over a frame boundary between two ticks
-        pos = clamp(np, 0, N - 1);
+        const tg0 = tgtOf(tt), target = clamp(tg0 + (far - tg0) * Math.exp(-tt / 0.8), 0, N - 1);
+        const w = 4; vel += (w * w * (target - pos) - 2 * w * vel) * dt;   // a critically damped spring: no jerk when a move starts, no sticking when it ends
+        pos = clamp(pos + vel * dt, 0, N - 1);
         const p = MAC.bend, B = clamp(wt.bend + 0.5 * p + 0.15 * lf(1, tt), 0, 1);
         const I = clamp(wt.fm * (p < 0 ? 1 + 0.8 * p : 1) + 1.9 * Math.max(0, p - 0.15) / 0.85, 0, 3.2);
         kick *= Math.exp(-dt / 0.7);
@@ -1624,19 +1625,21 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         if (bendC) bendC.offset.setTargetAtTime(0.24 * B * wt.bs, now, 0.08);
         fmG.gain.setTargetAtTime(I * f * wt.fr, now, 0.08);
         lp.frequency.setTargetAtTime(clamp(b.cut * (1 + 0.6 * ZH + 0.5 * F), 300, 9000), now, 0.1);
-        const f0 = Math.min(N - 2, Math.floor(pos));
+        const f0 = Math.min(N - 2, Math.floor(pos)), ga = 1 - Math.exp(-dt / 0.02);
         vs.forEach((sl, v) => {
-          const c = 1200 * Math.log2(1 + dets[v] * bz / f);
-          sl.forEach((s, k) => {
-            s.o.detune.setTargetAtTime(c, now, 0.15);
-            if (s.fr !== f0 && s.fr !== f0 + 1) { s.fr = sl[1 - k].fr === f0 ? f0 + 1 : f0; s.o.setPeriodicWave(waves[s.fr]); }   // the one that has dropped out of the pair (its weight is 0) takes the next frame
-            s.g.gain.setTargetAtTime(Math.max(0, 1 - Math.abs(pos - s.fr)) * wt.gn[s.fr], now, 0.02);
+          const c = 1200 * Math.log2(1 + dets[v] * bz / f), inP = s => s.fr === f0 || s.fr === f0 + 1;
+          sl.forEach(s => s.o.detune.setTargetAtTime(c, now, 0.15));
+          [f0, f0 + 1].forEach(fw => {   // a frame of the pair that nobody holds goes to a waiting oscillator (one that is already silent), so no wave is ever swapped while it is heard
+            if (sl.some(s => s.fr === fw)) return;
+            const s = sl.find(q => !inP(q) && q.w < 0.03);
+            if (s) { s.fr = fw; s.w = 0; s.o.setPeriodicWave(waves[fw]); }
           });
+          sl.forEach(s => { const tg = inP(s) ? Math.max(0, 1 - Math.abs(pos - s.fr)) : 0; s.w += (tg - s.w) * ga; s.g.gain.setTargetAtTime(tg * wt.gn[s.fr], now, 0.02); });
         });
         WT.on = true; WT.cfg = wt; WT.pos = pos; WT.B = B; WT.I = I; WT.F = F; WT.depth = depth; WT.beat = bz; WT.ph1 = ph1; WT.ph2 = ph2; WT.kick = kick;
       };
       upd();
-      const iv = setInterval(upd, 50);
+      const iv = setInterval(upd, 30);
       return {
         hit() { kick = 1; },   // the P tap: a burst of fold, up at once, gone in about two seconds
         mod() {
@@ -1904,7 +1907,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     ridges:  { x: ['cut'],   y: ['res'] },
     clouds:  { x: ['color'], y: ['space', 'cut'] },
     shepard: { x: ['color'], y: ['cut'] },   // x: the wave (saw to square), y: the cutoff
-    wavetable: { x: ['color'], y: ['bend'] },   // x: the position in the table (dark to bright), y: pure, then bend, then FM
+    wavetable: { x: ['bend'], y: ['color'] },   // y: the place in the 64-frame table (bottom dark, top bright), x: the path to the bend: pure, then bend, then FM
     overtones: { x: ['color'], y: ['ring'] },   // x: the brightness of the drone, y: the register of the melody
     vector:  { x: ['color'], y: ['ring'] }   // the mix point of the four materials: x soft to bright, y short to long
   };
@@ -2772,72 +2775,88 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   function buildWavetable() {
-    // three flat layers of cut paper, one per voice of the drone. The top edge of a layer is the real cycle of that voice after the bend, the FM and the fold, stretched over two cycles of the screen width,
-    // so the shape is honest. The layers slide against each other at the real beat of the voices (in Hz, as heard): near unison they lie as one wave, the longer the finger stays (Z) the more they pull apart and
-    // fan out. The pitch itself (33 to 123 Hz) cannot be drawn, so the screen shows the shape and the beating, not the height. A thin light line over every layer is the wave before the fold: where it
-    // runs past the layer, the layer has been folded back. X morphs the shape, Y bends it (and FM crinkles it), the P pinch folds, the P tap flashes, the finger is a lens that swells the paper under it.
+    // "Waves": seven fat flat layers of land in a dusk haze. The screen is the table itself: the height on the screen is the place in the table (the top is the last, brightest frame, the bottom the first,
+    // the same as the Y axis), and every layer draws the frame that belongs to its height. The layer the sound is at (the real, smoothed position, not the finger) swells and shows the wave that is really heard:
+    // the table, the FM, the bend, the fold. Two thin ghost rims of that layer drift against each other at the real beat of the voices (Z pulls them apart). The finger is a warm source inside the wave:
+    // X leans the swell and the bend towards it. The far layers are pale and low in contrast, the near ones dark, one dusk colour per press. The P tap lights the haze, the P pinch is the fold.
     const wrap = document.createElement('div'); wrap.className = 'skinsvg'; wrap.id = 'wtwrap';
     const cv = document.createElement('canvas');
     cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
     wrap.appendChild(cv);
     skinSvg.parentNode.insertBefore(wrap, skinSvg);
     const g = cv.getContext('2d', { alpha: false });
-    const PALS = [   // a ground and three flat inks, one palette per press
-      { bg: '#1B1740', c: ['#FF7A45', '#2FC4E0', '#FF4F93'] },
-      { bg: '#0F2A2E', c: ['#FFC23C', '#FF6F76', '#7B9BFF'] },
-      { bg: '#2A1030', c: ['#FFAA2B', '#2FD6C0', '#FF5E80'] },
-      { bg: '#1A1638', c: ['#FFD047', '#FF5C9E', '#3FE0A5'] },
-      { bg: '#0F1C36', c: ['#FFD95C', '#FF8A5C', '#5CCBF2'] },
-      { bg: '#271A14', c: ['#FFA94A', '#7DC4F7', '#F78FB0'] }
-    ];
-    const demoRe = (n, k) => { const a = new Float32Array(25); for (let h = 1; h < 25; h++) a[h] = Math.pow(h, -(n + k)); return a; };
-    const DEMO_CFG = { lut: [wtLut(new Float32Array(25), demoRe(2.0, 0)), wtLut(new Float32Array(25), demoRe(0.9, 0.2))], fr: 1, bs: 1 };
-    let W = 0, H = 0, dpr = 1, dead = false, raf = 0, last = 0, lastDraw = 0, T = 0, lens = 0, fx = 0.5, flash = 0, pal = PALS[0], lookBus = null;
-    function resize() { dpr = Math.min(window.devicePixelRatio || 1, 2); W = cv.width = Math.round(innerWidth * dpr); H = cv.height = Math.round(innerHeight * dpr); }
+    const hex = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; }, mixc = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t)), css = c => 'rgb(' + c.join(',') + ')';
+    const PALS = [   // one dusk per press: the sky (top, middle, horizon), the far and near land, the lit edge, the warm haze, the sun
+      { sky: ['#171033', '#5C3A7A', '#F29A78'], far: '#B987A8', near: '#120A22', warm: '#F6B08C', rim: '255,220,180', sun: '255,225,190' },
+      { sky: ['#06161F', '#1D4F5C', '#F2B27A'], far: '#7FB3B0', near: '#05141A', warm: '#F4C08A', rim: '255,226,184', sun: '255,232,196' },
+      { sky: ['#1E0F2A', '#7A3358', '#FFB07A'], far: '#D08AA0', near: '#1A0A1C', warm: '#FFB890', rim: '255,214,176', sun: '255,222,186' },
+      { sky: ['#0B1030', '#2E3C86', '#F7C27A'], far: '#8E9BD0', near: '#090B22', warm: '#F8CE90', rim: '255,230,190', sun: '255,236,200' },
+      { sky: ['#1A0C14', '#6B2A3A', '#F58F5A'], far: '#C97C78', near: '#16080F', warm: '#F8A878', rim: '255,208,170', sun: '255,214,176' },
+      { sky: ['#07201C', '#1F6B60', '#F0C891'], far: '#86C2AE', near: '#06171A', warm: '#F2D4A0', rim: '255,230,196', sun: '255,238,206' }
+    ].map(p => ({ sky: p.sky, far: hex(p.far), near: hex(p.near), warm: hex(p.warm), dark: hex('#07040E'), rim: p.rim, sun: p.sun }));
+    const DEMO = rollWT(0);   // a table for the empty screen
+    let W = 0, H = 0, dpr = 1, dead = false, raf = 0, last = 0, lastDraw = 0, T = 0, lens = 0, fx = 0.5, fy = 0.5, flash = 0, pal = PALS[0], sunX = 0.3, lookBus = null;
+    function resize() { dpr = Math.min(window.devicePixelRatio || 1, 2); cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr); W = innerWidth; H = innerHeight; }
     addEventListener('resize', resize); resize();
-    const NX = 120, EY = new Float32Array(NX + 1), GY = new Float32Array(NX + 1);
+    const L = 7, M = 200, TH = WT_TANH;
     function paint() {
-      const on = WT.on && WT.cfg, cfg = on ? WT.cfg : DEMO_CFG, lut = cfg.lut, NF = lut.length;
-      const pos = clamp(on ? WT.pos : 0.5 + 0.4 * Math.sin(T * 0.15), 0, NF - 1), fm = on ? WT.I : 0, fr = cfg.fr, B = on ? WT.B : 0.1, bs = cfg.bs, depth = on ? WT.depth : 0.16;
-      const offs = [0, on ? WT.ph1 : T * 0.08, on ? WT.ph2 : -T * 0.13];
-      const i0 = Math.min(NF - 2, Math.floor(pos)), wf = pos - i0, A = H * 0.115 * (1 + 0.3 * flash), gap = H * 0.2 * (1 + 0.35 * ZH);
-      const samp = q => { q -= Math.floor(q); const x = q * 256, k = x | 0, r = x - k, k2 = (k + 1) & 255, a = lut[i0], c = lut[i0 + 1]; return (a[k] * (1 - r) + a[k2] * r) * (1 - wf) + (c[k] * (1 - r) + c[k2] * r) * wf; };
-      g.fillStyle = pal.bg; g.fillRect(0, 0, W, H);
-      for (let j = 0; j < 3; j++) {
-        const base = H * 0.5 + (j - 1) * gap;
-        for (let ix = 0; ix <= NX; ix++) {
-          const u = ix / NX, q = 2 * u + offs[j] + fm / TAU * Math.sin(TAU * fr * 2 * u), v = samp(q);
-          const y1 = Math.tanh(1.5 * (0.7 * v + 0.24 * B * bs)) / WT_TANH;   // the bend, as in the sound
-          const d = u - fx, lz = 1 + 0.5 * lens * Math.exp(-d * d / 0.01);
-          EY[ix] = base - A * lz * Math.sin(Math.PI * 5 * depth * y1);   // the fold, as in the sound
-          GY[ix] = base - A * lz * clamp(10 * depth * y1, -1.7, 1.7);    // the same wave before it was folded
+      const on = WT.on && WT.cfg, cfg = on ? WT.cfg : DEMO, lut = cfg.lut, NF = lut.length, nm = NF - 1;
+      const pos = clamp(on ? WT.pos : nm * (0.5 + 0.34 * Math.sin(T * 0.12)), 0, nm), B = on ? WT.B : 0.12, I = on ? WT.I : 0, depth = on ? WT.depth : 0.14, fr = cfg.fr, bs = cfg.bs;
+      const yPos = 1 - pos / nm, s1 = on ? WT.ph1 * 0.3 : T * 0.02, s2 = on ? WT.ph2 * 0.3 : -T * 0.032;
+      const tv = (f, p) => { p -= Math.floor(p); const x = p * 256, k = x | 0, r = x - k, k2 = (k + 1) & 255; f = clamp(f, 0, nm - 1e-6); const a = lut[f | 0], c = lut[(f | 0) + 1], w = f - (f | 0); return (a[k] * (1 - r) + a[k2] * r) * (1 - w) + (c[k] * (1 - r) + c[k2] * r) * w; };
+      const heard = (f, p) => Math.sin(Math.PI * 5 * depth * Math.tanh(1.5 * (0.7 * tv(f, p + I / TAU * Math.sin(TAU * fr * p)) + 0.24 * B * bs)) / TH);
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.fillStyle = pal.sky[2]; g.fillRect(0, 0, W, H);
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.5); sky.addColorStop(0, pal.sky[0]); sky.addColorStop(0.6, pal.sky[1]); sky.addColorStop(1, pal.sky[2]); g.fillStyle = sky; g.fillRect(0, 0, W, H * 0.5);
+      const sr = 150 * (1 + 0.3 * ZH + 0.5 * flash), sun = g.createRadialGradient(W * sunX, H * 0.2, 0, W * sunX, H * 0.2, sr);
+      sun.addColorStop(0, 'rgba(' + pal.sun + ',' + (0.55 + 0.25 * flash).toFixed(3) + ')'); sun.addColorStop(1, 'rgba(' + pal.sun + ',0)'); g.fillStyle = sun; g.fillRect(0, 0, W, H);
+      g.lineJoin = 'round';
+      const sg = 0.3 * W, pts = new Float32Array(2 * (M + 1));
+      for (let i = 0; i < L; i++) {
+        const t = i / (L - 1), base = H * (0.26 + 0.098 * i), f = (1 - base / H) * nm, A = H * (0.04 + 0.03 * t), dy = base / H - yPos, ws = Math.exp(-dy * dy / (2 * 0.09 * 0.09)) * (0.3 + 0.7 * lens);
+        const col = mixc(pal.far, pal.near, Math.pow(t, 0.8)), sw = ws > 0.1;
+        for (let m = 0; m <= M; m++) {
+          const x = W * m / M, p = (x / W) * 1.15, d = (x - fx * W) / sg, wx = Math.exp(-d * d / 2) * ws;
+          pts[2 * m] = x; pts[2 * m + 1] = base - A * (tv(f, p) * (1 - wx) + heard(f, p) * wx) * (1 + wx * (1 + 0.25 * flash));
         }
-        g.beginPath(); g.moveTo(0, H);
-        for (let ix = 0; ix <= NX; ix++) g.lineTo(ix / NX * W, EY[ix]);
-        g.lineTo(W, H); g.closePath(); g.fillStyle = pal.c[j]; g.fill();
-        g.beginPath();
-        for (let ix = 0; ix <= NX; ix++) { if (ix) g.lineTo(ix / NX * W, EY[ix]); else g.moveTo(0, EY[0]); }
-        g.lineWidth = 1.5 * dpr; g.strokeStyle = 'rgba(255,255,255,0.42)'; g.stroke();
-        g.beginPath();
-        for (let ix = 0; ix <= NX; ix++) { if (ix) g.lineTo(ix / NX * W, GY[ix]); else g.moveTo(0, GY[0]); }
-        g.lineWidth = 1 * dpr; g.strokeStyle = 'rgba(255,255,255,' + (0.16 + 0.3 * flash).toFixed(3) + ')'; g.stroke();
+        const gr = g.createLinearGradient(0, base - A * 1.3, 0, base + H * 0.12);
+        gr.addColorStop(0, css(mixc(col, pal.warm, 0.3 * (1 - t) + 0.12 * ws))); gr.addColorStop(1, css(mixc(col, pal.dark, 0.72)));
+        g.beginPath(); g.moveTo(pts[0], pts[1]); for (let m = 1; m <= M; m++) g.lineTo(pts[2 * m], pts[2 * m + 1]);
+        g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.fillStyle = gr; g.fill();
+        g.beginPath(); g.moveTo(pts[0], pts[1]); for (let m = 1; m <= M; m++) g.lineTo(pts[2 * m], pts[2 * m + 1]);
+        g.lineWidth = 1 + 1.6 * ws; g.strokeStyle = 'rgba(' + pal.rim + ',' + clamp(0.15 + 0.12 * (1 - t) + 0.6 * ws + 0.2 * flash * ws, 0, 1).toFixed(3) + ')'; g.stroke();
+        if (sw) {   // the two other voices of the drone: the same wave, a little out of step, at the real beat
+          [s1, s2].forEach(sh => {
+            g.beginPath();
+            for (let m = 0; m <= M; m++) {
+              const x = W * m / M, p = (x / W) * 1.15 + sh, d = (x - fx * W) / sg, wx = Math.exp(-d * d / 2) * ws, y = base - A * (tv(f, p) * (1 - wx) + heard(f, p) * wx) * (1 + wx * (1 + 0.25 * flash));
+              if (m) g.lineTo(x, y); else g.moveTo(x, y);
+            }
+            g.lineWidth = 1; g.strokeStyle = 'rgba(' + pal.rim + ',' + (0.2 * ws).toFixed(3) + ')'; g.stroke();
+          });
+        }
       }
-      if (flash > 0.02) { g.fillStyle = 'rgba(255,255,255,' + (flash * 0.1).toFixed(3) + ')'; g.fillRect(0, 0, W, H); }
+      if (lens > 0.02) {   // the finger: a warm source inside the wave
+        const gl = g.createRadialGradient(fx * W, fy * H, 0, fx * W, fy * H, 150);
+        gl.addColorStop(0, 'rgba(' + pal.rim + ',' + (0.3 * lens).toFixed(3) + ')'); gl.addColorStop(1, 'rgba(' + pal.rim + ',0)'); g.fillStyle = gl; g.fillRect(0, 0, W, H);
+      }
+      if (flash > 0.02) { g.fillStyle = 'rgba(' + pal.sun + ',' + (flash * 0.1).toFixed(3) + ')'; g.fillRect(0, 0, W, H); }
     }
+    function setPal() { const r = (lastBus && lastBus.r) || [0.2, 0.3]; pal = PALS[Math.floor(r[0] * PALS.length) % PALS.length]; sunX = 0.2 + 0.6 * (r[1] == null ? 0.3 : r[1]); wrap.style.background = pal.sky[2]; }
     function frame(tn) {
       if (dead) return;
       raf = requestAnimationFrame(frame);
       const live = !!seq;
       if (!live && tn - lastDraw < 40) return;
       const dt = Math.min(0.05, (tn - last) / 1000); last = lastDraw = tn; T += dt;
-      if (lookBus !== lastBus) { lookBus = lastBus; const r = (lastBus && lastBus.r) || [0.2]; pal = PALS[Math.floor(r[0] * PALS.length) % PALS.length]; wrap.style.background = pal.bg; }
+      if (lookBus !== lastBus) { lookBus = lastBus; setPal(); }
       const down = (XY.down || holding) && seq;
       lens += ((down ? 1 : 0) - lens) * (1 - Math.exp(-dt * 6));
-      if (down) fx += (XY.x - fx) * (1 - Math.exp(-dt * 12));
+      if (down) { fx += (XY.x - fx) * (1 - Math.exp(-dt * 12)); fy += (XY.y - fy) * (1 - Math.exp(-dt * 12)); }
       flash *= Math.exp(-dt * 4);
       paint();
     }
-    last = lastDraw = performance.now(); lookBus = lastBus; if (lastBus && lastBus.r) pal = PALS[Math.floor(lastBus.r[0] * PALS.length) % PALS.length]; wrap.style.background = pal.bg;
+    last = lastDraw = performance.now(); lookBus = lastBus; setPal();
     try { paint(); } catch (e) { }
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) raf = requestAnimationFrame(frame);
     SK.pTap = () => { flash = 1; };
@@ -3631,7 +3650,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     ridges:  { x: ['cutoff', 'closed', 'open'],    y: ['resonance', 'calm', 'squeal'],  p: ['env depth', 'flat', 'deep'],   pt: 'stab', z: ['squeal', 'higher'] },
     clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] },
     shepard: { x: ['wave', 'saw', 'square'],       y: ['cutoff', 'closed', 'open'],      p: ['env + reso', 'short', 'long'],   pt: 'hit', z: ['filter env', 'deeper'] },
-    wavetable: { x: ['table', 'dark', 'bright'],  y: ['bend', 'pure', 'fm'],            p: ['fold', 'clean', 'folded'],  pt: 'fold', z: ['detune', 'wider'] },
+    wavetable: { x: ['bend', 'pure', 'fm'],  y: ['table', 'dark', 'bright'],            p: ['fold', 'clean', 'folded'],  pt: 'fold', z: ['detune', 'wider'] },
     overtones: { x: ['drone', 'dark', 'bright'],   y: ['register', 'low', 'high'],       p: ['harmonics', 'sparse', 'dense'], pt: 'jump', z: ['morph', 'bell'] },
     vector:  { x: ['timbre', 'soft', 'bright'],    y: ['body', 'short', 'long'],         p: ['border', 'soft', 'sharp'],    pt: 'snap', z: ['orbit', 'wider'] }
   };
@@ -3702,7 +3721,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
   const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
     amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
-    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM', 'INTERVAL', 'SWELL'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW'], vector: ['TIMBRE', 'BODY', 'BORDER', 'SNAP'], shepard: ['WAVE', 'CUTOFF', 'ENV + RESO', 'HIT'], overtones: ['DRONE', 'REGISTER', 'HARMONICS', 'JUMP'], wavetable: ['TABLE', 'BEND / FM', 'FOLD', 'FOLD BURST']
+    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM', 'INTERVAL', 'SWELL'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW'], vector: ['TIMBRE', 'BODY', 'BORDER', 'SNAP'], shepard: ['WAVE', 'CUTOFF', 'ENV + RESO', 'HIT'], overtones: ['DRONE', 'REGISTER', 'HARMONICS', 'JUMP'], wavetable: ['BEND / FM', 'TABLE', 'FOLD', 'FOLD BURST']
   };
   let hudEl = null, hudRaf = 0;
   function hudStart() {
