@@ -1,6 +1,6 @@
 // Subversum: service worker. Оболочка кэшируется при установке, страница работает офлайн.
 // Навигация идёт сначала в сеть, чтобы обновления доезжали сразу; без сети отдаётся кэш.
-const CACHE = 'subversum-v1';
+const CACHE = 'subversum-v2';
 const SHELL = [
   './',
   'index.html',

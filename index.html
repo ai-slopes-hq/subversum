@@ -7,11 +7,11 @@
 <script>
 // the look is picked at random on every launch; ?skin=riso|scope|amber forces one
 (function () {
-  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds', 'vector'], k = all[Math.floor(Math.random() * all.length)];
-  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|clouds|vector|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
+  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds', 'vector', 'shepard', 'overtones'], k = all[Math.floor(Math.random() * all.length)];
+  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|clouds|vector|shepard|overtones|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
   document.documentElement.setAttribute('data-skin', k);
   var m = document.querySelector('meta[name=theme-color]');
-  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12', vector: '#08080C' }[k]);
+  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12', vector: '#08080C', shepard: '#06030C', overtones: '#06040C' }[k]);
 })();
 </script>
 <meta name="mobile-web-app-capable" content="yes">
@@ -356,8 +356,8 @@ html[data-skin="ridges"] .go { inset: 33%; }
 /* no button and no sequencer ring in scope, topo, matrix and ridges: the waves start at the finger. amber, riso and mandala keep the button */
 html[data-skin="scope"] .go, html[data-skin="topo"] .go, html[data-skin="matrix"] .go, html[data-skin="ridges"] .go { display: none; }
 html[data-skin="topo"] .ring, html[data-skin="matrix"] .ring, html[data-skin="ridges"] .ring { display: none; }
-html[data-skin="vector"] .dial, html[data-skin="vector"] .bg, html[data-skin="clouds"] .dial, html[data-skin="clouds"] .bg, html[data-skin="amber"] .dial, html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
-html[data-skin="vector"] .skinsvg, html[data-skin="clouds"] .skinsvg, html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
+html[data-skin="shepard"] .dial, html[data-skin="shepard"] .bg, html[data-skin="overtones"] .dial, html[data-skin="overtones"] .bg, html[data-skin="vector"] .dial, html[data-skin="vector"] .bg, html[data-skin="clouds"] .dial, html[data-skin="clouds"] .bg, html[data-skin="amber"] .dial, html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
+html[data-skin="shepard"] .skinsvg, html[data-skin="overtones"] .skinsvg, html[data-skin="vector"] .skinsvg, html[data-skin="clouds"] .skinsvg, html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
 /* amber: night drive towards a sunset, neon grid road */
 .nd-s0 { stop-color: hsl(var(--hue, 28) 45% 3%); } .nd-s1 { stop-color: hsl(calc(var(--hue, 28) - 12) 80% 13%); } .nd-s2 { stop-color: hsl(calc(var(--hue, 28) - 4) 100% 34%); }
 .nd-u0 { stop-color: hsl(calc(var(--hue, 28) + 24) 100% 68%); } .nd-u1 { stop-color: hsl(calc(var(--hue, 28) - 22) 100% 52%); }
@@ -374,6 +374,11 @@ html[data-skin="vector"] .skinsvg, html[data-skin="clouds"] .skinsvg, html[data-
 /* vector: one flow of particles, four fields */
 html[data-skin="vector"] { --accent: hsl(var(--hue) 70% 78%); --bg: #08080C; }
 html[data-skin="vector"] body { background-color: var(--bg); background-image: none; }
+/* shepard: stairs that climb for ever, violet to amber. overtones: a Chladni plate, ultraviolet and amber */
+html[data-skin="shepard"] { --accent: hsl(36 100% 70%); --bg: #06030C; }
+html[data-skin="shepard"] body { background-color: var(--bg); background-image: none; }
+html[data-skin="overtones"] { --accent: hsl(36 100% 70%); --bg: #06040C; }
+html[data-skin="overtones"] body { background-color: var(--bg); background-image: none; }
 /* clouds: a scatter of grains */
 html[data-skin="clouds"] { --accent: hsl(var(--hue) 100% 72%); --bg: hsl(var(--hue) 30% 5%); }
 html[data-skin="clouds"] body { background-color: var(--bg); background-image: none; }
@@ -442,6 +447,8 @@ html[data-skin="ridges"] #mod { --k-ink: hsl(var(--hue) 45% 84%); --k-hi: hsl(va
 html[data-skin="clouds"] #mod { --k-ink: hsl(var(--hue) 45% 92%); --k-hi: hsl(var(--hue) 100% 80%); --k-fw: 300; --k-fs: 10px; --k-ls: .16em; --k-case: lowercase; --k-th: 3px; --k-r: 2px;
   --k-track: radial-gradient(circle, rgba(255,255,255,.34) 1px, transparent 1.4px) 0 50% / 5px 100% repeat-x; --k-mask: radial-gradient(circle, #000 1.4px, transparent 1.9px) 0 50% / 5px 100% repeat-x;
   --k-glow: 0 0 12px hsl(var(--hue) 100% 72% / .9); --k-hd: 7px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
+html[data-skin="shepard"] #mod { --k-ink: hsl(36 40% 90%); --k-hi: hsl(36 100% 72%); --k-fw: 400; --k-fs: 10px; --k-ls: .14em; --k-case: lowercase; --k-th: 2px; --k-r: 0; --k-track: hsl(270 40% 70% / .3); --k-glow: 0 0 10px hsl(36 100% 70% / .7); --k-hd: 5px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
+html[data-skin="overtones"] #mod { --k-ink: hsl(36 40% 92%); --k-hi: hsl(36 100% 74%); --k-fw: 300; --k-fs: 10px; --k-ls: .16em; --k-case: lowercase; --k-th: 2px; --k-r: 1px; --k-track: hsl(262 50% 70% / .3); --k-glow: 0 0 12px hsl(36 100% 70% / .8); --k-hd: 6px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
 html[data-skin="vector"] #mod { --k-ink: hsl(var(--hue) 30% 92%); --k-hi: hsl(var(--hue) 70% 82%); --k-fw: 400; --k-fs: 10px; --k-ls: .14em; --k-case: lowercase; --k-th: 2px; --k-r: 0; --k-track: hsl(var(--hue) 30% 80% / .26); --k-glow: 0 0 10px hsl(var(--hue) 70% 78% / .7); --k-hd: 5px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
 @media (prefers-reduced-motion: reduce) { #mod .md { transition: opacity .16s linear; } }
 /* debug HUD (?hud=1): the axes and their values as a game readout; never on by default */
@@ -879,6 +886,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
     vector:   { cut: [2500, 9000], len: [0.2, 0.6], fb: [0.2, 0.5], dela: [0.1, 0.4], revSec: [1.2, 2.8], reva: [0.15, 0.45], res: [0, 4] },
     clouds:   { shimmer: true, cut: [2500, 7000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
+    shepard:  { cut: [2500, 8000], len: [0.3, 0.8], fb: [0.2, 0.5], dela: [0.1, 0.4], revSec: [1.5, 3.5], reva: [0.2, 0.5], res: [0, 3] },
+    overtones: { cut: [3000, 9000], len: [0.3, 0.9], fb: [0.2, 0.5], dela: [0.15, 0.5], revSec: [2.5, 5], reva: [0.35, 0.7], res: [0, 3] },
     ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] }
   };
 
@@ -1120,7 +1129,114 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     let s = 0; for (let i = 0; i < 4; i++) { w[i] = Math.pow(w[i], gam); s += w[i]; }
     return w.map(v => v / s);
   }
+
+  /* ---------- shepard: octave-spaced sines under a Gaussian window over log-frequency ----------
+     A note is not a pitch but a pitch class: sines at every octave (the spacing is the P pinch), their loudness drawn by a bell over log-frequency, so the note has no register.
+     Z opens an endless glide (Risset): the whole set slides, the scale keeps its intervals, and after one octave the key is the same again. Y is its speed, a P tap turns it round. */
+  const SHEP = { b: null, gl: 0, t: 0, dir: 1 };   // gl: how far the set has slid, in semitones; dir: +1 up, -1 down
+  function shepRate(b) {   // semitones per second, from Z (the glide opens with it), Y (speed) and the direction
+    const base = 0.35 + 0.5 * (b && b.r ? b.r[0] : 0.5);
+    return SHEP.dir * base * Math.pow(2, 1.6 * MAC.ring) * ZH;
+  }
+  function shepSpacing() { const d = PX.d; return Math.pow(2, 1 - (d < 0 ? d * 0.585 : d * 0.415)); }   // together: wide (up to a twelfth), apart: close (down to a fifth)
+  function shepSigma() { return 0.9 + 1.7 * (MAC.color + 1) / 2; }   // octaves: x from a narrow bell to an organ
+  function shepFc(b) { return Math.log2(300) + ((b && b.r ? b.r[1] : 0.5) - 0.5) * 0.8; }
+  const shepW = (lf, fc, sg) => Math.exp(-0.5 * Math.pow((lf - fc) / sg, 2));
+  const SHEP_VOICE = c => {
+    const { t0, f, vel, b } = c, boom = !!c.boom;
+    if (SHEP.b !== b) { SHEP.b = b; SHEP.gl = 0; SHEP.t = t0; SHEP.dir = 1; }
+    const rate = shepRate(b);
+    SHEP.gl += (SHEP.rate || 0) * (t0 - SHEP.t); SHEP.t = t0; SHEP.rate = rate;
+    const midi = Math.round(69 + 12 * Math.log2(f / 440)), pc = ((midi % 12) + 12) % 12;
+    const sg = shepSigma(), fc = shepFc(b), sp = shepSpacing(), lsp = Math.log2(sp), L = (0.9 + 0.8 * b.len) * (boom ? 0.7 : 1);
+    const lb = Math.log2(16.3516) + (pc + SHEP.gl) / 12, drift = rate / 12 * L;   // log2 Hz of the lowest C, and how far the set moves in octaves during this note
+    const parts = [];
+    let k = Math.ceil((Math.log2(20) - lb) / lsp), s2 = 0;
+    for (; parts.length < 12; k++) {
+      const lf = lb + k * lsp;
+      if (lf > Math.log2(11000)) break;
+      const w0 = shepW(lf, fc, sg), w1 = shepW(lf + drift, fc, sg);
+      if (Math.max(w0, w1) < 0.04) continue;
+      parts.push({ lf, w0, w1 }); s2 += Math.max(w0, w1) * Math.max(w0, w1);
+    }
+    const A = 0.5 * vel * (boom ? 1.15 : 1) / Math.sqrt(Math.max(1.5, s2)), e = c.g(0), tau = L / 7;
+    e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(1, t0 + 0.02); e.gain.setTargetAtTime(0, t0 + 0.14, tau);
+    e.connect(c.out);
+    parts.forEach(p => {
+      const fHz = Math.pow(2, p.lf), o = c.osc('sine', fHz), g = c.g(0);
+      if (Math.abs(rate) > 1e-4) { o.frequency.setValueAtTime(fHz, t0); o.frequency.exponentialRampToValueAtTime(fHz * Math.pow(2, drift), t0 + L); }
+      if (Math.abs(rate) > 1e-4) {   // the bell moves with the note: a partial that climbs out of it fades while it climbs
+        const cv = new Float32Array(10); for (let i = 0; i < 10; i++) cv[i] = A * shepW(p.lf + drift * i / 9, fc, sg);
+        g.gain.setValueCurveAtTime(cv, t0, L);
+      } else g.gain.value = A * p.w0;
+      o._end = t0 + L + 0.05; o.connect(g); g.connect(e);
+    });
+    return t0 + L + 0.06;
+  };
+
+  /* ---------- overtones: a quiet drone of the harmonic series and a melody sung on its upper harmonics ---------- */
+  const OV = { base: 0, f0: 0, hn: [], drone: null };   // f0: the fundamental now (Hz), base: where the press began, hn: the harmonic each step sings
+  const HSETS = [[8, 9, 10, 11, 12, 13, 14, 15, 16], [8, 9, 10, 12, 14, 15, 16, 18, 20], [9, 11, 13, 15, 17, 19, 21, 23], [8, 10, 12, 13, 15, 16, 18, 20, 24], [8, 9, 10, 12, 15, 16, 18, 20, 24], [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]];
+  function ovList(sq) { const st = PX.d < -0.33 ? 3 : PX.d > 0.33 ? 1 : 2; return sq.hset.filter((_, i) => i % st === 0); }   // the P pinch: every third, every second or every harmonic of the set
+  function ovPick(sq, k) {   // the harmonic for a step: its place in the pool, moved by Y (register) and Z (the melody climbs)
+    const l = ovList(sq), i = clamp(Math.round(k * (l.length - 1)) + Math.round(3 * MAC.ring) + Math.round(4 * ZH), 0, l.length - 1);
+    return l[i];
+  }
+  const ovMode = n => { const nn = Math.max(3, Math.round(n / 2.4)); let m = 1 + (n % 3); if (m >= nn) m = nn - 1; return [nn, m]; };   // the plate pattern a harmonic draws
+  const OV_VOICE = c => {
+    const { t0, vel, b, st, s, idx } = c, boom = !!c.boom, n = boom && OV.lastN ? OV.lastN : ovPick(s, st.k);
+    OV.hn[idx] = n; OV.lastN = n;
+    const f = OV.f0 * n, T = (0.35 + 0.7 * b.len) * (boom ? 1.2 : 1), tau = T / 4, e = c.g(0);
+    e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.3 * vel * (boom ? 1.3 : 1), t0 + 0.018); e.gain.setTargetAtTime(0, t0 + 0.03, tau);
+    e.connect(c.out);
+    [[1, 1, 0], [1, 0.5, 5], [2, 0.1, 0], [3, 0.035, 0]].forEach(p => {   // a clear sine, a slightly detuned twin for a slow beat, and two faint overtones
+      if (f * p[0] > 11000) return;
+      const o = c.osc('sine', f * p[0], p[2]), g = c.g(p[1]); o._end = t0 + T + 0.05; o.connect(g); g.connect(e);
+    });
+    const ns = c.noise(), bp = c.bq('bandpass', f, 25), ng = c.g(0.1 * vel);   // breath on the harmonic
+    ns._end = t0 + T * 0.5; ns.connect(bp); bp.connect(ng); ng.connect(e);
+    return t0 + T + 0.06;
+  };
+  function ovDrone(sq) {
+    const b = sq.dub, t0 = ctx.currentTime + 0.02, base = 440 * Math.pow(2, (36 + sq.root - 69) / 12), NH = 12;
+    OV.base = OV.f0 = base; OV.hn = [];
+    const kill = ctx.createGain(); kill.gain.setValueAtTime(0, t0); kill.gain.linearRampToValueAtTime(1, t0 + 1.2); kill.connect(b.inp);
+    const nodes = [kill], parts = [];
+    for (let h = 1; h <= NH; h++) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = base * h; o.detune.value = (Math.random() - 0.5) * 6; g.gain.value = 0;
+      o.connect(g); g.connect(kill); o.start(t0); nodes.push(g); parts.push({ o, g, h, m: 1 });
+    }
+    let tilt = 1.0;
+    const setAmps = () => {
+      const now = ctx.currentTime; let s2 = 0; parts.forEach(p => { const a = Math.pow(p.h, -tilt) * p.m; p.a = a; s2 += a * a; });
+      const k = 0.2 / Math.sqrt(Math.max(0.2, s2));
+      parts.forEach(p => p.g.gain.setTargetAtTime(p.a * k, now, 0.2));
+    };
+    setAmps();
+    const timer = setInterval(() => { for (let i = 0; i < 3; i++) parts[1 + Math.floor(Math.random() * (NH - 1))].m = 0.35 + Math.random() * 0.95; setAmps(); }, 400);   // the upper partials breathe on their own
+    const d = {
+      xy(x01) { tilt = 1.7 - 1.2 * x01; setAmps(); },   // x: left a dark drone (the fundamental and the first partials), right a bright one
+      jump(n) {   // modulation by the overtone ratio: the drone glides to the harmonic that was just sung (folded into one octave round where it began)
+        let r = n / Math.pow(2, Math.floor(Math.log2(n))), nf = OV.f0 * r;
+        while (nf > OV.base * 1.42) nf /= 2; while (nf < OV.base / 1.42) nf *= 2;
+        OV.f0 = nf; const now = ctx.currentTime; parts.forEach(p => p.o.frequency.setTargetAtTime(nf * p.h, now, 0.3));
+      },
+      stop() {
+        clearInterval(timer); const now = ctx.currentTime;
+        kill.gain.cancelScheduledValues(now); kill.gain.setTargetAtTime(0, now, 0.15);
+        parts.forEach(p => { try { p.o.stop(now + 1); } catch (e) {} });
+        setTimeout(() => nodes.concat(parts.map(p => p.o)).forEach(n => { try { n.disconnect(); } catch (e) {} }), 1200);
+        if (OV.drone === d) OV.drone = null;
+      }
+    };
+    OV.drone = d; d.xy((MAC.color + 1) / 2);
+    return d;
+  }
+
   const VOICES = {
+    shepard: SHEP_VOICE,
+    overtones: OV_VOICE,
     // vector: one note through four materials, each in its own octave (the pool is the two octaves of every world, C1..B2: fog x2, wood x4, metal x8, glass x16). Layers under 3 % are not started.
     vector: c => {
       const { t0, f, vel } = c, ws = vecWeights(vecMix(true)), D = c.dur;
@@ -1314,7 +1430,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const srcs = [], nodes = [kill];
     if (pn) { nodes.push(pn); kill.connect(pn); pn.connect(b.inp); } else kill.connect(b.inp);
     const c = {
-      t0, f, vel: st.vel, boom: st.boom, b, r: b.r, dur: s.dur, out: kill, chord: st.chord || [st.midi],
+      t0, f, vel: st.vel, boom: st.boom, st, s, idx, b, r: b.r, dur: s.dur, out: kill, chord: st.chord || [st.midi],
       osc: (type, fr, det) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = fr; if (det) o.detune.value = det; srcs.push(o); return o; },
       noise: () => { const n = ctx.createBufferSource(); n.buffer = getNoise(); n.loop = true; srcs.push(n); return n; },
       g: v => { const n = ctx.createGain(); n.gain.value = v === undefined ? 1 : v; nodes.push(n); return n; },
@@ -1534,14 +1650,14 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   function makeSeq() {
     let bpm = carry ? carry.bpm : Math.round(rnd(BPM_MIN, BPM_MAX));
     // clouds plays at half the clock (about 55 to 68 BPM); a tempo carried over a swipe is halved or doubled to match
-    const sk0 = document.documentElement.getAttribute('data-skin'), isCl = sk0 === 'clouds' || sk0 === 'vector';
+    const sk0 = document.documentElement.getAttribute('data-skin'), isCl = sk0 === 'clouds' || sk0 === 'vector' || sk0 === 'shepard' || sk0 === 'overtones';
     if (isCl) { if (bpm > 90) bpm = Math.round(bpm / 2); } else if (bpm < 90) bpm *= 2;
     const root = carry ? carry.root : Math.floor(Math.random() * 12);
     const same = list => (carry && list.filter(x => x.name === carry.sc)[0]) || pick(list);
     const skin = document.documentElement.dataset.skin, dubOn = skin === 'mandala';
     const RISO_SCALES = ['MAJOR', 'MINOR', 'DORIAN', 'MIXOLYDIAN'];
     const ACID_SCALES = ['MINOR', 'MIN PENTA', 'DORIAN'];
-    const sc = skin === 'clouds' || skin === 'vector' ? same(SCALES.filter(x => ['MAJOR', 'MINOR', 'DORIAN', 'MAJ PENTA', 'MIN PENTA'].indexOf(x.name) >= 0)) : skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
+    const sc = skin === 'clouds' || skin === 'vector' || skin === 'shepard' || skin === 'overtones' ? same(SCALES.filter(x => ['MAJOR', 'MINOR', 'DORIAN', 'MAJ PENTA', 'MIN PENTA'].indexOf(x.name) >= 0)) : skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
     carry = null;
     const pool = [];
     for (let m = LOW; m <= HIGH; m++) {
@@ -1572,6 +1688,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     // the first step is always a clear note, so a quick tap catches exactly one good hit
     if (!s.steps[0]) s.steps[0] = s.dubChord ? { midi: 0, chord: s.dubChord(0), vel: 1 } : { midi: pool[s.idx], vel: 1 };
     s.steps[0].vel = 1;
+    if (skin === 'overtones') {   // the pool position of every step decides which harmonic of the seed's set it sings; the key and the scale name belong to the drone
+      s.hset = pick(HSETS); s.steps.forEach(st => { if (st) st.k = (st.midi - LOW) / (HIGH - LOW); }); s.sc = { name: 'HARMONICS', iv: sc.iv };
+    }
     return s;
   }
 
@@ -1618,6 +1737,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     lastInfo = { bpm: seq.bpm, root: seq.root, sc: seq.sc.name, pure: !handed };
     setAccent(tapPatch, characterOf(seq, tapPatch));
     if (seq.cont) { cont = CONT[seq.cont](seq); startMod(); }
+    if (skin === 'overtones') cont = ovDrone(seq);
     // a fresh press starts from the finger; a press that continues after a swipe keeps the macros and glides to the new axes
     clearInterval(glideTimer); glide = null;
     if (handoffMac) {
@@ -1674,6 +1794,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     matrix:  { x: ['color'], y: ['arp'] },
     ridges:  { x: ['cut'],   y: ['res'] },
     clouds:  { x: ['color'], y: ['space', 'cut'] },
+    shepard: { x: ['color'], y: ['ring'] },   // x: the width of the window, y: the speed of the glide
+    overtones: { x: ['color'], y: ['ring'] },   // x: the brightness of the drone, y: the register of the melody
     vector:  { x: ['color'], y: ['ring'] }   // the mix point of the four materials: x soft to bright, y short to long
   };
   const MAC = { cut: 0, res: 0, echo: 0, space: 0, color: 0, lpg: 0, hit: 0, ring: 0, arp: 0 };   // -1..1 around the press patch
@@ -1739,6 +1861,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (sk === 'riso') { b.len = clamp(b.base.len + 0.75 * MAC.ring + 0.2 * ZH, 0.02, 0.95); b.hit = MAC.hit; b.cut = clamp(b.base.cut * Math.pow(2, MAC.ring * 1.4), 400, 12000); }   // y: damped is short and dark, ringing is long and open
     b.xt = Math.pow(2, MAC.color * 1.2); b.xc = Math.round(MAC.color * 7);
     if (sk === 'topo' && cont && cont.xy) { const sw = swellAmt(); cont.xy(b.cut * Math.pow(2, 1.3 * sw), (MAC.color + 1) / 2, ZH + 0.8 * sw, MAC.cut); if (cont.iv) cont.iv(topoIv()[1]); }
+    if (sk === 'overtones' && cont && cont.xy) cont.xy((MAC.color + 1) / 2);
     if (acid && seq && seq.acidV) seq.acidV.setRes(b.res);
   }
 
@@ -2326,6 +2449,224 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
   }
 
+  function buildShepard() {
+    // an isometric patchwork of staircases. Every block of the floor is a staircase that climbs in its own direction, the colour goes from violet at the foot to amber at the top.
+    // A Gaussian window over the height of the screen fades the stairs out at the top and the bottom, as the window in the sound does for the sines: the stairs never end, they only leave the light.
+    // The glide of the sound (Z) pushes the stairs up (an octave of glide is one whole turn of the staircase), every note drops a cube on a step, and the finger lifts the stairs under it.
+    const wrap = document.createElement('div'); wrap.className = 'skinsvg'; wrap.id = 'shepwrap';
+    const cv = document.createElement('canvas'); cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'; wrap.appendChild(cv);
+    skinSvg.parentNode.insertBefore(wrap, skinSvg);
+    const g = cv.getContext('2d', { alpha: false });
+    let W = 1, H = 1, sc = 1, kk = 1, ox = 0, oy = 0, dead = false, raf = 0, last = 0, lastDraw = 0, frames = 0, acc = 0, started = 0, lowQ = 1;
+    const BG = [6, 3, 12], VW = 390, VH = 844;
+    const hslRgb = (h, s, l) => { h = ((h % 360) + 360) % 360 / 360; s /= 100; l /= 100; const f = n => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1))); }; return [f(0) * 255, f(8) * 255, f(4) * 255]; };
+    const mixc = (c1, c2, t) => [c1[0] + (c2[0] - c1[0]) * t, c1[1] + (c2[1] - c1[1]) * t, c1[2] + (c2[2] - c1[2]) * t];
+    const rgb = c => 'rgb(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ')';
+    const sst = (a, b, x) => { x = clamp((x - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); };
+    const mulb = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    let look = null, lookBus = null, nC = 0, CI = null, CJ = null, CX = null, CY = null, CO = null, CB = null, LIFT = null;
+    const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1]];
+    let phase = 0, touch = 0, flash = 0, wS = 0.5, drops = [], vig = null;
+    function rebuild(r) {   // a new press: new floor (cell size, number of steps, size of the blocks, how many directions), from the dice of the press
+      const rr = mulb(Math.floor(r[0] * 4e9) ^ Math.floor(r[3] * 1e9));
+      look = { s0: 36 + 20 * r[0], P: 4 + Math.floor(r[1] * 4), zk: 1.0 + 0.3 * r[2], B: 4 + Math.floor(r[3] * 3), nd: 3 + Math.floor(rr() * 4), dx: 3 + 5 * rr() };
+      const s = look.s0, dx = s * 0.866, dy = s * 0.5, B = look.B, xmin = -ox / kk - 2 * s, xmax = (W - ox) / kk + 2 * s, ymin = -oy / kk - 3 * s, ymax = (H - oy) / kk + 3 * s + look.P * dy * look.zk;
+      const N = Math.ceil((ymax - ymin) / dy) + 30, cx = (xmin + xmax) / 2, cy = ymin - 2 * s, list = [], ori = {};
+      for (let d = -N; d <= N * 1.2; d++) for (let i = -N; i <= N; i++) {
+        const j = d - i, X = cx + (i - j) * dx, Y = cy + (i + j) * dy;
+        if (X < xmin || X > xmax || Y < ymin || Y > ymax) continue;
+        const bi = Math.floor(i / B), bj = Math.floor(j / B), k = bi + ',' + bj;
+        if (!(k in ori)) ori[k] = Math.floor(rr() * look.nd);
+        list.push([i, j, X, Y, ori[k], ((bi * 37 + bj * 11) % 5 + 5) % 5]);
+      }
+      nC = list.length; CI = new Int16Array(nC); CJ = new Int16Array(nC); CX = new Float32Array(nC); CY = new Float32Array(nC); CO = new Uint8Array(nC); CB = new Uint8Array(nC); LIFT = new Float32Array(nC);
+      list.forEach((q, n) => { CI[n] = q[0]; CJ[n] = q[1]; CX[n] = q[2]; CY[n] = q[3]; CO[n] = q[4]; CB[n] = q[5]; });
+      drops = [];
+    }
+    function resize() {
+      sc = Math.min(window.devicePixelRatio || 1, 1.5) * lowQ;
+      W = Math.max(1, Math.round(innerWidth * sc)); H = Math.max(1, Math.round(innerHeight * sc));
+      cv.width = W; cv.height = H;
+      const k = Math.max(innerWidth / VW, innerHeight / VH); kk = k * sc; ox = (W - VW * kk) / 2; oy = (H - VH * kk) / 2;
+      vig = document.createElement('canvas'); vig.width = 64; vig.height = 128;
+      const vg = vig.getContext('2d'), gr = vg.createRadialGradient(32, 64, 128 * 0.22, 32, 64, 128 * 0.72); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.6)'); vg.fillStyle = gr; vg.fillRect(0, 0, 64, 128);
+      look = null; lookBus = null;
+    }
+    addEventListener('resize', resize); resize();
+    const diceOf = () => (lastBus && lastBus.r) || [0.37, 0.61, 0.22, 0.83];
+    function drawCell(X, Y, s, hgt, zh, col, wv, edge, sideH) {   // one column: the top face at height hgt, the two sides down to the floor
+      const dx = s * 0.866, dy = s * 0.5, top = Y - hgt * zh, hue = col, by = sideH ? top + sideH * zh - 2 * dy + 2 * dy : Y;   // sideH: a loose cube (its sides are one step high), otherwise a column down to the floor
+      const poly = (pts, c) => { const f = rgb(mixc(BG, c, wv)); g.beginPath(); g.moveTo(pts[0], pts[1]); for (let n = 2; n < pts.length; n += 2) g.lineTo(pts[n], pts[n + 1]); g.closePath(); g.fillStyle = f; g.strokeStyle = f; g.fill(); g.stroke(); };
+      poly([X - dx, top + dy, X, top + 2 * dy, X, by + 2 * dy, X - dx, by + dy], hue[1]);
+      poly([X + dx, top + dy, X, top + 2 * dy, X, by + 2 * dy, X + dx, by + dy], hue[2]);
+      poly([X, top, X + dx, top + dy, X, top + 2 * dy, X - dx, top + dy], hue[0]);
+      if (edge) { g.strokeStyle = rgb(mixc(BG, edge, wv)); g.lineWidth = 1.3; g.beginPath(); g.moveTo(X - dx, top + dy); g.lineTo(X, top); g.lineTo(X + dx, top + dy); g.stroke(); g.lineWidth = 2.2; }
+    }
+    function draw(dt) {
+      if (!look || lookBus !== lastBus) { if (lastBus !== lookBus || !look) { lookBus = lastBus; rebuild(diceOf()); } }
+      g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = rgb(BG); g.fillRect(0, 0, W, H);
+      g.setTransform(kk, 0, 0, kk, ox, oy); g.lineJoin = 'round'; g.lineWidth = 2.2;
+      const x01 = (wS + 1) / 2, sgV = 0.3 + 0.22 * x01, s = look.s0, dy = s * 0.5, zh = dy * look.zk;
+      const Pe = look.P / Math.max(0.55, Math.log2(shepSpacing())), Hd = (H - oy * 2) / kk || VH;
+      const fx = VW / 2 + FP.vx, fy = VH / 2 + FP.vy, f2x = VW / 2 + FP2.vx, f2y = VH / 2 + FP2.vy;
+      const decay = Math.exp(-dt / 0.45);
+      const hue0 = 268, hueSpan = 128;   // violet (268) through magenta and red to amber (396 = 36)
+      for (let n = 0; n < nC; n++) {
+        const Y = CY[n], X = CX[n], vy = (Y - (-oy / kk)) / ((H / kk) || VH), win = Math.exp(-Math.pow((vy - 0.5) / sgV, 2)), wv = Math.min(1, win * 1.3);
+        if (wv < 0.02) continue;
+        const o = DIRS[CO[n]], raw = o[0] * CI[n] + o[1] * CJ[n] + phase * Pe, u = ((raw % Pe) + Pe) % Pe, fl = Math.floor(u), hgt = fl + sst(0.55, 1, u - fl);
+        let h = hgt + LIFT[n];
+        LIFT[n] *= decay;
+        if (touch > 0.02) { const dxx = X - fx, dyy = Y - fy, dd = dxx * dxx + dyy * dyy; if (dd < 14000) h += touch * 1.5 * Math.exp(-dd / 3200); }
+        if (PX.on) { const dxx = X - f2x, dyy = Y - f2y, dd = dxx * dxx + dyy * dyy; if (dd < 14000) h += 1.1 * Math.exp(-dd / 3200); }
+        const t = clamp(u / Pe, 0, 1), hh = hue0 + hueSpan * t + CB[n] * look.dx, L = 0.58 * (0.6 + 0.55 * t) * 100;
+        const cols = [hslRgb(hh, 62, L), hslRgb(hh + 10, 62, L * 0.62), hslRgb(hh - 10, 62, L * 0.38)];
+        drawCell(X, Y, s, h, zh, cols, wv, (fl === look.P - 1 || fl === 0) ? hslRgb(hh + 25, 100, 82) : null);
+      }
+      // the cubes that fall on a step: they land on the top of a column, flash, and the column settles under the weight
+      for (let q = drops.length - 1; q >= 0; q--) {
+        const d = drops[q]; d.vy += 30 * dt; d.y -= d.vy * dt;
+        if (d.y <= 0 && !d.landed) { d.landed = true; d.y = 0; d.vy = 0; LIFT[d.c] += 1.0; d.age = 0; }
+        if (d.landed) { d.age += dt; if (d.age > 0.5) { drops.splice(q, 1); continue; } }
+        const X = CX[d.c], Y = CY[d.c], vy = (Y + oy / kk) / (H / kk), win = Math.exp(-Math.pow((vy - 0.5) / sgV, 2)), wv = Math.min(1, win * 1.4 + 0.25);
+        const o = DIRS[CO[d.c]], raw = o[0] * CI[d.c] + o[1] * CJ[d.c] + phase * Pe, u = ((raw % Pe) + Pe) % Pe, fl = Math.floor(u), base = fl + sst(0.55, 1, u - fl) + (d.landed ? LIFT[d.c] - 1 : LIFT[d.c]);
+        const a = d.landed ? 1 - d.age / 0.5 : 1, hh = 36 + 6 * a;
+        drawCell(X, Y, s, base + d.y + (d.landed ? 1 : 1), zh, [hslRgb(hh, 100, 62 + 24 * a), hslRgb(hh + 8, 100, 40 + 14 * a), hslRgb(hh - 8, 100, 28 + 10 * a)], wv * (0.55 + 0.45 * a), hslRgb(hh, 100, 92), 1);
+      }
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      if (flash > 0.02) { g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,170,90,' + (0.22 * flash).toFixed(3) + ')'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over'; }
+      g.drawImage(vig, 0, 0, W, H);
+    }
+    function frame(tn) {
+      if (dead) return;
+      raf = requestAnimationFrame(frame);
+      const live = !!seq;
+      if (!live && tn - lastDraw < 33) return;
+      const dt = Math.min(0.05, (tn - last) / 1000); last = lastDraw = tn;
+      wS += (MAC.color - wS) * (1 - Math.exp(-dt * 8));
+      touch += ((XY.down || holding ? 1 : 0) - touch) * (1 - Math.exp(-dt * 10));
+      flash *= Math.exp(-dt * 5);
+      phase += (live ? shepRate(lastBus) / 12 : 0.006 * SHEP.dir) * dt;   // an octave of glide is one turn of the staircase
+      draw(dt);
+      if (!started) started = tn;
+      if (tn - started > 2500) {
+        acc += dt; frames++;
+        if (frames === 60) { if (acc / frames * 1000 > 24 && lowQ > 0.7) { lowQ -= 0.15; resize(); } frames = 0; acc = 0; }
+      }
+    }
+    last = lastDraw = performance.now(); draw(0.016);
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) raf = requestAnimationFrame(frame);
+    SK.note = (i, vel) => {
+      if (!nC) return;
+      const Hv = (H / kk) || VH;
+      for (let tries = 0; tries < 40; tries++) {   // a step in the light of the window
+        const c = Math.floor(Math.random() * nC), vy = (CY[c] + oy / kk) / Hv;
+        if (vy > 0.18 && vy < 0.82 && Math.abs(vy - 0.5) < 0.3 * (0.5 + Math.random())) { drops.push({ c, y: 6 + 3 * vel, vy: 0, landed: false, age: 0 }); break; }
+      }
+      if (drops.length > 14) drops.shift();
+    };
+    SK.pTap = () => { flash = 1; };
+    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
+  }
+
+  function buildOvertones() {
+    // a Chladni plate. The drone is a few slow figures, every harmonic the melody sings draws its own (n, m) figure that rings and dies away, the figures add up on one plate.
+    // Two colours by the sign of the swing, ultraviolet and amber, and the sand lines (where the plate rests) glow gold.
+    const wrap = document.createElement('div'); wrap.className = 'skinsvg'; wrap.id = 'ovwrap'; wrap.style.background = '#06040c';
+    const cv = document.createElement('canvas'), ov = document.createElement('canvas');
+    cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'; ov.style.cssText = cv.style.cssText;
+    const vg = document.createElement('div'); vg.style.cssText = 'position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 38%, rgba(0,0,0,.62) 100%)';
+    wrap.appendChild(cv); wrap.appendChild(vg); wrap.appendChild(ov);
+    skinSvg.parentNode.insertBefore(wrap, skinSvg);
+    const px2 = cv.getContext('2d', { alpha: false }), octx = ov.getContext('2d');
+    let RW = 150, RH = 320, img = null, d32 = null, OW = 1, OH = 1, osc2 = 1, dead = false, raf = 0, last = 0, lastDraw = 0, frames = 0, acc = 0, started = 0;
+    const hslv = (h, s, l) => { h = ((h % 360) + 360) % 360 / 360; const f = n => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1))); }; return [f(0), f(8), f(4)]; };
+    const PAL = { hp: 28, hn: 262, hd: 250, s: 0.75, lp: 0.45, ln: 0.42, shift: 24, hl: [0.35, 0.2, 0.05] };
+    const Pc = hslv(PAL.hp, PAL.s, PAL.lp), Nc = hslv(PAL.hn, PAL.s, PAL.ln), P2 = hslv(PAL.hp + PAL.shift, PAL.s, PAL.lp + 0.12), N2 = hslv(PAL.hn - PAL.shift, PAL.s, PAL.ln + 0.1), Dk = hslv(PAL.hd, 0.6, 0.035);
+    const LUT = new Uint32Array(512);
+    for (let q = 0; q < 512; q++) {   // the colour of the plate for the swing v in -1..1
+      const v = q / 255.5 - 1, av = Math.abs(v), C1 = v > 0 ? Pc : Nc, C2 = v > 0 ? P2 : N2, body = Math.pow(av, 0.8), k2 = Math.pow(av, 2.2), line = Math.exp(-Math.pow(av / 0.05, 2)), halo = Math.exp(-Math.pow(av / 0.2, 2)) * 0.35;
+      const ch = i => Math.min(255, 255 * (Dk[i] + C1[i] * body * 0.75 + C2[i] * k2 * 0.8 + line * [1, 0.86, 0.62][i] + halo * PAL.hl[i])) | 0;
+      LUT[q] = (255 << 24) | (ch(2) << 16) | (ch(1) << 8) | ch(0);
+    }
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      RW = clamp(Math.round(innerWidth * 0.42 * dpr), 120, 200); RH = Math.round(RW * innerHeight / innerWidth);
+      cv.width = RW; cv.height = RH; img = px2.createImageData(RW, RH); d32 = new Uint32Array(img.data.buffer);
+      osc2 = Math.min(dpr, 1.5); OW = Math.round(innerWidth * osc2); OH = Math.round(innerHeight * osc2); ov.width = OW; ov.height = OH;
+    }
+    addEventListener('resize', resize); resize();
+    const BG = [[2, 1], [3, 2], [5, 2]];
+    const modes = BG.map((b, k) => ({ n: b[0], m: b[1], a: 0, p: k * 1.7, q: k * 0.9, vp: 0.07 + 0.03 * k, vq: -0.05 - 0.02 * k, base: [0.3, 0.24, 0.18][k], sing: false }));
+    let x01 = 0.5, touch = 0, flash = 0, kickP = 0, fx2 = 0, fy2 = 0;
+    const tabs = []; for (let i = 0; i < 4; i++) tabs.push(null);
+    const MAXM = 12, cxA = [], cyA = [], cxB = [], cyB = []; for (let i = 0; i < MAXM; i++) { cxA.push(new Float32Array(260)); cyA.push(new Float32Array(560)); cxB.push(new Float32Array(260)); cyB.push(new Float32Array(560)); }
+    function plate() {
+      const act = modes.filter(m => m.a > 0.004).slice(0, MAXM); let sum = 0;
+      const S = Math.PI * 1.05 / RW;
+      act.forEach((m, k) => {
+        sum += m.a;
+        const p = m.p + (m.sing ? 0 : kickP * 1.6), q = m.q;
+        for (let x = 0; x < RW; x++) { const X = x * S; cxA[k][x] = Math.cos(m.n * X + p); cxB[k][x] = Math.cos(m.m * X + q); }
+        for (let y = 0; y < RH; y++) { const Y = y * S; cyA[k][y] = Math.cos(m.m * Y + q); cyB[k][y] = Math.cos(m.n * Y + p); }
+      });
+      const inv = 1.5 / Math.max(0.9, sum), na = act.length;
+      for (let y = 0, o = 0; y < RH; y++) for (let x = 0; x < RW; x++, o++) {
+        let u = 0;
+        for (let k = 0; k < na; k++) u += act[k].a * (cxA[k][x] * cyA[k][y] - cxB[k][x] * cyB[k][y]);
+        let v = u * inv; v = v > 1 ? 1 : v < -1 ? -1 : v;
+        d32[o] = LUT[((v + 1) * 255.5) | 0];
+      }
+      px2.putImageData(img, 0, 0);
+    }
+    function drawFinger() {
+      octx.clearRect(0, 0, OW, OH);
+      const ring = (x, y, r, a, hot) => {
+        const gr = octx.createRadialGradient(x, y, 0, x, y, r * 2.2);
+        gr.addColorStop(0, 'rgba(255,214,140,' + (0.22 * a) + ')'); gr.addColorStop(1, 'rgba(255,214,140,0)');
+        octx.fillStyle = gr; octx.beginPath(); octx.arc(x, y, r * 2.2, 0, 6.2832); octx.fill();
+        octx.strokeStyle = 'rgba(255,226,170,' + (0.7 * a) + ')'; octx.lineWidth = 1.5 * osc2; octx.beginPath(); octx.arc(x, y, r * 0.5, 0, 6.2832); octx.stroke();
+      };
+      if (touch > 0.02) ring(XY.x * OW, XY.y * OH, 0.07 * OW, touch);
+      if (PX.on) ring(pX / innerWidth * OW, pY / innerHeight * OH, 0.05 * OW, 0.8 * touch);
+      if (flash > 0.02) { octx.fillStyle = 'rgba(255,200,120,' + (0.16 * flash).toFixed(3) + ')'; octx.fillRect(0, 0, OW, OH); }
+    }
+    function frame(tn) {
+      if (dead) return;
+      raf = requestAnimationFrame(frame);
+      const live = !!seq;
+      if (!live && tn - lastDraw < 50) return;
+      const dt = Math.min(0.05, (tn - last) / 1000); last = lastDraw = tn;
+      x01 += ((MAC.color + 1) / 2 - x01) * (1 - Math.exp(-dt * 8));
+      touch += ((XY.down || holding ? 1 : 0) - touch) * (1 - Math.exp(-dt * 10));
+      flash *= Math.exp(-dt * 5); kickP *= Math.exp(-dt / 0.8);
+      for (let i = modes.length - 1; i >= 0; i--) {
+        const m = modes[i];
+        m.p += m.vp * dt; m.q += m.vq * dt;
+        if (m.sing) {
+          if (m.rise > 0) { m.a += (m.top - m.a) * (1 - Math.exp(-dt * 25)); m.rise -= dt; } else m.a *= Math.exp(-dt / 0.55);
+          if (m.a < 0.01 && m.rise <= 0) modes.splice(i, 1);
+        } else {   // the drone's figures: brighter drone, more of them; they swell a little with the live drone
+          const tgt = live ? m.base * (0.55 + 0.9 * x01) : m.base * 0.5;
+          m.a += (tgt - m.a) * (1 - Math.exp(-dt * 2));
+        }
+      }
+      plate(); drawFinger();
+      if (!started) started = tn;
+      if (tn - started > 2500) { acc += dt; frames++; if (frames === 60) { if (acc / frames * 1000 > 26 && RW > 120) { RW = Math.max(120, Math.round(RW * 0.85)); RH = Math.round(RW * innerHeight / innerWidth); cv.width = RW; cv.height = RH; img = px2.createImageData(RW, RH); d32 = new Uint32Array(img.data.buffer); } frames = 0; acc = 0; } }
+    }
+    last = lastDraw = performance.now(); plate();
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) raf = requestAnimationFrame(frame);
+    SK.note = (i, vel) => {
+      const n = OV.hn[i]; if (!n) return;
+      const nm = ovMode(n), v = Math.random() < 0.5 ? 1 : -1;
+      modes.push({ n: nm[0], m: nm[1], a: 0, top: Math.min(1.1, 0.55 + 0.6 * vel), rise: 0.12, p: Math.random() * 6.28, q: Math.random() * 6.28, vp: v * (0.12 + 0.2 * Math.random()), vq: -v * (0.1 + 0.15 * Math.random()), sing: true });
+      while (modes.filter(m => m.sing).length > 6) { const k = modes.findIndex(m => m.sing); modes.splice(k, 1); }
+    };
+    SK.pTap = () => { flash = 1; kickP = 1; };
+    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
+  }
+
   function buildClouds() {
     // a scatter of grains: every note leaves a smudge of dots under the finger (the memory, which fades over the 4 s it lasts in the sound) and every grain of the sound
     // lights a few dots for exactly its own length, with the same Hann swell, sideways by its pan and up or down by chance.
@@ -2765,8 +3106,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   // skins can be swapped at any time: clear the old full-screen layer, build the new one, redraw the current pattern
-  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds', 'vector'];   // paper and donut are light: kept in the code, out of the rotation
-  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12', vector: '#08080C' };
+  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds', 'vector', 'shepard', 'overtones'];   // paper and donut are light: kept in the code, out of the rotation
+  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12', vector: '#08080C', shepard: '#06030C', overtones: '#06040C' };
   function applySkin(name) {
     skin = name;
     root.setAttribute('data-skin', name);
@@ -2778,7 +3119,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
     else root.style.removeProperty('--accent');
-    ({ amber: buildAmber, riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges, clouds: buildClouds, vector: buildVector }[name] || (() => {}))();
+    ({ amber: buildAmber, riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges, clouds: buildClouds, vector: buildVector, shepard: buildShepard, overtones: buildOvertones }[name] || (() => {}))();
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
@@ -2986,7 +3327,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
   let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
-  const P_WORLDS = { clouds: true, ridges: true, vector: true, amber: true, riso: true, mandala: true, scope: true, matrix: true, topo: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
+  const P_WORLDS = { clouds: true, ridges: true, vector: true, amber: true, riso: true, mandala: true, scope: true, matrix: true, topo: true, shepard: true, overtones: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
   const setFP2 = (x, y) => { const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844); pX = x; pY = y; FP2.vx = (x - W / 2) / sc; FP2.vy = (y - H / 2) / sc; };   // the second finger in the skin's coordinates, so a world can animate it like the first
   function pinch() {
     const raw = Math.log2(Math.max(24, Math.hypot(pX - P1.x, pY - P1.y)) / pDist0);
@@ -3009,6 +3350,14 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (skin === 'vector') {   // vector: the mix jumps to the nearest material for a moment and the last note is struck again, hard
       const mm = vecMix(true); VEC.snapC = [mm[0] > 0.5 ? 1 : 0, mm[1] > 0.5 ? 1 : 0]; VEC.snapUntil = performance.now() + 220;
       if (seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.2, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);
+    }
+    if (skin === 'shepard') {   // shepard: the glide turns round, and the last note is struck again
+      SHEP.dir = -SHEP.dir;
+      if (seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.1, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);
+    }
+    if (skin === 'overtones') {   // overtones: the drone glides to the harmonic that was sung last, and that harmonic is sung again over the new ground
+      if (OV.drone && OV.lastN) OV.drone.jump(OV.lastN);
+      if (seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.1, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);
     }
     if (SK.pTap) SK.pTap();
   }
@@ -3104,6 +3453,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     matrix:  { x: ['bit depth', 'crushed', 'clean'], y: ['arp', 'plain', 'busy'],       p: ['arp rate', 'fast', 'slow'],    pt: 'ratchet', z: ['arp', 'busier'] },
     ridges:  { x: ['cutoff', 'closed', 'open'],    y: ['resonance', 'calm', 'squeal'],  p: ['env depth', 'flat', 'deep'],   pt: 'stab', z: ['squeal', 'higher'] },
     clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] },
+    shepard: { x: ['window', 'narrow', 'wide'],    y: ['glide', 'slow', 'fast'],         p: ['spacing', 'wide', 'close'],   pt: 'turn', z: ['glide', 'faster'] },
+    overtones: { x: ['drone', 'dark', 'bright'],   y: ['register', 'low', 'high'],       p: ['harmonics', 'sparse', 'dense'], pt: 'jump', z: ['climb', 'higher'] },
     vector:  { x: ['timbre', 'soft', 'bright'],    y: ['body', 'short', 'long'],         p: ['border', 'soft', 'sharp'],    pt: 'snap', z: ['orbit', 'wider'] }
   };
   const MOD_HOLD = 800, MOD_FADE = 3200, MOD_SLOT = 30, MOD_RANK = [1, 0.6, 0.38, 0.2];   // a line stays fully lit 0.8 s after its last change, then fades over 3.2 s; the lower in the stack, the dimmer
@@ -3173,7 +3524,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
   const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
     amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
-    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM', 'INTERVAL', 'SWELL'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW'], vector: ['TIMBRE', 'BODY', 'BORDER', 'SNAP']
+    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM', 'INTERVAL', 'SWELL'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW'], vector: ['TIMBRE', 'BODY', 'BORDER', 'SNAP'], shepard: ['WINDOW', 'GLIDE', 'SPACING', 'TURN'], overtones: ['DRONE', 'REGISTER', 'HARMONICS', 'JUMP']
   };
   let hudEl = null, hudRaf = 0;
   function hudStart() {
