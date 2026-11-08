@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>wavetable: эскизы, не хребты</title>
+<style>
+  html, body { margin: 0; background: #07070C; color: #8a98a0; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; }
+  #sheet { display: flex; gap: 18px; padding: 18px; align-items: flex-start; width: max-content; }
+  figure { margin: 0; }
+  figcaption { padding: 10px 2px 0; max-width: 390px; }
+  figcaption b { color: #e8e2d0; font-weight: 600; }
+  canvas { display: block; width: 390px; height: 844px; border-radius: 16px; }
+  body.one #sheet { padding: 0; gap: 0; display: block; width: auto; }
+  body.one figcaption { display: none; }
+  body.one canvas { width: 100vw; height: 100vh; border-radius: 0; }
+</style>
+<div id="sheet"></div>
+<script>
+/* Статичные эскизы wavetable, второй набор: не стопка линий. Та же таблица из 64 кадров и тот же палец (Y = кадр, X = путь до bend).
+   Общее с хребтами: покой, одна крупная форма, палец как источник, а не значок. ?v=1..2 показывает один вариант. */
+const N = 64, NP = 360, TAU = Math.PI * 2, DPR = 2, CW = 390, CH = 844;
+const rng = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const R = rng(20261109), T = new Float32Array(N * NP);
+(function () {   // the same smooth table as in the first set
+  const NH = 9, ph = [], dph = [];
+  for (let h = 1; h <= NH; h++) { ph[h] = R() * TAU; dph[h] = (R() - 0.5) * 1.2; }
+  for (let k = 0; k < N; k++) {
+    const u = k / (N - 1), c = 1.5 * Math.pow(6.5 / 1.5, u); let pk = 1e-9; const row = new Float32Array(NP);
+    for (let i = 0; i < NP; i++) {
+      let v = 0; const x = i / NP * TAU;
+      for (let h = 1; h <= NH; h++) v += Math.pow(h, -1.2) * (1 + 4 * Math.exp(-0.5 * Math.pow((Math.log2(h) - Math.log2(c)) / 0.38, 2))) * Math.sin(h * x + ph[h] * 0.4 + dph[h] * u * 1.5 - TAU * h * 0.45 * u);
+      row[i] = v; pk = Math.max(pk, Math.abs(v));
+    }
+    for (let i = 0; i < NP; i++) T[k * NP + i] = row[i] / pk;
+  }
+})();
+function tv(f, p) {
+  p -= Math.floor(p); const x = p * NP, i = x | 0, r = x - i, i2 = (i + 1) % NP; f = Math.max(0, Math.min(N - 1 - 1e-6, f)); const k = f | 0, w = f - k;
+  return (T[k * NP + i] * (1 - r) + T[k * NP + i2] * r) * (1 - w) + (T[(k + 1) * NP + i] * (1 - r) + T[(k + 1) * NP + i2] * r) * w;
+}
+const TH = Math.tanh(1.5), BEND = 0.55, DEPTH = 0.15, FM = 0.7;
+const heard = (f, p) => Math.sin(Math.PI * 5 * DEPTH * Math.tanh(1.5 * (0.7 * tv(f, p + FM / TAU * Math.sin(TAU * 2 * p)) + 0.24 * BEND)) / TH);   // table, FM, bend, fold
+const FJ = 41.3, FX = 0.58;   // the finger: frame and x
+const lerp = (a, b, t) => a + (b - a) * t, mix = (c1, c2, t) => c1.map((v, i) => Math.round(lerp(v, c2[i], t)));
+const hex = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; }, css = c => 'rgb(' + c.join(',') + ')';
+
+function mk(title, text, draw) {
+  const fig = document.createElement('figure'), cv = document.createElement('canvas'), cap = document.createElement('figcaption');
+  cv.width = CW * DPR; cv.height = CH * DPR; cap.innerHTML = '<b>' + title + '</b><br>' + text;
+  fig.appendChild(cv); fig.appendChild(cap); document.getElementById('sheet').appendChild(fig);
+  const g = cv.getContext('2d'); g.save(); g.scale(DPR, DPR); draw(g); g.restore();
+}
+
+// ============ 2. swells: seven fat layers of land in haze, each a frame of the table, the one at the finger swells ============
+mk('1 · Волны', 'Семь крупных плоских слоёв, каждый это кадр таблицы на своей высоте экрана, как гряды в дымке. Далёкие бледные и низкоконтрастные, ближние тёмные и насыщенные. Слой у пальца поднимается и показывает bend и фолд. Один цвет сумерек.', g => {
+  const sky = g.createLinearGradient(0, 0, 0, CH * 0.5); sky.addColorStop(0, '#171033'); sky.addColorStop(0.6, '#5C3A7A'); sky.addColorStop(1, '#F29A78'); g.fillStyle = sky; g.fillRect(0, 0, CW, CH);
+  const sun = g.createRadialGradient(CW * 0.3, CH * 0.2, 0, CW * 0.3, CH * 0.2, 150); sun.addColorStop(0, 'rgba(255,225,190,.55)'); sun.addColorStop(1, 'rgba(255,225,190,0)'); g.fillStyle = sun; g.fillRect(0, 0, CW, CH);
+  const L = 7, M = 220, far = hex('#B987A8'), near = hex('#120A22');
+  for (let i = 0; i < L; i++) {
+    const t = i / (L - 1), base = CH * (0.26 + 0.1 * i), f = (1 - base / CH) * (N - 1), A = CH * (0.04 + 0.03 * t), dj = f - FJ, ws = Math.exp(-dj * dj / 40);
+    const col = mix(far, near, Math.pow(t, 0.8)), pts = [];
+    for (let m = 0; m <= M; m++) {
+      const x = CW * m / M, p = x / CW, wx = Math.exp(-Math.pow((x - FX * CW) / 140, 2) / 2) * ws;
+      pts.push([x, base - A * (tv(f, p * 1.15) * (1 - wx) + heard(f, p * 1.15) * wx) * (1 + 1.0 * wx)]);
+    }
+    const gr = g.createLinearGradient(0, base - A * 1.3, 0, base + CH * 0.12); gr.addColorStop(0, css(mix(col, hex('#F6B08C'), 0.18 * (1 - t) + 0.12 * ws))); gr.addColorStop(1, css(mix(col, hex('#07040E'), 0.55)));
+    g.beginPath(); pts.forEach((q, k) => k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.lineTo(CW, CH); g.lineTo(0, CH); g.closePath(); g.fillStyle = gr; g.fill();
+    g.beginPath(); pts.forEach((q, k) => k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.lineWidth = 1 + 1.6 * ws; g.strokeStyle = 'rgba(255,220,180,' + (0.15 + 0.12 * (1 - t) + 0.6 * ws) + ')'; g.stroke();
+  }
+});
+
+// ============ 3. curtain: the wave as the lower edge of a hanging light, rays go up from it ============
+mk('2 · Занавес', 'Волна это нижняя кромка висящего света, от неё вверх уходят лучи, ярче там, где кромка круче (складки фолда). Три занавеса это три соседних кадра таблицы, у пальца самый яркий и он набухает. Тёмное небо и силуэт земли внизу, чтобы стоять под ним.', g => {
+  const sky = g.createLinearGradient(0, 0, 0, CH); sky.addColorStop(0, '#04060D'); sky.addColorStop(1, '#0C1530'); g.fillStyle = sky; g.fillRect(0, 0, CW, CH);
+  const r = rng(7); g.fillStyle = 'rgba(255,255,255,.55)'; for (let i = 0; i < 70; i++) { const s = r() < 0.15 ? 1.3 : 0.7; g.fillRect(r() * CW, r() * CH * 0.8, s, s); }
+  const cur = [[FJ + 14, 0.5, 275], [FJ, 0.62, 155], [FJ - 14, 0.75, 195]], M = 260;   // frame, baseline, hue
+  g.globalCompositeOperation = 'lighter';
+  cur.forEach(([f, by, hue], ci) => {
+    const base = CH * by, heardC = ci === 1, A = CH * (heardC ? 0.085 : 0.06), ys = [];
+    for (let m = 0; m <= M; m++) {
+      const x = CW * m / M, p = x / CW, wx = heardC ? Math.exp(-Math.pow((x - FX * CW) / 120, 2) / 2) : 0;
+      ys.push(base - A * (tv(f, p * 1.15) * (1 - wx) + heard(f, p * 1.15) * wx) * (1 + 0.9 * wx));
+    }
+    for (let m = 1; m < M; m++) {
+      const x = CW * m / M, slope = Math.abs(ys[m + 1] - ys[m - 1]) / (2 * CW / M), a0 = (heardC ? 0.2 : 0.11) + 0.5 * Math.min(1, slope * 1.6) * (heardC ? 1 : 0.7), len = CH * (0.26 + 0.1 * Math.min(1, slope));
+      const gr = g.createLinearGradient(0, ys[m], 0, ys[m] - len); gr.addColorStop(0, 'hsla(' + hue + ',90%,62%,' + a0 + ')'); gr.addColorStop(0.35, 'hsla(' + hue + ',90%,55%,' + a0 * 0.35 + ')'); gr.addColorStop(1, 'hsla(' + hue + ',90%,50%,0)');
+      g.fillStyle = gr; g.fillRect(x - 0.9, ys[m] - len, 1.8 + CW / M * 0.4, len);
+    }
+    g.beginPath(); ys.forEach((y, m) => m ? g.lineTo(CW * m / M, y) : g.moveTo(0, y)); g.lineWidth = heardC ? 2 : 1.2; g.strokeStyle = 'hsla(' + hue + ',90%,' + (heardC ? 80 : 66) + '%,' + (heardC ? 0.95 : 0.5) + ')'; g.stroke();
+  });
+  g.globalCompositeOperation = 'source-over';
+  g.fillStyle = '#04050A'; g.beginPath(); g.moveTo(0, CH); const rr = rng(3); for (let i = 0; i <= 40; i++) g.lineTo(CW * i / 40, CH * (0.9 + 0.025 * Math.sin(i * 0.7) + 0.02 * (rr() - 0.5))); g.lineTo(CW, CH); g.closePath(); g.fill();
+});
+
+const v = +(/[?&]v=(\d)/.exec(location.search) || [0, 0])[1];
+if (v) { document.body.classList.add('one'); [...document.querySelectorAll('figure')].forEach((f, i) => { if (i !== v - 1) f.remove(); }); }
+</script>
