@@ -413,28 +413,27 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 #handle { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: 40px; height: 4px; margin-left: -20px; border-radius: 2px;
   background: rgba(255,255,255,.16); z-index: 6; pointer-events: none; }
 #sabprobe { position: fixed; left: 0; top: 0; width: 0; height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); visibility: hidden; pointer-events: none; }
-#fan { position: fixed; inset: 0; z-index: 9; display: none; pointer-events: none; color: #f1ece4;
-  font: 500 13px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-user-select: none; user-select: none;
-  background: linear-gradient(to bottom, rgba(0,0,0,.62) 0, rgba(0,0,0,0) 34%), linear-gradient(to top, rgba(0,0,0,.84) 0, rgba(0,0,0,.6) 17%, rgba(0,0,0,0) 42%); }
+#fan { position: fixed; inset: 0; z-index: 9; display: none; pointer-events: none; color: #f1ece4; background: rgba(0,0,0,.5);
+  font: 500 13px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-user-select: none; user-select: none; }
 #fan.open { display: block; animation: fanin .09s ease-out; }
 @keyframes fanin { from { opacity: 0; } to { opacity: 1; } }
-/* the icons live in the bottom sixth of the screen: the lock on top in the middle, the share link a little lower to the right; tempo and key are big text at the top */
-.fan-arc { position: absolute; left: 0; right: 0; bottom: 0; height: calc(100% / 6); }
-.fan-item { position: absolute; display: flex; align-items: center; justify-content: center; background: rgba(10,10,14,.55);
-  border: 1.5px solid rgba(255,255,255,.34); transition: background .08s, border-color .08s, transform .08s, opacity .08s, color .08s; }
-.fan-item { width: 56px; height: 56px; margin-left: -28px; border-radius: 50%; }
-.fan-item svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-#fanLock { left: 50%; top: 6px; }
-#fanShare { left: calc(50% + 84px); top: 30px; }
-#fanLock .shut, #fanLock.on .open { display: none; }
-#fanLock.on .shut { display: inline; }
 .fan-top { position: absolute; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 44px); text-align: center; text-shadow: 0 1px 16px rgba(0,0,0,.65); }
 .fan-top b { font: 600 76px/1 system-ui, -apple-system, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .fan-top i { font-style: normal; font-size: 18px; letter-spacing: .12em; opacity: .65; margin-left: 8px; }
 .fan-top span { display: block; margin-top: 10px; font-size: 30px; font-weight: 500; opacity: .92; }
-.fan-item.hot { background: hsl(var(--hue, 38) 80% 60% / .32); border-color: hsl(var(--hue, 38) 85% 70%); transform: scale(1.12); }
-.fan-item.on { border-color: hsl(var(--hue, 38) 85% 70%); color: hsl(var(--hue, 38) 90% 78%); }
-.fan-item.dis { opacity: .3; }
+/* the fan: an opaque half disc on the bottom edge, as tall as the bottom sixth of the screen, cut into sectors; a whole sector is the touch target */
+.fan-arc { position: absolute; left: 50%; bottom: 0; height: calc(100% / 6); aspect-ratio: 2 / 1; transform: translateX(-50%); }
+.fan-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.fan-sec { color: #f1ece4; }
+.fan-sec .sec { fill: #17171d; stroke: rgba(255,255,255,.22); stroke-width: .7; transition: fill .08s; }
+.fan-sec .ico * { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fan-sec.hot .sec { fill: hsl(var(--hue, 38) 55% 30%); }
+.fan-sec.on { color: hsl(var(--hue, 38) 90% 78%); }
+.fan-sec.on .sec { fill: hsl(var(--hue, 38) 40% 18%); }
+.fan-sec.hot.on .sec { fill: hsl(var(--hue, 38) 55% 30%); }
+.fan-sec.dis { opacity: .5; }
+#fanLock .shut, #fanLock.on .open { display: none; }
+#fanLock.on .shut { display: inline; }
 @media (prefers-reduced-motion: reduce) { html.lock-shake .stage, html.lock-shake .skinsvg, #fan.open { animation: none; } }
 </style>
 </head>
@@ -456,14 +455,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 <div id="sabprobe" aria-hidden="true"></div>
 <div id="fan" aria-hidden="true">
   <div class="fan-top"><b id="fanBpm">—</b><i>BPM</i><span id="fanKey"></span></div>
-  <div class="fan-arc">
-  <div class="fan-item" id="fanLock" data-act="lock">
-    <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shut" d="M8 11V8a4 4 0 0 1 8 0v3"/><path class="open" d="M8 11V8a4 4 0 0 1 7.6-1.7"/></svg>
-  </div>
-  <div class="fan-item" id="fanShare" data-act="share">
-    <svg viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></svg>
-  </div>
-</div></div>
+  <div class="fan-arc"><svg class="fan-svg" viewBox="0 0 200 100" aria-hidden="true">
+    <g class="fan-sec" id="fanLock" data-act="lock"><path class="sec" d="M100 100L0.00 100.00A100 100 0 0 1 100.00 0.00Z"/><g class="ico" transform="translate(44.2 44.2)"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shut" d="M8 11V8a4 4 0 0 1 8 0v3"/><path class="open" d="M8 11V8a4 4 0 0 1 7.6-1.7"/></g></g>
+    <g class="fan-sec" id="fanShare" data-act="share"><path class="sec" d="M100 100L100.00 0.00A100 100 0 0 1 200.00 100.00Z"/><g class="ico" transform="translate(131.8 44.2)"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></g></g>
+  </svg></div>
+</div>
 
 <script>
 (() => {
@@ -2479,7 +2475,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   /* ---------- service layer: lock, quiet strip, fan ---------- */
-  const fan = $('#fan'), fanItems = [].slice.call(document.querySelectorAll('.fan-item[data-act]')), lockFrame = $('#lockframe'), probe = $('#sabprobe');
+  const fan = $('#fan'), fanItems = [].slice.call(document.querySelectorAll('.fan-sec[data-act]')), lockFrame = $('#lockframe'), probe = $('#sabprobe');
   let locked = false, lockWin = null, attempted = false, stripId = null, stripX0 = 0, stripY0 = 0, fanOpen = false, fanArmed = false, fanHover = null, frameTimer = 0, shakeTimer = 0, lastInfo = null;
   const KEY_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
   const stripH = () => 96 + (parseFloat(getComputedStyle(probe).paddingBottom) || 0);   // the bottom strip does not play: touches there belong to the fan
@@ -2522,13 +2518,15 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
   function openFan() { fillFan(); fanOpen = true; fan.classList.add('open'); fan.setAttribute('aria-hidden', 'false'); }
   function closeFan() { fanOpen = false; fanArmed = false; fanHover = null; fan.classList.remove('open'); fan.setAttribute('aria-hidden', 'true'); fanItems.forEach(el => el.classList.remove('hot')); }
+  // the half disc is cut into equal sectors; the finger picks the sector it is in (any point of it), not an icon
   function hoverAt(x, y) {
-    let best = null, bd = 40;   // only a touch that is actually on an icon (radius 28 plus a margin) counts
-    fanItems.forEach(el => {
-      if (el.classList.contains('dis')) return;
-      const r = el.getBoundingClientRect(), d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
-      if (d < bd) { bd = d; best = el; }
-    });
+    const r = $('.fan-arc').getBoundingClientRect(), px = r.left + r.width / 2, py = r.bottom, R = r.height;
+    const dx = x - px, dy = py - y, d = Math.hypot(dx, dy);
+    let best = null;
+    if (dy >= 0 && d <= R + 18 && Math.abs(dx) > 8) {   // a narrow dead strip on the cut between two sectors
+      const k = Math.min(fanItems.length - 1, Math.floor((Math.PI - Math.atan2(dy, dx)) / (Math.PI / fanItems.length)));
+      if (!fanItems[k].classList.contains('dis')) best = fanItems[k];
+    }
     fanHover = best ? best.dataset.act : null;
     fanItems.forEach(el => el.classList.toggle('hot', el === best));
   }
@@ -2539,7 +2537,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
   surface.addEventListener('pointermove', e => {
     if (e.pointerId !== stripId) return;
-    if (!fanOpen && stripY0 - e.clientY > 16) openFan();   // an upward swipe opens the fan at once
+    if (!fanOpen && Math.hypot(e.clientX - stripX0, e.clientY - stripY0) > 16 && e.clientY <= stripY0 + 4) openFan();   // a swipe up (also a slanted one) opens the fan at once
     if (fanOpen && !fanArmed && Math.hypot(e.clientX - stripX0, e.clientY - stripY0) >= 36) fanArmed = true;   // the icons sit right above the strip: a short flick must not pick one
     if (fanOpen && fanArmed) hoverAt(e.clientX, e.clientY);
   });
