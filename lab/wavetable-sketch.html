@@ -2,7 +2,7 @@
 <html lang="ru">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>wavetable: статичные эскизы</title>
+<title>wavetable: статичные эскизы (рецепт хребтов)</title>
 <style>
   html, body { margin: 0; background: #07070C; color: #8a98a0; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; }
   #sheet { display: flex; gap: 18px; padding: 18px; align-items: flex-start; width: max-content; }
@@ -16,141 +16,90 @@
 </style>
 <div id="sheet"></div>
 <script>
-/* Статичные эскизы экрана wavetable. Без звука и без движения. Все четыре варианта рисуют одну и ту же таблицу из 64 кадров
-   и одно положение пальца: Y = позиция в таблице (кадр), X = путь до bend (чем правее, тем сильнее изогнута волна).
-   ?v=1..4 показывает один вариант на весь экран. */
+/* Статичные эскизы wavetable по рецепту хребтов: заслонение линий (hidden-line), одна краска с глубиной, тихая основа, один гладкий цикл на ширину,
+   палец это источник: кадр под пальцем набухает и показывает bend и фолд. 64 кадра таблицы = 64 линии. Y = кадр, X = путь до bend.
+   ?v=1..3 показывает один вариант на весь экран. */
 const N = 64, NP = 360, TAU = Math.PI * 2, DPR = 2, CW = 390, CH = 844;
 const rng = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const R = rng(20261109);
-
-// ---- the table: 64 frames, two formants that sweep and cross while the phase of the partials slowly turns, so the shape flows from frame to frame
+// a smooth table: few partials, a formant that climbs through them, the phase drifts a little from frame to frame so neighbours look alike
 const T = new Float32Array(N * NP);
-(function gen() {
-  const NH = 16, ph = [], dph = [];
-  for (let h = 1; h <= NH; h++) { ph[h] = R() * TAU; dph[h] = (R() - 0.5) * 1.6; }
+(function () {
+  const NH = 9, ph = [], dph = [];
+  for (let h = 1; h <= NH; h++) { ph[h] = R() * TAU; dph[h] = (R() - 0.5) * 1.2; }
   for (let k = 0; k < N; k++) {
-    const u = k / (N - 1), cA = 2.5 * Math.pow(10 / 2.5, u), cB = 12 * Math.pow(4 / 12, u), a = new Float32Array(NH + 1), th = new Float32Array(NH + 1);
-    for (let h = 1; h <= NH; h++) {
-      const lh = Math.log2(h);
-      a[h] = Math.pow(h, -1.25) * (1 + 6 * Math.exp(-0.5 * Math.pow((lh - Math.log2(cA)) / 0.36, 2)) + 4 * Math.exp(-0.5 * Math.pow((lh - Math.log2(cB)) / 0.32, 2)));
-      th[h] = ph[h] * 0.5 + dph[h] * u * 2.2 - TAU * h * 1.5 * u;   // the whole shape also travels 1.5 cycles along the table
+    const u = k / (N - 1), c = 1.5 * Math.pow(6.5 / 1.5, u); let pk = 1e-9; const row = new Float32Array(NP);
+    for (let i = 0; i < NP; i++) {
+      let v = 0; const x = i / NP * TAU;
+      for (let h = 1; h <= NH; h++) v += Math.pow(h, -1.2) * (1 + 4 * Math.exp(-0.5 * Math.pow((Math.log2(h) - Math.log2(c)) / 0.38, 2))) * Math.sin(h * x + ph[h] * 0.4 + dph[h] * u * 1.5 - TAU * h * 0.45 * u);
+      row[i] = v; pk = Math.max(pk, Math.abs(v));
     }
-    let pk = 1e-9; const row = new Float32Array(NP);
-    for (let i = 0; i < NP; i++) { let v = 0; const x = i / NP * TAU; for (let h = 1; h <= NH; h++) v += a[h] * Math.sin(h * x + th[h]); row[i] = v; pk = Math.max(pk, Math.abs(v)); }
     for (let i = 0; i < NP; i++) T[k * NP + i] = row[i] / pk;
   }
 })();
-function tv(f, p) {   // the table at frame f (0..63, fractional) and phase p (cycles), bilinear, periodic in phase
-  p -= Math.floor(p); const x = p * NP, i = x | 0, r = x - i, i2 = (i + 1) % NP;
-  f = Math.max(0, Math.min(N - 1 - 1e-6, f)); const k = f | 0, w = f - k;
-  const a = T[k * NP + i] * (1 - r) + T[k * NP + i2] * r, b = T[(k + 1) * NP + i] * (1 - r) + T[(k + 1) * NP + i2] * r;
-  return a * (1 - w) + b * w;
+function tv(f, p) {
+  p -= Math.floor(p); const x = p * NP, i = x | 0, r = x - i, i2 = (i + 1) % NP; f = Math.max(0, Math.min(N - 1 - 1e-6, f)); const k = f | 0, w = f - k;
+  return (T[k * NP + i] * (1 - r) + T[k * NP + i2] * r) * (1 - w) + (T[(k + 1) * NP + i] * (1 - r) + T[(k + 1) * NP + i2] * r) * w;
 }
-const TH = Math.tanh(1.5);
-const chain = (v, B, depth) => Math.sin(Math.PI * 5 * depth * Math.tanh(1.5 * (0.7 * v + 0.24 * B)) / TH);   // bend, then the fold of the sound
+const TH = Math.tanh(1.5), BEND = 0.55, DEPTH = 0.15, FM = 0.7;
+// the wave that is heard: the table with a little FM, then the bend, then the fold
+const heard = (f, p) => Math.sin(Math.PI * 5 * DEPTH * Math.tanh(1.5 * (0.7 * tv(f, p + FM / TAU * Math.sin(TAU * 2 * p)) + 0.24 * BEND)) / TH);
+const FJ = 41.3, FX = 0.58;   // the finger: frame and x (0..1)
 
-// ---- the state of the finger that every sketch shows
-const FCUR = 41.3, BEND = 0.45, DEPTH = 0.13, FX = 0.36;   // frame, bend 0..1, fold depth, finger x (0..1)
-
-function mk(title, text, draw) {
+// one stack, hidden-line, the same recipe as the ridges world
+function stack(g, o) {
+  const DY = 10, Y0 = 118, M = 200, A = 15, tw = x => Math.pow(Math.sin(Math.PI * x / CW), 0.55);
+  g.save(); g.scale(DPR, DPR); g.fillStyle = o.bg; g.fillRect(0, 0, CW, CH);
+  g.lineJoin = 'round';
+  for (let j = N - 1; j >= 0; j--) {   // the top of the screen is the last frame; the nearest line is frame 0
+    const y = Y0 + (N - 1 - j) * DY, t = j / (N - 1), dj = j - FJ, ws = Math.exp(-dj * dj / 12), pts = [];
+    for (let m = 0; m <= M; m++) {
+      const x = CW * m / M, p = x / CW, wx = Math.exp(-Math.pow((x - FX * CW) / 120, 2) / 2) * ws;
+      const base = tv(j, p), hv = heard(j, p), v = base * (1 - wx) + hv * wx;
+      pts.push([x, y - A * tw(x) * v * (1 + 1.1 * wx)]);
+    }
+    g.beginPath(); pts.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]));
+    const edge = new Path2D(); pts.forEach((q, i) => i ? edge.lineTo(q[0], q[1]) : edge.moveTo(q[0], q[1]));
+    g.lineTo(CW, CH + 20); g.lineTo(0, CH + 20); g.closePath();
+    o.fill(g, y, t, ws); g.fill();
+    g.lineWidth = o.lw(ws); g.strokeStyle = o.stroke(t, ws); g.stroke(edge);
+  }
+  if (o.after) o.after(g);
+  g.restore();
+}
+function mk(title, text, o) {
   const fig = document.createElement('figure'), cv = document.createElement('canvas'), cap = document.createElement('figcaption');
   cv.width = CW * DPR; cv.height = CH * DPR; cap.innerHTML = '<b>' + title + '</b><br>' + text;
   fig.appendChild(cv); fig.appendChild(cap); document.getElementById('sheet').appendChild(fig);
-  draw(cv.getContext('2d'), cv.width, cv.height);
-  return fig;
+  stack(cv.getContext('2d'), o);
 }
-const ring = (g, W, H) => {   // the finger: a faint ring where it lies
-  const x = FX * W, y = H * (1 - FCUR / (N - 1)); g.save(); g.lineWidth = 1.5 * DPR; g.strokeStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(x, y, 20 * DPR, 0, TAU); g.stroke(); g.restore();
-};
-const slice = (g, W, H, A, col, glow, cycles) => {   // the wave that is heard: the current frame after the bend and the fold, drawn over the line of the frame
-  const y0 = H * (1 - FCUR / (N - 1)); g.save(); g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = col; g.lineWidth = 2.6 * DPR; g.shadowColor = col; g.shadowBlur = glow * DPR;
-  g.beginPath(); const NX = 600;
-  for (let i = 0; i <= NX; i++) { const u = i / NX, y = y0 - A * chain(tv(FCUR, u * cycles), BEND, DEPTH); i ? g.lineTo(u * W, y) : g.moveTo(0, y); }
-  g.stroke(); g.restore();
-};
 
-// ============ A. strata: a hypsometric map of the whole table, flat colours, the section line over it ============
-mk('A · Страты', 'Вся таблица как карта высот: по горизонтали фаза цикла (1,5 периода), по вертикали кадр. Плоские ступени цвета, как на гипсометрической карте. Палец ведёт линию разреза, поверх неё живая волна.', (g, W, H) => {
-  const S = 1.5, ow = Math.round(W * S), oh = Math.round(H * S), off = document.createElement('canvas'); off.width = ow; off.height = oh;
-  const og = off.getContext('2d'), img = og.createImageData(ow, oh), d = new Uint32Array(img.data.buffer);
-  const hex = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; };
-  const PAL = ['#10182E', '#16284A', '#1D4468', '#2A6A7E', '#4E948C', '#A7B98C', '#E6C58A', '#F08E73'].map(hex), L = PAL.length;
-  const px = c => (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0], dark = c => px([c[0] * 0.72 | 0, c[1] * 0.72 | 0, c[2] * 0.78 | 0]);
-  const Q = new Uint8Array(ow * oh);
-  for (let y = 0; y < oh; y++) { const f = (1 - y / oh) * (N - 1); for (let x = 0; x < ow; x++) { const v = tv(f, x / ow * 1.5); Q[y * ow + x] = Math.max(0, Math.min(L - 1, Math.floor((v * 0.5 + 0.5) * L))); } }
-  for (let y = 0; y < oh; y++) for (let x = 0; x < ow; x++) {
-    const q = Q[y * ow + x], e = (x + 1 < ow && Q[y * ow + x + 1] !== q) || (y + 1 < oh && Q[(y + 1) * ow + x] !== q);
-    d[y * ow + x] = e ? dark(PAL[q]) : px(PAL[q]);
-  }
-  og.putImageData(img, 0, 0); g.imageSmoothingQuality = 'high'; g.drawImage(off, 0, 0, W, H);
-  const y0 = H * (1 - FCUR / (N - 1)); g.fillStyle = 'rgba(8,10,20,.28)'; g.fillRect(0, y0 - 44 * DPR, W, 88 * DPR);   // a light veil so the wave reads on any colour
-  g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(0, y0 - 0.75 * DPR, W, 1.5 * DPR);
-  slice(g, W, H, 34 * DPR, '#FFF6E0', 10, 1.5); ring(g, W, H);
+// 1: the recipe as it is: one ink, depth in opacity, the lines hide each other
+mk('1 · Лёд', 'Рецепт хребтов как есть: одна краска, глубина прозрачностью, линии заслоняют друг друга. Каждая линия это кадр таблицы, один гладкий цикл на ширину. Кадр под пальцем набухает и изогнут bend и фолдом.', {
+  bg: '#070C14',
+  fill: (g) => { g.fillStyle = '#070C14'; },
+  lw: ws => 1.15 + 1.1 * ws,
+  stroke: (t, ws) => 'hsla(196,85%,' + (62 + 14 * ws) + '%,' + Math.min(1, (0.22 + 0.78 * (1 - t)) + 0.5 * ws) + ')'
 });
 
-// ============ B. glowing lines: 64 frames in an oblique view, no hiding, additive ============
-mk('B · Свечение', 'Каждый кадр таблицы это линия. Косой вид: дальние кадры выше, уже и мельче. Линии не заслоняют друг друга, а складываются светом. Цвет по номеру кадра от синего через пурпур к оранжевому. Текущий кадр белый и толще.', (g, W, H) => {
-  const grad = g.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, '#0A0716'); grad.addColorStop(1, '#050812'); g.fillStyle = grad; g.fillRect(0, 0, W, H);
-  g.globalCompositeOperation = 'lighter'; g.lineJoin = 'round'; const NX = 420;
-  for (let k = 0; k < N; k++) {
-    const t = k / (N - 1), s = 1 - 0.3 * t, y0 = H * (0.9 - 0.74 * t), x0 = W / 2 - W * 0.46 * s + t * W * 0.07, wd = W * 0.92 * s, A = H * 0.052 * s;
-    const near = Math.exp(-Math.pow((k - FCUR) / 2.2, 2));
-    g.beginPath();
-    for (let i = 0; i <= NX; i++) { const u = i / NX, y = y0 - A * tv(k, u * 1.5); i ? g.lineTo(x0 + u * wd, y) : g.moveTo(x0, y); }
-    g.lineWidth = (1 + 0.8 * near) * DPR; g.strokeStyle = 'hsla(' + ((228 + 150 * t) % 360) + ',80%,' + (58 + 14 * near) + '%,' + (0.34 + 0.12 * t + 0.4 * near) + ')'; g.stroke();
-  }
-  {   // the section that is heard: one crisp line at the fractional frame, after the bend and the fold
-    const t = FCUR / (N - 1), s = 1 - 0.3 * t, y0 = H * (0.9 - 0.74 * t), x0 = W / 2 - W * 0.46 * s + t * W * 0.07, wd = W * 0.92 * s, A = H * 0.052 * s * 1.6;
-    g.beginPath(); for (let i = 0; i <= NX; i++) { const u = i / NX, y = y0 - A * chain(tv(FCUR, u * 1.5), BEND, DEPTH); i ? g.lineTo(x0 + u * wd, y) : g.moveTo(x0, y); }
-    g.globalCompositeOperation = 'source-over'; g.lineWidth = 2.6 * DPR; g.strokeStyle = '#FFF3D6'; g.shadowColor = 'hsl(40,100%,70%)'; g.shadowBlur = 16 * DPR; g.stroke();
-  }
-  g.globalCompositeOperation = 'source-over'; g.shadowBlur = 0; ring(g, W, H);
+// 2: slabs: the same stack as layers of paper in one colour that deepens with distance
+mk('2 · Пласты', 'То же, но каждый кадр это пласт: тёмная заливка с градиентом от светлой кромки вниз. Один цвет, который глубже вдали. Читается как слои породы или бумаги, а кадр под пальцем вспыхивает.', {
+  bg: '#0B0716',
+  fill: (g, y, t, ws) => { const gr = g.createLinearGradient(0, y - 20, 0, y + 70), l = 22 + 22 * (1 - t) + 12 * ws; gr.addColorStop(0, 'hsl(' + (262 + 70 * (1 - t) - 20 * ws) + ',55%,' + l + '%)'); gr.addColorStop(1, '#0B0716'); g.fillStyle = gr; },
+  lw: ws => 1.1 + 1.2 * ws,
+  stroke: (t, ws) => 'hsla(' + (300 + 50 * (1 - t) - 30 * ws) + ',90%,' + (62 + 18 * ws) + '%,' + Math.min(1, 0.35 + 0.65 * (1 - t) + 0.5 * ws) + ')'
 });
 
-// ============ C. isolines: the contour map of the same surface, thin lines ============
-mk('C · Горизонтали', 'Та же поверхность, но тонкими изолиниями, как топографическая карта. Каждая пятая линия жирнее (основная горизонталь). Палец ведёт линию разреза, поверх неё живая волна. Спокойнее и тоньше, чем A.', (g, W, H) => {
-  g.fillStyle = '#0B1616'; g.fillRect(0, 0, W, H);
-  const GX = 300, GY = (N - 1) * 3 + 1, cyc = 1.5, V = new Float32Array(GX * GY);
-  for (let j = 0; j < GY; j++) { const f = (1 - j / (GY - 1)) * (N - 1); for (let i = 0; i < GX; i++) V[j * GX + i] = tv(f, i / (GX - 1) * cyc); }
-  const NL = 16;
-  for (let n = 0; n < NL; n++) {
-    const L = -0.92 + 1.84 * n / (NL - 1), major = n % 5 === 0, t = n / (NL - 1);
-    g.beginPath();
-    const X = i => i / (GX - 1) * W, Y = j => j / (GY - 1) * H;
-    for (let j = 0; j < GY - 1; j++) for (let i = 0; i < GX - 1; i++) {
-      const tl = V[j * GX + i], tr = V[j * GX + i + 1], br = V[(j + 1) * GX + i + 1], bl = V[(j + 1) * GX + i];
-      const c = (tl > L ? 8 : 0) | (tr > L ? 4 : 0) | (br > L ? 2 : 0) | (bl > L ? 1 : 0); if (c === 0 || c === 15) continue;
-      const ip = (a, b) => (L - a) / (b - a);
-      const T_ = () => [X(i + ip(tl, tr)), Y(j)], R_ = () => [X(i + 1), Y(j + ip(tr, br))], B_ = () => [X(i + ip(bl, br)), Y(j + 1)], L_ = () => [X(i), Y(j + ip(tl, bl))];
-      const seg = (p, q) => { g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }, hi = (tl + tr + br + bl) / 4 > L;
-      switch (c) {
-        case 1: case 14: seg(L_(), B_()); break; case 2: case 13: seg(B_(), R_()); break; case 3: case 12: seg(L_(), R_()); break;
-        case 4: case 11: seg(T_(), R_()); break; case 6: case 9: seg(T_(), B_()); break; case 7: case 8: seg(T_(), L_()); break;
-        case 5: if (hi) { seg(T_(), L_()); seg(B_(), R_()); } else { seg(T_(), R_()); seg(L_(), B_()); } break;
-        case 10: if (hi) { seg(T_(), R_()); seg(L_(), B_()); } else { seg(T_(), L_()); seg(B_(), R_()); } break;
-      }
-    }
-    g.lineCap = 'round'; g.lineWidth = (major ? 1.9 : 0.9) * DPR; g.strokeStyle = 'hsla(' + (182 - 140 * t) + ',' + (major ? 38 : 30) + '%,' + (major ? 74 : 52) + '%,' + (major ? 0.95 : 0.62) + ')'; g.stroke();
+// 3: two inks: a cold stack and a warm glow where the finger is
+mk('3 · Тепло под пальцем', 'Холодная стопка, а там, где палец, кадр и его соседи теплеют, и под ними вспыхивает тёплое пятно света. Палец не значок поверх картинки, а место, где среда нагрета.', {
+  bg: '#08090F',
+  fill: (g) => { g.fillStyle = '#08090F'; },
+  lw: ws => 1.1 + 1.3 * ws,
+  stroke: (t, ws) => ws > 0.06 ? 'hsla(26,95%,' + (62 + 10 * ws) + '%,' + Math.min(1, 0.25 + 0.9 * ws + 0.3 * (1 - t)) + ')' : 'hsla(214,35%,64%,' + (0.18 + 0.6 * (1 - t)) + ')',
+  after: g => {
+    const x = FX * CW, y = 118 + (N - 1 - FJ) * 10, gr = g.createRadialGradient(x, y, 0, x, y, 170);
+    gr.addColorStop(0, 'rgba(255,150,80,.30)'); gr.addColorStop(1, 'rgba(255,150,80,0)'); g.globalCompositeOperation = 'screen'; g.fillStyle = gr; g.fillRect(0, 0, CW, CH); g.globalCompositeOperation = 'source-over';
   }
-  const y0 = H * (1 - FCUR / (N - 1)); g.fillStyle = 'rgba(11,22,22,.55)'; g.fillRect(0, y0 - 40 * DPR, W, 80 * DPR);
-  g.fillStyle = '#FF7A59'; g.fillRect(0, y0 - 0.75 * DPR, W, 1.5 * DPR); for (let i = 0; i <= 12; i++) g.fillRect(i / 12 * W - 0.75 * DPR, y0 - 6 * DPR, 1.5 * DPR, 12 * DPR);   // ticks on the section line
-  slice(g, W, H, 30 * DPR, '#FFB59E', 8, 1.5); ring(g, W, H);
-});
-
-// ============ D. engraving: 120 lines whose weight follows the slope, the current section swells out of the stack ============
-mk('D · Гравюра', '120 строк, толщина каждой следует за наклоном волны, как в гравюре. Таблица спокойно лежит стопкой, а текущий разрез, как под линзой, выпучивается из неё и раздвигает соседей. Одна краска плюс одна акцентная.', (g, W, H) => {
-  g.fillStyle = '#0A1022'; g.fillRect(0, 0, W, H);
-  const NL = 120, NX = 520, top = H * 0.07, bot = H * 0.95, sp = (bot - top) / (NL - 1), A0 = sp * 1.5, cyc = 1.5;
-  for (let l = 0; l < NL; l++) {
-    const t = l / (NL - 1), f = (1 - t) * (N - 1), y0 = top + l * sp;   // l = 0 is the top of the screen, the last frame
-    const d = (f - FCUR), lens = Math.exp(-d * d / 9), push = -Math.sign(d) * sp * 3.2 * (1 - Math.exp(-Math.abs(d) / 2.2)) * Math.exp(-Math.abs(d) / 7) * 1.0;   // the neighbours are pushed aside
-    const yb = y0 + push, A = A0 * (1 + 3.3 * lens), top_ = [], bot_ = [], pts = [];
-    for (let i = 0; i <= NX; i++) { const u = i / NX, v = lens > 0.25 ? chain(tv(f, u * cyc), BEND, DEPTH) : tv(f, u * cyc), v2 = tv(f, (u + 0.002) * cyc); pts.push([u * W, yb - A * v, Math.abs(v2 - tv(f, u * cyc)) / 0.002 * 0.004]); }
-    for (let i = 0; i <= NX; i++) { const [x, y, s] = pts[i], w = (0.5 + 2.3 * Math.min(1, s * 1.4) + 1.6 * lens) * DPR / 2; top_.push([x, y - w]); bot_.push([x, y + w]); }
-    g.beginPath(); top_.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); for (let i = NX; i >= 0; i--) g.lineTo(bot_[i][0], bot_[i][1]); g.closePath();
-    g.fillStyle = lens > 0.45 ? '#FF6A3D' : 'rgba(240,232,210,' + (0.62 + 0.3 * t) + ')'; g.fill();
-  }
-  ring(g, W, H);
 });
 
 const v = +(/[?&]v=(\d)/.exec(location.search) || [0, 0])[1];
