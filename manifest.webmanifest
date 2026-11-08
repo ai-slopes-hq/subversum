@@ -1,6 +1,6 @@
 {
-  "name": "Складка",
-  "short_name": "Складка",
+  "name": "Subversum",
+  "short_name": "Subversum",
   "description": "Одна кнопка: случайный VCO/FM, wavefolder и LPG с резонансом, зажатие играет мелодию.",
   "id": "./",
   "start_url": "./",

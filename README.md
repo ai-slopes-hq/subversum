@@ -1,4 +1,4 @@
-# Складка
+# Subversum
 
 Одна кнопка, один голос: VCO (с FM) → wavefolder → low pass gate с резонансом. Web Audio, без зависимостей, под телефон.
 

@@ -17,7 +17,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="Складка">
+<meta name="apple-mobile-web-app-title" content="Subversum">
 <meta name="description" content="Одна кнопка: случайный VCO/FM, wavefolder и LPG с резонансом, зажатие играет мелодию.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
@@ -26,7 +26,7 @@
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 [hidden]{display:none!important}
 </style>
-<title>Складка</title>
+<title>Subversum</title>
 <style>
 /* Layout: black screen with one huge round button. The whole screen is the touch target; the tick ring around the button shows the gate level. */
 :root {
@@ -405,7 +405,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 <div class="bg" id="bg" aria-hidden="true"></div>
 <div class="skindots" id="skindots" aria-hidden="true"></div>
 <svg id="skin" class="skinsvg" viewBox="-195 -422 390 844" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
-<main class="app" role="application" aria-label="Складка">
+<main class="app" role="application" aria-label="Subversum">
 
   <section class="stage">
     <div class="dial">
@@ -2368,9 +2368,9 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 
   const surface = document.body;
   // XY: where the finger is. x, y are 0..1 over the screen (y down), nx, ny are -1..1 from the centre (ny up). Nothing is mapped to sound yet:
-  // this is the groundwork for an xy pad, other code can read window.skladka.xy or listen to the 'skladka:xy' event
+  // this is the groundwork for an xy pad, other code can read window.subversum.xy or listen to the 'subversum:xy' event
   const XY = { x: 0.5, y: 0.5, nx: 0, ny: 0, down: false };
-  window.skladka = { xy: XY, z: () => ZH, rev: () => seq && seq.rev, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // groundwork: nothing is mapped to sound yet
+  window.subversum = { xy: XY, z: () => ZH, rev: () => seq && seq.rev, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // groundwork: nothing is mapped to sound yet
   function place(cx, cy, snap) {
     const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844);
     XY.x = cx / W; XY.y = cy / H; XY.nx = XY.x * 2 - 1; XY.ny = 1 - XY.y * 2;
@@ -2381,7 +2381,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     if (snap) { void root.offsetWidth; root.classList.remove('snap'); if (SK.touch) SK.touch(FP); }
     if (SK.xy) SK.xy(XY);
     if (holding) applyXY(XY.nx, XY.ny);
-    dispatchEvent(new CustomEvent('skladka:xy', { detail: XY }));
+    dispatchEvent(new CustomEvent('subversum:xy', { detail: XY }));
   }
   // a quick horizontal flick (within 300 ms) changes the skin: left = next, right = previous. Slower movement moves the world (xy)
   let sx = 0, sy = 0, swiped = false, tDown = 0, dragging = false;
