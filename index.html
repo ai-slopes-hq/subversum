@@ -2427,8 +2427,12 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     };
   }
 
+  // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody (it is free for the service strip and fan)
+  let activeId = null;
   surface.addEventListener('pointerdown', e => {
     e.preventDefault();
+    if (activeId !== null && activeId !== e.pointerId) return;
+    activeId = e.pointerId;
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
     sx = e.clientX; sy = e.clientY; swiped = false; dragging = false; tDown = performance.now();
     XY.down = FP.down = true;
@@ -2436,6 +2440,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     down();
   });
   surface.addEventListener('pointermove', e => {
+    if (e.pointerId !== activeId) return;
     if (!holding || swiped) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
     const horizontal = Math.abs(dx) > 1.5 * Math.abs(dy);
@@ -2456,15 +2461,17 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
     }
   });
   const dragReset = () => { XY.down = FP.down = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); };
-  surface.addEventListener('pointerup', dragReset);
-  surface.addEventListener('pointercancel', dragReset);
-  surface.addEventListener('pointerup', up);
-  surface.addEventListener('pointercancel', up);
-  surface.addEventListener('lostpointercapture', up);
+  const release = e => {
+    if (e && e.pointerId !== undefined && e.pointerId !== activeId) return;   // not the playing finger
+    activeId = null; dragReset(); up();
+  };
+  surface.addEventListener('pointerup', release);
+  surface.addEventListener('pointercancel', release);
+  surface.addEventListener('lostpointercapture', release);
   surface.addEventListener('contextmenu', e => e.preventDefault());
   // no text, no selection, no loupe: block the long-press magnifier and selection on iOS
   ['selectstart', 'dragstart', 'gesturestart'].forEach(n => document.addEventListener(n, e => e.preventDefault()));
-  addEventListener('blur', up);
+  addEventListener('blur', () => release(null));
   // iOS only unlocks audio inside click/touchend, so retry the pending trigger there
   surface.addEventListener('click', () => {
     if (ctx && ctx.state !== 'running') {
