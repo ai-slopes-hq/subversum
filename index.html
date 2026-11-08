@@ -7,11 +7,11 @@
 <script>
 // the look is picked at random on every launch; ?skin=riso|scope|amber forces one
 (function () {
-  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds'], k = all[Math.floor(Math.random() * all.length)];
-  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|clouds|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
+  var all = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds', 'vector'], k = all[Math.floor(Math.random() * all.length)];
+  try { var q = /[?&]skin=(amber|riso|scope|topo|matrix|mandala|ridges|clouds|vector|paper|donut)/.exec(location.search); if (q) k = q[1]; } catch (e) {}
   document.documentElement.setAttribute('data-skin', k);
   var m = document.querySelector('meta[name=theme-color]');
-  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12' }[k]);
+  if (m) m.setAttribute('content', { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12', vector: '#08080C' }[k]);
 })();
 </script>
 <meta name="mobile-web-app-capable" content="yes">
@@ -356,8 +356,8 @@ html[data-skin="ridges"] .go { inset: 33%; }
 /* no button and no sequencer ring in scope, topo, matrix and ridges: the waves start at the finger. amber, riso and mandala keep the button */
 html[data-skin="scope"] .go, html[data-skin="topo"] .go, html[data-skin="matrix"] .go, html[data-skin="ridges"] .go { display: none; }
 html[data-skin="topo"] .ring, html[data-skin="matrix"] .ring, html[data-skin="ridges"] .ring { display: none; }
-html[data-skin="clouds"] .dial, html[data-skin="clouds"] .bg, html[data-skin="amber"] .dial, html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
-html[data-skin="clouds"] .skinsvg, html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
+html[data-skin="vector"] .dial, html[data-skin="vector"] .bg, html[data-skin="clouds"] .dial, html[data-skin="clouds"] .bg, html[data-skin="amber"] .dial, html[data-skin="scope"] .dial, html[data-skin="riso"] .dial, html[data-skin="mandala"] .dial { display: none; }
+html[data-skin="vector"] .skinsvg, html[data-skin="clouds"] .skinsvg, html[data-skin="amber"] .skinsvg, html[data-skin="scope"] .skinsvg, html[data-skin="riso"] .skinsvg, html[data-skin="mandala"] .skinsvg { display: block; }
 /* amber: night drive towards a sunset, neon grid road */
 .nd-s0 { stop-color: hsl(var(--hue, 28) 45% 3%); } .nd-s1 { stop-color: hsl(calc(var(--hue, 28) - 12) 80% 13%); } .nd-s2 { stop-color: hsl(calc(var(--hue, 28) - 4) 100% 34%); }
 .nd-u0 { stop-color: hsl(calc(var(--hue, 28) + 24) 100% 68%); } .nd-u1 { stop-color: hsl(calc(var(--hue, 28) - 22) 100% 52%); }
@@ -371,6 +371,9 @@ html[data-skin="clouds"] .skinsvg, html[data-skin="amber"] .skinsvg, html[data-s
 .nd-vs0 { stop-color: hsl(var(--hue, 28) 100% 60%); stop-opacity: 0; } .nd-vs1 { stop-color: hsl(var(--hue, 28) 100% 66%); stop-opacity: .75; }
 /* mandala: a flower in layers, blooming across the whole screen */
 .mf { stroke-linejoin: round; }
+/* vector: one flow of particles, four fields */
+html[data-skin="vector"] { --accent: hsl(var(--hue) 70% 78%); --bg: #08080C; }
+html[data-skin="vector"] body { background-color: var(--bg); background-image: none; }
 /* clouds: a scatter of grains */
 html[data-skin="clouds"] { --accent: hsl(var(--hue) 100% 72%); --bg: hsl(var(--hue) 30% 5%); }
 html[data-skin="clouds"] body { background-color: var(--bg); background-image: none; }
@@ -439,6 +442,7 @@ html[data-skin="ridges"] #mod { --k-ink: hsl(var(--hue) 45% 84%); --k-hi: hsl(va
 html[data-skin="clouds"] #mod { --k-ink: hsl(var(--hue) 45% 92%); --k-hi: hsl(var(--hue) 100% 80%); --k-fw: 300; --k-fs: 10px; --k-ls: .16em; --k-case: lowercase; --k-th: 3px; --k-r: 2px;
   --k-track: radial-gradient(circle, rgba(255,255,255,.34) 1px, transparent 1.4px) 0 50% / 5px 100% repeat-x; --k-mask: radial-gradient(circle, #000 1.4px, transparent 1.9px) 0 50% / 5px 100% repeat-x;
   --k-glow: 0 0 12px hsl(var(--hue) 100% 72% / .9); --k-hd: 7px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
+html[data-skin="vector"] #mod { --k-ink: hsl(var(--hue) 30% 92%); --k-hi: hsl(var(--hue) 70% 82%); --k-fw: 400; --k-fs: 10px; --k-ls: .14em; --k-case: lowercase; --k-th: 2px; --k-r: 0; --k-track: hsl(var(--hue) 30% 80% / .26); --k-glow: 0 0 10px hsl(var(--hue) 70% 78% / .7); --k-hd: 5px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
 @media (prefers-reduced-motion: reduce) { #mod .md { transition: opacity .16s linear; } }
 /* debug HUD (?hud=1): the axes and their values as a game readout; never on by default */
 #hud { position: fixed; z-index: 8; left: max(8px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 150px); width: 168px; pointer-events: none; font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: #f1ece4; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; -webkit-user-select: none; user-select: none; }
@@ -873,6 +877,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     scope:    { cut: [1500, 7000], len: [0.03, 0.35], fb: [0.3, 0.75], dela: [0.2, 0.8],  revSec: [1, 2.5],   reva: [0.05, 0.4],  res: [0, 10] },
     topo:     { cut: [300, 2200],  len: [0.3, 0.9],   fb: [0.2, 0.6],  dela: [0, 0.35],   revSec: [2.5, 5],   reva: [0.4, 0.9],  res: [3, 14] },
     matrix:   { cut: [400, 6000],  len: [0.02, 0.3],  fb: [0.3, 0.75], dela: [0.15, 0.7], revSec: [0.5, 1.5], reva: [0, 0.3] },
+    vector:   { cut: [2500, 9000], len: [0.2, 0.6], fb: [0.2, 0.5], dela: [0.1, 0.4], revSec: [1.2, 2.8], reva: [0.15, 0.45], res: [0, 4] },
     clouds:   { shimmer: true, cut: [2500, 7000], len: [0.25, 0.8],  fb: [0.2, 0.55], dela: [0.1, 0.5],  revSec: [1.8, 3.5], reva: [0.35, 0.8], res: [0, 6] },
     ridges:   { cut: [150, 1400],  len: [0.1, 0.5],   fb: [0.3, 0.7],  dela: [0.1, 0.6],  revSec: [0.8, 2.5], reva: [0, 0.35],   res: [6, 20] }
   };
@@ -1095,7 +1100,71 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       }
     }, 40);
   }
+  /* ---------- vector: four materials play one note ----------
+     fog (pad), glass (FM bell), wood (marimba), metal (tuned hat) sit in the four corners of the screen and each lives in its own octave.
+     The mix point is the finger (x soft to bright, y short to long); Z sends it round the finger; the pinch sets how hard the border between materials is.
+     The area a material takes on the screen is its weight in the sound. */
+  const VEC = { snapUntil: 0, snapC: [0, 0] };
+  const vecWander = t => [0.5 + 0.3 * Math.sin(t * 0.13), 0.5 + 0.3 * Math.cos(t * 0.17)];
+  function vecSharp() { const d = PX.d; return d < 0 ? 0.3 * (1 + d) : 0.3 + 0.7 * d; }   // pinch together: soft border, apart: hard
+  function vecMix(live) {   // live: the mix of the finger (with Z orbit and the P snap); not live: the drift of the picture at rest
+    const tn = performance.now(), t = tn / 1000;
+    if (!live) return vecWander(t);
+    let m = [clamp((MAC.color + 1) / 2, 0, 1), clamp(1 - (MAC.ring + 1) / 2, 0, 1)];
+    const r = 0.22 * ZH, a = t * 0.9;
+    m = [clamp(m[0] + r * Math.cos(a), 0, 1), clamp(m[1] + r * Math.sin(a), 0, 1)];
+    return tn < VEC.snapUntil ? VEC.snapC.slice() : m;
+  }
+  function vecWeights(m) {   // 0 fog (top left), 1 glass (top right), 2 wood (bottom left), 3 metal (bottom right)
+    const c0 = 1 - m[0], c1 = 1 - m[1], w = [c0 * c1, (1 - c0) * c1, c0 * (1 - c1), (1 - c0) * (1 - c1)], gam = 1 + 2.5 * vecSharp();
+    let s = 0; for (let i = 0; i < 4; i++) { w[i] = Math.pow(w[i], gam); s += w[i]; }
+    return w.map(v => v / s);
+  }
   const VOICES = {
+    // vector: one note through four materials, each in its own octave (the pool is one octave, C1..B1: fog x4, wood x8, metal x16, glass x32). Layers under 3 % are not started.
+    vector: c => {
+      const { t0, f, vel } = c, ws = vecWeights(vecMix(true)), D = c.dur;
+      let end = t0 + 0.2;
+      const BAL = [2, 0.85, 0.55, 1.5], lay = k => { const g = c.g(Math.sqrt(ws[k]) * 0.9 * BAL[k]); g.connect(c.out); return g; };   // levelled by ear of the analyser: fog was quiet, wood loud
+      if (ws[0] >= 0.03) {   // fog: three detuned saws, a slow attack through a soft low pass, a long tail
+        const f0 = f * 4, g = lay(0), e = c.g(0), lp = c.bq('lowpass', 500, 0.4), hold = Math.max(D, 0.3), te = t0 + 0.12 + hold + 1.3;
+        lp.frequency.setValueAtTime(500, t0); lp.frequency.linearRampToValueAtTime(1100, t0 + 0.6);
+        e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.2 * vel, t0 + 0.12); e.gain.setValueAtTime(0.2 * vel, t0 + 0.12 + hold); e.gain.setTargetAtTime(0, t0 + 0.12 + hold, 0.32);
+        lp.connect(e); e.connect(g);
+        [-12, 0, 12].forEach(d => { const o = c.osc('sawtooth', f0, d); o._end = te; o.connect(lp); });
+        end = Math.max(end, te);
+      }
+      if (ws[2] >= 0.03) {   // wood: a marimba bar, the fundamental and two quickly dying overtones, plus the click of the mallet
+        const f0 = f * 8, g = lay(2);
+        [[1, 1, 0.6], [4, 0.38, 0.16], [9.9, 0.14, 0.07]].forEach(p => {
+          if (f0 * p[0] > 12000) return;
+          const e = c.g(0), o = c.osc('sine', f0 * p[0]), te = t0 + p[2] * 1.3 + 0.1;
+          e.gain.setValueAtTime(0.9 * vel * p[1], t0); e.gain.setTargetAtTime(0, t0, p[2] / 3);
+          o._end = te; o.connect(e); e.connect(g); end = Math.max(end, te);
+        });
+        const ns = c.noise(), bp = c.bq('bandpass', 1800, 1), ne = c.g(0);
+        ne.gain.setValueAtTime(0.25 * vel, t0); ne.gain.setTargetAtTime(0, t0, 0.008); ns._end = t0 + 0.05; ns.connect(bp); bp.connect(ne); ne.connect(g);
+      }
+      if (ws[1] >= 0.03) {   // glass: an FM bell, modulator at 3.5 times the carrier, the index falls fast
+        const f0 = f * 32, g = lay(1), e = c.g(0), car = c.osc('sine', f0), mod = c.osc('sine', f0 * 3.5), mg = c.g(0), te = t0 + 1.4;
+        e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.5 * vel, t0 + 0.003); e.gain.setTargetAtTime(0, t0 + 0.003, 0.35);
+        mg.gain.setValueAtTime(f0 * 3.5 * 3.2, t0); mg.gain.setTargetAtTime(f0 * 3.5 * 0.15, t0, 0.1);
+        mod.connect(mg); mg.connect(car.frequency); car.connect(e); e.connect(g);
+        const o2 = c.osc('sine', f0 * 2.76), e2 = c.g(0);
+        e2.gain.setValueAtTime(0.15 * vel, t0); e2.gain.setTargetAtTime(0, t0, 0.17); o2._end = t0 + 0.7; o2.connect(e2); e2.connect(g);
+        car._end = mod._end = te; end = Math.max(end, te);
+      }
+      if (ws[3] >= 0.03) {   // metal: the six squares of a 808 hat tuned to the note, band and high passed, a short ring, a sine for the pitch
+        const f0 = f * 16, g = lay(3), bp = c.bq('bandpass', Math.min(f0 * 4, 9000), 1.2), hp = c.bq('highpass', 1500, 0.7), e = c.g(0), te = t0 + 0.45;
+        e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(0.12 * vel, t0 + 0.001); e.gain.setTargetAtTime(0, t0 + 0.001, 0.09);
+        bp.connect(hp); hp.connect(e); e.connect(g);
+        [1, 1.483, 1.8, 2.546, 2.63, 3.9].forEach(r => { if (f0 * 2 * r > 12000) return; const o = c.osc('square', f0 * 2 * r); o._end = te; o.connect(bp); });
+        const o2 = c.osc('sine', f0), e2 = c.g(0);
+        e2.gain.setValueAtTime(0.25 * vel, t0); e2.gain.setTargetAtTime(0, t0, 0.04); o2._end = t0 + 0.2; o2.connect(e2); e2.connect(g);
+        end = Math.max(end, te);
+      }
+      return end;
+    },
     // riso: a bank of resonators tuned to a major or minor chord, struck by a burst of ink noise (a bit like Rings fed with noise)
     riso: c => {
       const { t0, vel, b, r } = c, boom = !!c.boom, T = (0.1 + b.len * 1.8) * (boom ? 1.3 : 1);   // y reaches from a dead thud (0.1 s) to a long ring
@@ -1253,10 +1322,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       shaper: curve => { const n = ctx.createWaveShaper(); n.curve = curve; nodes.push(n); return n; }
     };
     const end = s.voice(c);
-    srcs.forEach(o => { if (o.buffer) o.start(t0, Math.random() * 1.5); else o.start(t0); o.stop(end); });
+    srcs.forEach(o => { if (o.buffer) o.start(t0, Math.random() * 1.5); else o.start(t0); o.stop(o._end || end); });   // a voice may give a source its own end (vector: four layers of different lengths)
     const grp = { stop: t => srcs.forEach(o => { try { o.stop(t); } catch (e) {} }) };
     const v = { osc: grp, mod: grp, kill, t0, cancelled: false };
-    srcs[0].onended = () => {
+    let lastSrc = srcs[0]; srcs.forEach(o => { if ((o._end || end) > (lastSrc._end || end)) lastSrc = o; });   // the nodes are let go when the longest source has ended
+    lastSrc.onended = () => {
       nodes.forEach(n => { try { n.disconnect(); } catch (e) {} });
       srcs.forEach(o => { try { o.disconnect(); } catch (e) {} });
       const qi = queued.indexOf(v);
@@ -1464,21 +1534,21 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   function makeSeq() {
     let bpm = carry ? carry.bpm : Math.round(rnd(BPM_MIN, BPM_MAX));
     // clouds plays at half the clock (about 55 to 68 BPM); a tempo carried over a swipe is halved or doubled to match
-    const isCl = document.documentElement.getAttribute('data-skin') === 'clouds';
+    const sk0 = document.documentElement.getAttribute('data-skin'), isCl = sk0 === 'clouds' || sk0 === 'vector';
     if (isCl) { if (bpm > 90) bpm = Math.round(bpm / 2); } else if (bpm < 90) bpm *= 2;
     const root = carry ? carry.root : Math.floor(Math.random() * 12);
     const same = list => (carry && list.filter(x => x.name === carry.sc)[0]) || pick(list);
     const skin = document.documentElement.dataset.skin, dubOn = skin === 'mandala';
     const RISO_SCALES = ['MAJOR', 'MINOR', 'DORIAN', 'MIXOLYDIAN'];
     const ACID_SCALES = ['MINOR', 'MIN PENTA', 'DORIAN'];
-    const sc = skin === 'clouds' ? same(SCALES.filter(x => ['MAJOR', 'MINOR', 'DORIAN', 'MAJ PENTA', 'MIN PENTA'].indexOf(x.name) >= 0)) : skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
+    const sc = skin === 'clouds' || skin === 'vector' ? same(SCALES.filter(x => ['MAJOR', 'MINOR', 'DORIAN', 'MAJ PENTA', 'MIN PENTA'].indexOf(x.name) >= 0)) : skin === 'ridges' ? same(SCALES.filter(x => ACID_SCALES.indexOf(x.name) >= 0)) : dubOn ? same(SCALES.filter(x => DUB_SCALES.indexOf(x.name) >= 0)) : skin === 'riso' ? same(SCALES.filter(x => RISO_SCALES.indexOf(x.name) >= 0)) : same(SCALES);
     carry = null;
     const pool = [];
-    for (let m = LOW; m <= HIGH; m++) {
+    for (let m = LOW; m <= (skin === 'vector' ? LOW + 11 : HIGH); m++) {   // vector: one octave, the materials stack the octaves
       if (sc.iv.indexOf(((m - root) % 12 + 12) % 12) !== -1) pool.push(m);
     }
     const s = { bpm, root, sc, pool, dur: 60 / bpm / 4, steps: [], i: 0, idx: Math.floor(Math.random() * pool.length), timbre: tapPatch || roll(), next: 0, timer: 0, dub: null, voice: null, dubChord: null, cont: null, acid: false, acidV: null };
-    if (VOICES[skin]) { s.dub = rollDub(s.dur, TW[skin]); s.voice = VOICES[skin]; if (skin === 'clouds') s.rev = revPattern(); }
+    if (VOICES[skin]) { s.dub = rollDub(s.dur, TW[skin]); s.voice = VOICES[skin]; if (skin === 'clouds') s.rev = revPattern(); if (skin === 'vector') s.turing = true; }
     if (skin === 'topo') { s.dub = rollDub(s.dur, TW[skin]); s.cont = skin; }
     if (skin === 'ridges') { s.dub = rollDub(s.dur, TW.ridges); s.acid = true; }
     if (skin === 'riso') {
@@ -1508,6 +1578,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   function stepNote(s, t) {
     // nothing is re-rolled while the screen is held: same patch, same 16 steps, looped
     const idx = s.i;
+    if (s.turing && idx !== 0 && Math.random() < 0.015 + 0.3 * ZH) s.steps[idx] = makeStep(s);   // vector: the longer the finger rests, the more steps of the pattern are replaced (a shift register that mutates)
     const st = s.steps[idx];
     s.i = (s.i + 1) % STEPS;
     if (s.rev && s.dub) { const m = s.dub.revMap || (s.dub.revMap = []); m.push({ t, rev: s.rev[idx] }); if (m.length > 24) m.shift(); }
@@ -1603,7 +1674,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     topo:    { x: ['cut'],   y: ['color', 'space'] },
     matrix:  { x: ['color'], y: ['arp'] },
     ridges:  { x: ['cut'],   y: ['res'] },
-    clouds:  { x: ['color'], y: ['space', 'cut'] }
+    clouds:  { x: ['color'], y: ['space', 'cut'] },
+    vector:  { x: ['color'], y: ['ring'] }   // the mix point of the four materials: x soft to bright, y short to long
   };
   const MAC = { cut: 0, res: 0, echo: 0, space: 0, color: 0, lpg: 0, hit: 0, ring: 0, arp: 0 };   // -1..1 around the press patch
   let glide = null, glideTimer = 0;
@@ -2106,6 +2178,155 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
   }
 
+  function buildVector() {
+    // one flow of particles on a dark ground; the four corners of the screen give it four fields: fog (curl noise), glass (straight runs that break at cell borders),
+    // wood (rings round the bottom left corner), metal (a grid that turns by 90 degrees). A particle follows the weighted mix of the four fields at its place,
+    // so a pattern bends into the next one as the mix point moves. The colour is a pale base with a faint tint of the pattern that rules at that place.
+    const wrap = document.createElement('div'); wrap.className = 'skinsvg'; wrap.id = 'vecwrap';
+    const cv = document.createElement('canvas'), ov = document.createElement('canvas');
+    [cv, ov].forEach(e => { e.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'; wrap.appendChild(e); });
+    skinSvg.parentNode.insertBefore(wrap, skinSvg);
+    const ctx2 = cv.getContext('2d', { alpha: false }), octx = ov.getContext('2d');
+    let W = 1, H = 1, asp = 1, sc = 1;
+    const sst = (a, b, x) => { x = clamp((x - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); };
+    function resize() {
+      sc = Math.min(window.devicePixelRatio || 1, 1.5);
+      W = Math.max(1, Math.round(innerWidth * sc)); H = Math.max(1, Math.round(innerHeight * sc)); asp = W / H;
+      cv.width = ov.width = W; cv.height = ov.height = H;
+      ctx2.fillStyle = '#08080C'; ctx2.fillRect(0, 0, W, H);
+    }
+    addEventListener('resize', resize); resize();
+    const hash = (x, y) => { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); };
+    const vnoise = (x, y) => {
+      const ix = Math.floor(x), iy = Math.floor(y); let fx = x - ix, fy = y - iy;
+      fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+      const a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+      return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+    };
+    let T = 0; const o = [0, 0];
+    const FIELDS = [
+      (u, v) => { const a = u * 2.2 + T * 0.04, b = v * 2.2 - T * 0.03, e = 0.05, dx = vnoise(a + e, b) - vnoise(a - e, b), dy = vnoise(a, b + e) - vnoise(a, b - e), l = Math.sqrt(dx * dx + dy * dy) + 1e-3, s = Math.min(1, l * 6) * 0.5; o[0] = dy / l * s; o[1] = -dx / l * s; },
+      (u, v) => { const h = hash(Math.floor(u * 3.4 + T * 0.01), Math.floor(v * 3.4)), a = Math.floor(h * 6) * 1.0472 + 0.5236; o[0] = Math.cos(a) * 0.85; o[1] = Math.sin(a) * 0.85; },
+      (u, v) => { const dx = u + 0.04, dy = v - 1.04, d = Math.sqrt(dx * dx + dy * dy) + 1e-4, rad = Math.sin(d * 55 - T * 0.6) * 0.18; o[0] = (-dy / d) * 0.55 + (dx / d) * rad; o[1] = (dx / d) * 0.55 + (dy / d) * rad; },
+      (u, v) => { const i = Math.floor(u * 7), j = Math.floor(v * 7), ph = Math.floor(T * 0.2) * 3.7; if (hash(i + 7, j + ph) < 0.5) { o[0] = (j & 1) ? 0.6 : -0.6; o[1] = 0; } else { o[0] = 0; o[1] = (i & 1) ? 0.6 : -0.6; } }
+    ];
+    const BASE = [200, 205, 235], TINT = [[255, 158, 122], [142, 235, 255], [255, 198, 107], [185, 180, 255]];
+    const NMAX = 3000; let n = 2400;
+    const px = new Float32Array(NMAX), py = new Float32Array(NMAX), qx = new Float32Array(NMAX), qy = new Float32Array(NMAX);
+    const vx = new Float32Array(NMAX), vy = new Float32Array(NMAX), ex = new Float32Array(NMAX), ey = new Float32Array(NMAX), hot = new Float32Array(NMAX);
+    const skip = new Uint8Array(NMAX), key = new Uint8Array(NMAX), order = new Uint16Array(NMAX), cnt = new Uint16Array(127), grid = new Uint8Array(48 * 96);
+    for (let i = 0; i < NMAX; i++) { px[i] = qx[i] = Math.random(); py[i] = qy[i] = Math.random(); }
+    let m = vecWander(0), sharpS = 0.3, flash = 0, touch = 0, dead = false, raf = 0, last = 0, lastDraw = 0, frames = 0, acc = 0, lowCount = 0, started = 0;
+    function burst(kind, mm, count) {
+      const c0 = 1 - mm[0], c1 = 1 - mm[1];
+      const x0 = (kind & 1) ? c0 : 0, x1 = (kind & 1) ? 1 : c0, y0 = (kind & 2) ? c1 : 0, y1 = (kind & 2) ? 1 : c1;
+      const bx = x0 + (x1 - x0) * Math.random(), by = y0 + (y1 - y0) * Math.random();
+      for (let k = 0; k < count; k++) {
+        const i = (Math.random() * n) | 0; let a, s;
+        if (kind === 0) { a = Math.random() * 6.283; s = 0.08 + Math.random() * 0.22; }
+        else if (kind === 1) { a = Math.floor(Math.random() * 6) * 1.0472 + 0.5236; s = 0.5 + Math.random() * 0.7; }
+        else if (kind === 2) { a = k / count * 6.283; s = 0.45; }
+        else { a = Math.floor(Math.random() * 4) * 1.5708; s = 0.7 + Math.random() * 0.5; }
+        px[i] = qx[i] = bx + (Math.random() - 0.5) * 0.01; py[i] = qy[i] = by + (Math.random() - 0.5) * 0.01;
+        ex[i] = Math.cos(a) * s; ey[i] = Math.sin(a) * s; hot[i] = 0.35;
+      }
+    }
+    function step(dt, fx0, fy0, fTouch, zh) {
+      grid.fill(0);
+      const c0 = 1 - m[0], c1 = 1 - m[1], w = 0.25 + (0.012 - 0.25) * sharpS, gam = 1 + 2.5 * sharpS;
+      const fu = fx0 * asp, fv = fy0, spd = 1 + 0.6 * zh, kk0 = 1 - Math.exp(-dt * 8), dec = Math.exp(-dt * 3), wv = [0, 0, 0, 0];
+      for (let i = 0; i < n; i++) {
+        let x = px[i], y = py[i]; const u = x * asp, v = y;
+        const warp = Math.sin(y * 7 + T * 0.3) * 0.03 * (1 - sharpS), warp2 = Math.sin(x * 6 - T * 0.27) * 0.03 * (1 - sharpS);
+        const sx = sst(-w, w, x - c0 + warp), sy = sst(-w, w, y - c1 + warp2);
+        wv[0] = (1 - sx) * (1 - sy); wv[1] = sx * (1 - sy); wv[2] = (1 - sx) * sy; wv[3] = sx * sy;
+        let sum = 0, fx = 0, fy = 0, r = 0, g = 0, b = 0, k;
+        for (k = 0; k < 4; k++) { wv[k] = Math.pow(wv[k], gam); sum += wv[k]; }
+        for (k = 0; k < 4; k++) {
+          const wk = wv[k] / sum;
+          if (wk > 0.02) { FIELDS[k](u, v); fx += o[0] * wk; fy += o[1] * wk; }
+          r += TINT[k][0] * wk; g += TINT[k][1] * wk; b += TINT[k][2] * wk;
+        }
+        const dx = u - fu, dy = v - fv, fd = Math.sqrt(dx * dx + dy * dy);
+        if (fd < 0.3 && fTouch > 0.02) { let s = fTouch * (1 - fd / 0.3); s *= s; fx += (-dy / (fd + 0.08)) * 0.08 * s + (dx / (fd + 0.08)) * 0.06 * s; fy += (dx / (fd + 0.08)) * 0.08 * s + (dy / (fd + 0.08)) * 0.06 * s; }
+        vx[i] += (fx * spd - vx[i]) * kk0; vy[i] += (fy * spd - vy[i]) * kk0;
+        qx[i] = x; qy[i] = y;
+        x += (vx[i] + ex[i]) * dt / asp; y += (vy[i] + ey[i]) * dt;
+        ex[i] *= dec; ey[i] *= dec; if (hot[i] > 0) hot[i] -= dt;
+        skip[i] = 0;
+        const gi = (clamp(y, 0, 0.999) * 96 | 0) * 48 + (clamp(x, 0, 0.999) * 48 | 0), crowd = ++grid[gi] > 9 && hot[i] <= 0;
+        if (crowd || x < -0.02 || x > 1.02 || y < -0.02 || y > 1.02 || Math.random() < 0.008) { x = Math.random(); y = Math.random(); qx[i] = x; qy[i] = y; skip[i] = 1; vx[i] = vy[i] = ex[i] = ey[i] = 0; hot[i] = 0; }
+        px[i] = x; py[i] = y;
+        r = BASE[0] * 0.25 + r * 0.75; g = BASE[1] * 0.25 + g * 0.75; b = BASE[2] * 0.25 + b * 0.75;
+        key[i] = hot[i] > 0 ? 125 : Math.round(r / 255 * 4) * 25 + Math.round(g / 255 * 4) * 5 + Math.round(b / 255 * 4);
+      }
+    }
+    function draw(fade) {
+      ctx2.globalCompositeOperation = 'source-over'; ctx2.fillStyle = 'rgba(8,8,12,' + fade + ')'; ctx2.fillRect(0, 0, W, H);
+      ctx2.globalCompositeOperation = 'lighter'; ctx2.lineCap = 'round';
+      let i, k; cnt.fill(0);
+      for (i = 0; i < n; i++) cnt[key[i] + 1]++;
+      for (k = 1; k < 127; k++) cnt[k] += cnt[k - 1];
+      const cur2 = cnt.slice();
+      for (i = 0; i < n; i++) order[cur2[key[i]]++] = i;
+      for (k = 0; k <= 125; k++) {
+        const a = cnt[k], bnd = cnt[k + 1];
+        if (bnd <= a) continue;
+        if (k === 125) { ctx2.strokeStyle = 'rgba(255,255,255,.95)'; ctx2.lineWidth = 2.2 * sc; }
+        else { ctx2.strokeStyle = 'rgba(' + Math.round(Math.floor(k / 25) * 63.75) + ',' + Math.round(Math.floor((k % 25) / 5) * 63.75) + ',' + Math.round((k % 5) * 63.75) + ',.4)'; ctx2.lineWidth = 1.3 * sc; }
+        ctx2.beginPath();
+        for (let j = a; j < bnd; j++) { const p = order[j]; if (skip[p]) continue; ctx2.moveTo(qx[p] * W, qy[p] * H); ctx2.lineTo(px[p] * W, py[p] * H); }
+        ctx2.stroke();
+      }
+    }
+    function drawFinger() {
+      octx.clearRect(0, 0, W, H);
+      if (touch < 0.02) return;
+      const ring = (x, y, r, a) => {
+        const gr = octx.createRadialGradient(x, y, 0, x, y, r * 2.2);
+        gr.addColorStop(0, 'rgba(255,255,255,' + (0.2 * a) + ')'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        octx.fillStyle = gr; octx.beginPath(); octx.arc(x, y, r * 2.2, 0, 6.2832); octx.fill();
+        octx.strokeStyle = 'rgba(255,255,255,' + (0.75 * a) + ')'; octx.lineWidth = 1.6 * sc; octx.beginPath(); octx.arc(x, y, r * 0.5, 0, 6.2832); octx.stroke();
+      };
+      ring(XY.x * W, XY.y * H, 0.07 * W, touch);
+      if (PX.on) ring(pX / innerWidth * W, pY / innerHeight * H, 0.05 * W, 0.8 * touch);
+    }
+    function frame(tn) {
+      if (dead) return;
+      raf = requestAnimationFrame(frame);
+      const live = !!seq;
+      if (!live && tn - lastDraw < 33) return;
+      const dt = Math.min(0.05, (tn - last) / 1000); last = lastDraw = tn; T = tn / 1000;
+      const raw = vecMix(live), snapping = performance.now() < VEC.snapUntil, k = 1 - Math.exp(-dt * (snapping ? 30 : live ? 12 : 1.2));
+      m[0] += (raw[0] - m[0]) * k; m[1] += (raw[1] - m[1]) * k;
+      sharpS += (vecSharp() - sharpS) * (1 - Math.exp(-dt * 8));
+      touch += ((XY.down || holding ? 1 : 0) - touch) * (1 - Math.exp(-dt * 10));
+      flash *= Math.exp(-dt * 6);
+      const fx0 = live ? XY.x : m[0], fy0 = live ? XY.y : m[1];
+      step(dt, fx0, fy0, live ? touch : 0, ZH);
+      draw(0.12 - 0.05 * ZH);
+      drawFinger();
+      if (!started) started = tn;
+      if (tn - started > 2000) {
+        acc += dt; frames++;
+        if (frames === 60) {
+          const avg = acc / frames * 1000;
+          if (avg > 22) { lowCount++; if (lowCount >= 2 && n > 900) { n = Math.max(900, Math.floor(n * 0.85)); lowCount = 0; } } else lowCount = 0;
+          frames = 0; acc = 0;
+        }
+      }
+    }
+    // warm up: the first picture already has trails (nothing here may touch the finger, it is not set up yet)
+    for (let w0 = 0; w0 < 70; w0++) { T = w0 / 30; step(1 / 30, 0.5, 0.5, 0, 0); draw(0.12); }
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = lastDraw = performance.now(); raf = requestAnimationFrame(frame); }
+    SK.note = (i, vel) => {
+      const ws = vecWeights(m);
+      for (let k = 0; k < 4; k++) if (ws[k] >= 0.06) burst(k, m, Math.round((6 + 22 * ws[k]) * (0.6 + 0.4 * vel)));
+    };
+    SK.pTap = () => { burst(VEC.snapC[1] * 2 + VEC.snapC[0], VEC.snapC, 90); flash = 1; };
+    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
+  }
+
   function buildClouds() {
     // a scatter of grains: every note leaves a smudge of dots under the finger (the memory, which fades over the 4 s it lasts in the sound) and every grain of the sound
     // lights a few dots for exactly its own length, with the same Hann swell, sideways by its pan and up or down by chance.
@@ -2545,8 +2766,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   // skins can be swapped at any time: clear the old full-screen layer, build the new one, redraw the current pattern
-  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds'];   // paper and donut are light: kept in the code, out of the rotation
-  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12' };
+  const SKINS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds', 'vector'];   // paper and donut are light: kept in the code, out of the rotation
+  const THEME = { amber: '#000000', riso: '#14121C', scope: '#020805', topo: '#102528', matrix: '#0B0B0C', paper: '#F7E3D3', donut: '#FBE3D6', mandala: '#0A0A0E', ridges: '#0A0A0E', clouds: '#0A0C12', vector: '#08080C' };
   function applySkin(name) {
     skin = name;
     root.setAttribute('data-skin', name);
@@ -2558,7 +2779,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     // the inline accent belongs to amber only; the other skins derive theirs from --hue in CSS
     if (name === 'amber') root.style.setProperty('--accent', 'hsl(' + (root.style.getPropertyValue('--hue') || 38) + ' 100% ' + accentL.toFixed(0) + '%)');
     else root.style.removeProperty('--accent');
-    ({ amber: buildAmber, riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges, clouds: buildClouds }[name] || (() => {}))();
+    ({ amber: buildAmber, riso: buildRiso, topo: buildTopo, scope: buildScope, matrix: buildMatrix, paper: buildPaper, donut: buildDonut, mandala: buildMandala, ridges: buildRidges, clouds: buildClouds, vector: buildVector }[name] || (() => {}))();
     if (SK.pattern) SK.pattern(lastSq || { steps: DEMO });
     if (SK.idle) SK.idle();
   }
@@ -2766,7 +2987,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
   let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
-  const P_WORLDS = { clouds: true, ridges: true, amber: true, riso: true, mandala: true, scope: true, matrix: true, topo: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
+  const P_WORLDS = { clouds: true, ridges: true, vector: true, amber: true, riso: true, mandala: true, scope: true, matrix: true, topo: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
   const setFP2 = (x, y) => { const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844); pX = x; pY = y; FP2.vx = (x - W / 2) / sc; FP2.vy = (y - H / 2) / sc; };   // the second finger in the skin's coordinates, so a world can animate it like the first
   function pinch() {
     const raw = Math.log2(Math.max(24, Math.hypot(pX - P1.x, pY - P1.y)) / pDist0);
@@ -2786,6 +3007,10 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (skin === 'matrix' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.1, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // matrix: a ratchet
     if (skin === 'scope' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.3, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // scope: a shot
     if (skin === 'riso' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.25, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // riso: the last chord struck again, hard, with a wide open noise
+    if (skin === 'vector') {   // vector: the mix jumps to the nearest material for a moment and the last note is struck again, hard
+      const mm = vecMix(true); VEC.snapC = [mm[0] > 0.5 ? 1 : 0, mm[1] > 0.5 ? 1 : 0]; VEC.snapUntil = performance.now() + 220;
+      if (seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.2, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);
+    }
     if (SK.pTap) SK.pTap();
   }
   function endP() {
@@ -2879,7 +3104,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     topo:    { x: ['filter', 'dark', 'open'],      y: ['pulse', 'narrow', 'wide'],      p: ['interval'], pLive: 1,          pt: 'swell', z: ['unison', 'wider'] },
     matrix:  { x: ['bit depth', 'crushed', 'clean'], y: ['arp', 'plain', 'busy'],       p: ['arp rate', 'fast', 'slow'],    pt: 'ratchet', z: ['arp', 'busier'] },
     ridges:  { x: ['cutoff', 'closed', 'open'],    y: ['resonance', 'calm', 'squeal'],  p: ['env depth', 'flat', 'deep'],   pt: 'stab', z: ['squeal', 'higher'] },
-    clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] }
+    clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] },
+    vector:  { x: ['timbre', 'soft', 'bright'],    y: ['body', 'short', 'long'],         p: ['border', 'soft', 'sharp'],    pt: 'snap', z: ['orbit', 'wider'] }
   };
   const MOD_HOLD = 800, MOD_FADE = 3200, MOD_SLOT = 30, MOD_RANK = [1, 0.6, 0.38, 0.2];   // a line stays fully lit 0.8 s after its last change, then fades over 3.2 s; the lower in the stack, the dimmer
   let modEl = null, modRaf = 0;
@@ -2948,7 +3174,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
   const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
     amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
-    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM', 'INTERVAL', 'SWELL'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW']
+    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM', 'INTERVAL', 'SWELL'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW'], vector: ['TIMBRE', 'BODY', 'BORDER', 'SNAP']
   };
   let hudEl = null, hudRaf = 0;
   function hudStart() {
