@@ -2775,7 +2775,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   function buildWavetable() {
-    // "Waves": seven fat flat layers of land in a dusk haze. The screen is the table itself: the height on the screen is the place in the table (the top is the last, brightest frame, the bottom the first,
+    // "Waves": eleven flat layers of land in a dusk haze. The screen is the table itself: the height on the screen is the place in the table (the top is the last, brightest frame, the bottom the first,
     // the same as the Y axis), and every layer draws the frame that belongs to its height. The layer the sound is at (the real, smoothed position, not the finger) swells and shows the wave that is really heard:
     // the table, the FM, the bend, the fold. Two thin ghost rims of that layer drift against each other at the real beat of the voices (Z pulls them apart). The finger is a warm source inside the wave:
     // X leans the swell and the bend towards it. The far layers are pale and low in contrast, the near ones dark, one dusk colour per press. The P tap lights the haze, the P pinch is the fold.
@@ -2798,7 +2798,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     let W = 0, H = 0, dpr = 1, dead = false, raf = 0, last = 0, lastDraw = 0, T = 0, lens = 0, fx = 0.5, fy = 0.5, flash = 0, pal = PALS[0], sunX = 0.3, lookBus = null;
     function resize() { dpr = Math.min(window.devicePixelRatio || 1, 2); cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr); W = innerWidth; H = innerHeight; }
     addEventListener('resize', resize); resize();
-    const L = 7, M = 200, TH = WT_TANH;
+    const L = 11, M = 200, TH = WT_TANH;
     function paint() {
       const on = WT.on && WT.cfg, cfg = on ? WT.cfg : DEMO, lut = cfg.lut, NF = lut.length, nm = NF - 1;
       const pos = clamp(on ? WT.pos : nm * (0.5 + 0.34 * Math.sin(T * 0.12)), 0, nm), B = on ? WT.B : 0.12, I = on ? WT.I : 0, depth = on ? WT.depth : 0.14, fr = cfg.fr, bs = cfg.bs;
@@ -2808,23 +2808,23 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.fillStyle = pal.sky[2]; g.fillRect(0, 0, W, H);
       const sky = g.createLinearGradient(0, 0, 0, H * 0.5); sky.addColorStop(0, pal.sky[0]); sky.addColorStop(0.6, pal.sky[1]); sky.addColorStop(1, pal.sky[2]); g.fillStyle = sky; g.fillRect(0, 0, W, H * 0.5);
-      const sr = 150 * (1 + 0.3 * ZH + 0.5 * flash), sun = g.createRadialGradient(W * sunX, H * 0.2, 0, W * sunX, H * 0.2, sr);
-      sun.addColorStop(0, 'rgba(' + pal.sun + ',' + (0.55 + 0.25 * flash).toFixed(3) + ')'); sun.addColorStop(1, 'rgba(' + pal.sun + ',0)'); g.fillStyle = sun; g.fillRect(0, 0, W, H);
+      const sr = 95 * (1 + 0.3 * ZH + 0.5 * flash), sun = g.createRadialGradient(W * sunX, H * 0.12, 0, W * sunX, H * 0.12, sr);
+      sun.addColorStop(0, 'rgba(' + pal.sun + ',' + (0.38 + 0.25 * flash).toFixed(3) + ')'); sun.addColorStop(1, 'rgba(' + pal.sun + ',0)'); g.fillStyle = sun; g.fillRect(0, 0, W, H);
       g.lineJoin = 'round';
-      const sg = 0.3 * W, pts = new Float32Array(2 * (M + 1));
+      const farC = mixc(pal.far, hex(pal.sky[2]), 0.55), sg = 0.3 * W, pts = new Float32Array(2 * (M + 1));
       for (let i = 0; i < L; i++) {
-        const t = i / (L - 1), base = H * (0.26 + 0.098 * i), f = (1 - base / H) * nm, A = H * (0.04 + 0.03 * t), dy = base / H - yPos, ws = Math.exp(-dy * dy / (2 * 0.09 * 0.09)) * (0.3 + 0.7 * lens);
-        const col = mixc(pal.far, pal.near, Math.pow(t, 0.8)), sw = ws > 0.1;
+        const t = i / (L - 1), base = H * (0.24 + 0.066 * i), f = (1 - base / H) * nm, A = H * (0.032 + 0.03 * t), dy = base / H - yPos, ws = Math.exp(-dy * dy / (2 * 0.09 * 0.09)) * (0.3 + 0.7 * lens);
+        const col = mixc(farC, pal.near, Math.pow(t, 0.65)), sw = ws > 0.1;
         for (let m = 0; m <= M; m++) {
           const x = W * m / M, p = (x / W) * 1.15, d = (x - fx * W) / sg, wx = Math.exp(-d * d / 2) * ws;
           pts[2 * m] = x; pts[2 * m + 1] = base - A * (tv(f, p) * (1 - wx) + heard(f, p) * wx) * (1 + wx * (1 + 0.25 * flash));
         }
         const gr = g.createLinearGradient(0, base - A * 1.3, 0, base + H * 0.12);
-        gr.addColorStop(0, css(mixc(col, pal.warm, 0.3 * (1 - t) + 0.12 * ws))); gr.addColorStop(1, css(mixc(col, pal.dark, 0.72)));
+        gr.addColorStop(0, css(mixc(col, pal.warm, 0.4 * (1 - t) + 0.15 * ws))); gr.addColorStop(1, css(mixc(col, pal.dark, 0.8)));
         g.beginPath(); g.moveTo(pts[0], pts[1]); for (let m = 1; m <= M; m++) g.lineTo(pts[2 * m], pts[2 * m + 1]);
         g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.fillStyle = gr; g.fill();
         g.beginPath(); g.moveTo(pts[0], pts[1]); for (let m = 1; m <= M; m++) g.lineTo(pts[2 * m], pts[2 * m + 1]);
-        g.lineWidth = 1 + 1.6 * ws; g.strokeStyle = 'rgba(' + pal.rim + ',' + clamp(0.15 + 0.12 * (1 - t) + 0.6 * ws + 0.2 * flash * ws, 0, 1).toFixed(3) + ')'; g.stroke();
+        g.lineWidth = 1 + 1.6 * ws; g.strokeStyle = 'rgba(' + pal.rim + ',' + clamp(0.28 + 0.2 * (1 - t) + 0.55 * ws + 0.2 * flash * ws, 0, 1).toFixed(3) + ')'; g.stroke();
         if (sw) {   // the two other voices of the drone: the same wave, a little out of step, at the real beat
           [s1, s2].forEach(sh => {
             g.beginPath();
