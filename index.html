@@ -434,6 +434,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 .fan-sec.dis { opacity: .5; }
 #fanLock .shut, #fanLock.on .open { display: none; }
 #fanLock.on .shut { display: inline; }
+#fanHold.on .ico .dot { fill: currentColor; }
 @media (prefers-reduced-motion: reduce) { html.lock-shake .stage, html.lock-shake .skinsvg, #fan.open { animation: none; } }
 </style>
 </head>
@@ -456,8 +457,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 <div id="fan" aria-hidden="true">
   <div class="fan-top"><b id="fanBpm">—</b><i>BPM</i><span id="fanKey"></span></div>
   <div class="fan-arc"><svg class="fan-svg" viewBox="0 0 200 100" aria-hidden="true">
-    <g class="fan-sec" id="fanLock" data-act="lock"><path class="sec" d="M100 100L0.00 100.00A100 100 0 0 1 100.00 0.00Z"/><g class="ico" transform="translate(44.2 44.2)"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shut" d="M8 11V8a4 4 0 0 1 8 0v3"/><path class="open" d="M8 11V8a4 4 0 0 1 7.6-1.7"/></g></g>
-    <g class="fan-sec" id="fanShare" data-act="share"><path class="sec" d="M100 100L100.00 0.00A100 100 0 0 1 200.00 100.00Z"/><g class="ico" transform="translate(131.8 44.2)"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></g></g>
+    <g class="fan-sec" id="fanHold" data-act="hold"><path class="sec" d="M100 100L0.00 100.00A100 100 0 0 1 50.00 13.40Z"/><g class="ico" transform="translate(34.3 57.0)"><circle cx="12" cy="12" r="10" stroke-dasharray="2 3.2"/><circle cx="12" cy="12" r="5.8"/><circle class="dot" cx="12" cy="12" r="2.2"/></g></g>
+    <g class="fan-sec" id="fanLock" data-act="lock"><path class="sec" d="M100 100L50.00 13.40A100 100 0 0 1 150.00 13.40Z"/><g class="ico" transform="translate(88.0 26.0)"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shut" d="M8 11V8a4 4 0 0 1 8 0v3"/><path class="open" d="M8 11V8a4 4 0 0 1 7.6-1.7"/></g></g>
+    <g class="fan-sec" id="fanShare" data-act="share"><path class="sec" d="M100 100L150.00 13.40A100 100 0 0 1 200.00 100.00Z"/><g class="ico" transform="translate(141.7 57.0)"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></g></g>
   </svg></div>
 </div>
 
@@ -2505,7 +2507,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 
   /* ---------- service layer: lock, quiet strip, fan ---------- */
   const fan = $('#fan'), fanItems = [].slice.call(document.querySelectorAll('.fan-sec[data-act]')), lockFrame = $('#lockframe'), probe = $('#sabprobe');
-  let locked = false, lockWin = null, attempted = false, stripId = null, stripX0 = 0, stripY0 = 0, fanOpen = false, fanArmed = false, fanHover = null, frameTimer = 0, shakeTimer = 0, lastInfo = null;
+  let locked = false, holdOn = false, diveFan = false, mv = [], lockWin = null, attempted = false, stripId = null, stripX0 = 0, stripY0 = 0, fanOpen = false, fanArmed = false, fanHover = null, frameTimer = 0, shakeTimer = 0, lastInfo = null;
   const KEY_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
   const stripH = () => 96 + (parseFloat(getComputedStyle(probe).paddingBottom) || 0);   // the bottom strip does not play: touches there belong to the fan
 
@@ -2513,6 +2515,15 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     locked = !!v; lockWin = null;
     document.documentElement.classList.toggle('locked', locked);
     $('#fanLock').classList.toggle('on', locked);
+  }
+  // hold: the finger is "always down". Lifting the real finger does not stop the music; a new touch only moves the position (no new patch, no world swipe)
+  function setHold(v) {
+    v = !!v; if (v === holdOn) return;
+    holdOn = v;
+    $('#fanHold').classList.toggle('on', holdOn);
+    if (holdOn) {
+      if (!holding) { place(XY.x * innerWidth, XY.y * innerHeight, true); XY.down = FP.down = true; down(); }   // nothing is playing: a virtual press at the last position
+    } else if (activeId === null) { XY.down = FP.down = false; up(); }   // no real finger on the glass: let go
   }
   function frameHot(ms) {
     lockFrame.classList.add('hot'); clearTimeout(frameTimer);
@@ -2546,15 +2557,16 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     $('#fanShare').classList.toggle('dis', !(lastInfo && lastInfo.pure));
   }
   function openFan() { fillFan(); fanOpen = true; fan.classList.add('open'); fan.setAttribute('aria-hidden', 'false'); }
-  function closeFan() { fanOpen = false; fanArmed = false; fanHover = null; fan.classList.remove('open'); fan.setAttribute('aria-hidden', 'true'); fanItems.forEach(el => el.classList.remove('hot')); }
+  function closeFan() { fanOpen = false; fanArmed = false; diveFan = false; fanHover = null; fan.classList.remove('open'); fan.setAttribute('aria-hidden', 'true'); fanItems.forEach(el => el.classList.remove('hot')); }
   // the half disc is cut into equal sectors; the finger picks the sector it is in (any point of it), not an icon
   function hoverAt(x, y) {
     const r = $('.fan-arc').getBoundingClientRect(), px = r.left + r.width / 2, py = r.bottom, R = r.height;
-    const dx = x - px, dy = py - y, d = Math.hypot(dx, dy);
+    const dx = x - px, dy = py - y, d = Math.hypot(dx, dy), n = fanItems.length;
     let best = null;
-    if (dy >= 0 && d <= R + 18 && Math.abs(dx) > 8) {   // a narrow dead strip on the cut between two sectors
-      const k = Math.min(fanItems.length - 1, Math.floor((Math.PI - Math.atan2(dy, dx)) / (Math.PI / fanItems.length)));
-      if (!fanItems[k].classList.contains('dis')) best = fanItems[k];
+    if (dy >= 0 && d <= R + 18) {
+      const f = (Math.PI - Math.atan2(dy, dx)) / (Math.PI / n), k = Math.min(n - 1, Math.floor(f)), fr = f - k;
+      const onCut = (fr < 0.05 && k > 0) || (fr > 0.95 && k < n - 1);   // a narrow dead band on the cuts between sectors
+      if (!onCut && !fanItems[k].classList.contains('dis')) best = fanItems[k];
     }
     fanHover = best ? best.dataset.act : null;
     fanItems.forEach(el => el.classList.toggle('hot', el === best));
@@ -2566,6 +2578,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
   surface.addEventListener('pointermove', e => {
     if (e.pointerId !== stripId) return;
+    if (diveFan) {   // the playing finger dived into the strip: the fan follows it; going back up out of the fan hands the finger back to the XY pad
+      const r = $('.fan-arc').getBoundingClientRect();
+      if (Math.hypot(e.clientX - (r.left + r.width / 2), r.bottom - e.clientY) > r.height + 18) { closeFan(); stripId = null; return; }
+      hoverAt(e.clientX, e.clientY); return;
+    }
     if (!fanOpen && Math.hypot(e.clientX - stripX0, e.clientY - stripY0) > 16 && e.clientY <= stripY0 + 4) openFan();   // a swipe up (also a slanted one) opens the fan at once
     if (fanOpen && !fanArmed && Math.hypot(e.clientX - stripX0, e.clientY - stripY0) >= 36) fanArmed = true;   // the icons sit right above the strip: a short flick must not pick one
     if (fanOpen && fanArmed) hoverAt(e.clientX, e.clientY);
@@ -2574,11 +2591,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (e.pointerId !== stripId) return;
     const act = fanOpen && e.type === 'pointerup' ? fanHover : null;   // released over an item: do it; released elsewhere: nothing
     closeFan(); stripId = null;
-    if (act === 'lock') setLock(!locked); else if (act === 'share') shareLink();
+    if (act === 'lock') setLock(!locked); else if (act === 'hold') setHold(!holdOn); else if (act === 'share') shareLink();
   };
   surface.addEventListener('pointerup', stripEnd);
   surface.addEventListener('pointercancel', stripEnd);
-  Object.assign(window.subversum, { lock: setLock, locked: () => locked, fan: () => fanOpen, stripH });
+  Object.assign(window.subversum, { hold: setHold, held: () => holdOn, lock: setLock, locked: () => locked, fan: () => fanOpen, stripH });
 
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
   let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
@@ -2612,7 +2629,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (stripDown(e)) return;
     if (activeId !== null && activeId !== e.pointerId) { startP(e); return; }
     activeId = e.pointerId;
-    attempted = false;
+    attempted = false; mv.length = 0; mv.push([performance.now(), e.clientY]);
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
     sx = e.clientX; sy = e.clientY; swiped = false; dragging = false; tDown = performance.now();
     XY.down = FP.down = true;
@@ -2620,12 +2637,18 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     down();
   });
   surface.addEventListener('pointermove', e => {
-    if (e.pointerId !== activeId) return;
+    if (e.pointerId !== activeId || e.pointerId === stripId) return;   // (a finger whose fan is open does not move the axes)
     if (!holding || swiped) return;
+    // a sudden dive into the bottom strip raises the fan under the same finger, so hold can be switched without lifting it
+    const tn = performance.now(); mv.push([tn, e.clientY]); while (mv.length > 2 && tn - mv[0][0] > 140) mv.shift();
+    if (!fanOpen && stripId === null && e.clientY >= innerHeight - stripH()) {
+      const dyv = e.clientY - mv[0][1], dtv = Math.max(1, tn - mv[0][0]);
+      if (dyv > 70 && dyv / dtv > 0.7) { stripId = e.pointerId; stripX0 = e.clientX; stripY0 = e.clientY; diveFan = true; openFan(); fanArmed = true; hoverAt(e.clientX, e.clientY); return; }
+    }
     const dx = e.clientX - sx, dy = e.clientY - sy;
     const horizontal = Math.abs(dx) > 1.5 * Math.abs(dy);
     const early = performance.now() - tDown < 300;
-    if (early && horizontal && Math.abs(dx) > 10 && !locked) {
+    if (early && horizontal && Math.abs(dx) > 10 && !locked && !holdOn) {
       // feedback while flicking: the scene follows the finger and dims, the dots appear
       dragging = true;
       root.style.setProperty('--sw', (dx * 0.45).toFixed(1) + 'px');
@@ -2635,7 +2658,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (dragging) { dragging = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); }
       place(e.clientX, e.clientY, false);
     }
-    if (early && Math.abs(dx) > 56 && horizontal) {
+    if (early && Math.abs(dx) > 56 && horizontal && !holdOn) {   // in hold a quick sideways move is just the position, not a world swipe
       if (!locked) { swiped = true; handoff(dx < 0 ? 1 : -1, e.clientX, e.clientY); }
       else if (!attempted) {   // locked: refuse once per touch; a repeat in the same direction within a second lifts the lock
         attempted = true;
@@ -2646,7 +2669,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   const dragReset = () => { XY.down = FP.down = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); };
   const release = e => {
     if (e && e.pointerId !== undefined && e.pointerId !== activeId) return;   // not the playing finger
-    activeId = null; dragReset(); up();
+    activeId = null;
+    if (holdOn) { dragging = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); return; }   // hold: the virtual finger stays down
+    dragReset(); up();
   };
   surface.addEventListener('pointerup', release);
   surface.addEventListener('pointercancel', release);
