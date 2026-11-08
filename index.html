@@ -638,6 +638,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 
   const XM = { cut: 1, fm: 1, fold: 1, dec: 1 };   // the finger on amber: brightness, FM index, fold depth, gate decay, as multipliers of the press patch
   let lastPlay = null;   // the last amber note, for the P tap
+  let thrT = -9, thrTimer = 0;   // mandala: when the last P throw was struck
+  const thrAmt = () => clamp(1 - (performance.now() - thrT) / 1300, 0, 1);
   function play(p, when) {
     const now = when === undefined ? ctx.currentTime : when;
 
@@ -760,6 +762,13 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     });
   }
 
+  // P tap in mandala: the throw. The last chord is struck once more, the echo takes it in full and its feedback opens for about a second while the dry chord ducks
+  function mandalaThrow() {
+    if (!seq || !seq.dubChord || !seq.lastSt || !ctx) return;
+    playDub(seq, Object.assign({}, seq.lastSt, { vel: 1 }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);
+    thrT = performance.now(); clearInterval(thrTimer);
+    thrTimer = setInterval(() => { applyMacros(); if (thrAmt() <= 0) clearInterval(thrTimer); }, 50);
+  }
   // P tap in amber: the last note again, struck harder, with the gate flung wide open and the FM pushed up; it takes the place of the note that rings now
   function amberStab() {
     if (!lastPlay || !ctx) return;
@@ -1500,7 +1509,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   /* ---------- the finger as an XY pad: every skin has its own two sound parameters ----------
      x (left to right) and y (down to up) are relative to what the press rolled, so the patch keeps its character and the finger bends it.
        amber    x how the gate opens (decay)     y a path through timbres (carrier, FM, fold); brightness follows
-       mandala  x echo (amount and feedback)     y filter cutoff and resonance: the dub pair
+       mandala  x echo throw (amount and feedback, the dry chord sinks)   y filter cutoff; the resonance only joins near the top
        riso     x what strikes the chord (dark soft .. bright snap)   y how long it rings (damping), reverb a little
        scope    x laser pitch (sweep and grains) y echo (amount and feedback)
        topo     x drone filter                   y pulse-width sweep (PWM) and reverb
@@ -1512,7 +1521,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   // When you swipe to another world with the finger down, the macros stay and glide to the new axes over 1.5 s, so the modulation carries over.
   const AXES = {
     amber:   { x: ['lpg'],   y: ['color'] },
-    mandala: { x: ['echo'],  y: ['cut', 'res'] },
+    mandala: { x: ['echo'],  y: ['cut'] },
     riso:    { x: ['hit'],   y: ['ring', 'space'] },
     scope:   { x: ['color'], y: ['echo'] },
     topo:    { x: ['cut'],   y: ['color', 'space'] },
@@ -1548,8 +1557,16 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (!ctx || !b || !b.base) return;
     b.cut = clamp(b.base.cut * Math.pow(2, MAC.cut * (sk === 'mandala' || sk === 'topo' ? 1.6 : 1.5)), 60, sk === 'clouds' ? 7500 : 12000);
     const acid = sk === 'ridges';
-    b.res = clamp(b.base.res + MAC.res * (acid || sk === 'matrix' ? 8 : 6), acid ? 1 : 0, acid ? 20 : 16);
-    const da = clamp(b.base.delAmt + 0.45 * MAC.echo, 0, 0.95), fbk = clamp(b.base.delFb + 0.25 * MAC.echo, 0.1, 0.8);
+    const km = sk === 'mandala', tm = clamp((MAC.cut - 0.35) / 0.65, 0, 1);   // mandala: the resonance does not move with the cutoff, it only joins near the top and starts to whistle
+    b.res = clamp(b.base.res + (km ? 7 * tm * tm * (3 - 2 * tm) : MAC.res * (acid || sk === 'matrix' ? 8 : 6)), acid ? 1 : 0, acid ? 20 : 16);
+    const th = km ? thrAmt() : 0;   // the P throw: the echo opens wide for a moment and the dry chord ducks
+    const da = clamp(b.base.delAmt + (km ? 0.55 : 0.45) * MAC.echo + 0.5 * th, 0, 0.95), fbk = clamp(b.base.delFb + (km ? 0.3 : 0.25) * MAC.echo + 0.2 * th, 0.1, 0.8);
+    if (km) {
+      b.dry.gain.setTargetAtTime(0.85 * (1 - 0.45 * Math.max(0, MAC.echo)) * (1 - 0.65 * clamp(1 - (performance.now() - thrT) / 350, 0, 1)), now, 0.04);
+      // P pinch: the echo time, together short, apart long; it glides slowly, like a tape, so the repeats bend in pitch while it moves
+      const et = clamp(b.delT * Math.pow(2, 1.5 * PX.d), 0.03, 2.9);
+      b.dl.delayTime.setTargetAtTime(et, now, 0.25); b.dr.delayTime.setTargetAtTime(et, now, 0.25);
+    }
     b.delAmt = da; b.dsend.gain.setTargetAtTime(da, now, 0.05);
     if (b.mg.delAmt) b.mg.delAmt.g.gain.value = b.mg.delAmt.d * 0.5 * da;
     b.delFb = fbk; b.fb.gain.setTargetAtTime(fbk, now, 0.05);
@@ -2155,8 +2172,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     });
     const rip = [];
     let gx = 0, gy = 0, open = 0, T = 0, noteT = -9, last = 0, raf = 0, dead = false;
-    function echoRing(delay, a) {
-      rip.push({ el: null, age: -delay, a });
+    function echoRing(delay, a, o) {
+      rip.push({ el: null, age: -delay, a, o: o || FP });
     }
     function draw(dt, env, kick) {
       const on = seq || cur, bright = 0.6 + 0.8 * XV.y, spin = (0.5 + 1.5 * XV.y) * (1 + 2.5 * env + 1.5 * kick);
@@ -2182,7 +2199,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       for (let q = rip.length - 1; q >= 0; q--) {
         const r = rip[q]; r.age += dt;
         if (r.age < 0) continue;
-        if (!r.el) { r.el = se('circle', { cx: f1(FP.vx), cy: f1(FP.vy), r: 6, fill: 'none', 'stroke-width': 1.6 }); r.el.style.stroke = 'hsl(calc(var(--hue, 38) + 20) 100% 78%)'; }
+        if (!r.el) { r.el = se('circle', { cx: f1(r.o.vx), cy: f1(r.o.vy), r: 6, fill: 'none', 'stroke-width': 1.6 }); r.el.style.stroke = 'hsl(calc(var(--hue, 38) + 20) 100% 78%)'; }
         const u = r.age / 1.7;
         if (u >= 1) { r.el.remove(); rip.splice(q, 1); continue; }
         r.el.setAttribute('r', (6 + 330 * Math.sqrt(u)).toFixed(1)); r.el.setAttribute('stroke-opacity', (r.a * (1 - u)).toFixed(2));
@@ -2204,9 +2221,10 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = performance.now(); raf = requestAnimationFrame(frame); } else { open = 1; draw(0.016, 0, 0); }
     SK.note = () => {
       noteT = performance.now() / 1000;
-      const n = 1 + Math.round(2.4 * XV.x);                    // more echo, more rings
-      for (let k = 0; k < n; k++) echoRing(k * 0.24, 0.55 * Math.pow(0.6, k));
+      const n = 1 + Math.round(2.4 * XV.x), gap = 0.24 * Math.pow(2, 1.5 * PX.d);   // more echo, more rings; the P pinch (the echo time) sets how far apart they come, and it stays
+      for (let k = 0; k < n; k++) { echoRing(k * gap, 0.55 * Math.pow(0.6, k), FP); if (PX.on) echoRing(k * gap, 0.55 * Math.pow(0.6, k), FP2); }
     };
+    SK.pTap = () => { const gap = 0.24 * Math.pow(2, 1.5 * PX.d); for (let k = 0; k < 6; k++) echoRing(k * gap, 0.9 * Math.pow(0.72, k), FP2); };   // the throw: a long run of rings
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
   }
 
@@ -2647,11 +2665,12 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
   let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
-  const P_WORLDS = { clouds: true, ridges: true, amber: true, riso: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
+  const P_WORLDS = { clouds: true, ridges: true, amber: true, riso: true, mandala: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
   const setFP2 = (x, y) => { const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844); pX = x; pY = y; FP2.vx = (x - W / 2) / sc; FP2.vy = (y - H / 2) / sc; };   // the second finger in the skin's coordinates, so a world can animate it like the first
   function pinch() {
     const raw = Math.log2(Math.max(24, Math.hypot(pX - P1.x, pY - P1.y)) / pDist0);
-    PX.d = clamp(PX.base + (Math.abs(raw) < 0.08 ? 0 : raw), -1, 1);   // a small dead zone: a tap with a slightly moving finger is just a tap; the pinch goes on from where it was left
+    PX.d = clamp(PX.base + (Math.abs(raw) < 0.08 ? 0 : raw), -1, 1);
+    if (ctx && holding) applyMacros();   // a small dead zone: a tap with a slightly moving finger is just a tap; the pinch goes on from where it was left
   }
   function startP(e) {
     if (!holding || swiped || switching || fanOpen || PX.on || !P_WORLDS[skin]) return;
@@ -2661,6 +2680,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     PX.on = true; PX.base = PX.d;
     if (skin === 'ridges' && seq && seq.acidV) seq.acidV.stab(ctx.currentTime + 0.01);   // the tap of each world
     if (skin === 'amber') amberStab();
+    if (skin === 'mandala') mandalaThrow();
     if (skin === 'riso' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.25, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // riso: the last chord struck again, hard, with a wide open noise
     if (SK.pTap) SK.pTap();
   }
@@ -2747,7 +2767,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
   const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
     amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
-    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO'], topo: ['FILTER', 'PWM'], matrix: ['CRUSH', 'FOCUS'], mandala: ['ECHO', 'FILTER']
+    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO'], topo: ['FILTER', 'PWM'], matrix: ['CRUSH', 'FOCUS'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW']
   };
   let hudEl = null, hudRaf = 0;
   function hudStart() {
