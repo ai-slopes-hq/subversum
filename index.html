@@ -944,6 +944,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   const crushCurve = lv => { const c = new Float32Array(1025); for (let k = 0; k < c.length; k++) { const x = k / 1024 * 2 - 1; c[k] = Math.round(x * lv) / lv; } return c; };
 
   const RES_GAIN = 1.8;
+  // P axis: the second finger. It never plays and never moves the XY axes; every world gives it its own two actions.
+  // on: the second finger is down (the tap, held for as long as it lies). d: the pinch, -1..1, how far the two fingers are from where they were when it landed (0 = as they landed, 1 = twice as far apart, -1 = half as far).
+  // Worlds that have not been given a P action ignore it.
+  const PX = { on: false, d: 0 };
+  const P1 = { x: 0, y: 0 };   // the playing finger in screen pixels
   let ZH = 0, zT0 = 0, zTimer = 0;   // Z: how long the finger has been held, 0..1 (one second of nothing, then it opens over about 11 s); only clouds and topo use it
   const CURVES = new Map();
   // a backwards grain swells slowly and stops short, like a reversed pluck; the last tenth is a quick fade so it does not click
@@ -967,6 +972,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     cl.next = ctx.currentTime;
     cl.timer = setInterval(() => {
       const now = ctx.currentTime;
+      if (PX.on) cl.until = now + 1.5;                         // P tap: the cloud is held, it does not fade while the second finger lies
       if (now > cl.until) { clearInterval(cl.timer); cl.timer = 0; return; }
       const sr = ctx.sampleRate, sec = cl.size / sr, dens = clamp((Math.log2(b.xt || 1) / 1.2 + 1) / 2, 0, 1), rate = 16 + 36 * dens;
       cl.lp.frequency.setTargetAtTime(clamp(b.cut * 2.5, 800, 9000), now, 0.05);
@@ -974,7 +980,10 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (cl.next < now) cl.next = now;
       while (cl.next < now + 0.12) {
         const ts = cl.next + 0.005, dur = (0.22 - 0.12 * dens) * (0.6 + Math.random() * 0.8);
-        const ratio = (Math.random() < 0.35 * ZH ? pick([2, 2, 1.5, 0.5]) : pick([1, 1, 1, 1, 2, 0.5, 1.5])) * Math.pow(2, (Math.random() - 0.5) * 0.03), span = dur * ratio;
+        // P pinch: together pulls the grains to one pitch, apart scatters them over three octaves (down to 0.25x, up to 4x)
+        const pd = PX.on ? PX.d : 0;
+        const base = pd < 0 && Math.random() < -pd ? 1 : pd > 0 && Math.random() < 0.75 * pd ? pick([0.25, 0.5, 2, 2, 3, 4, 1.5]) : Math.random() < 0.35 * ZH ? pick([2, 2, 1.5, 0.5]) : pick([1, 1, 1, 1, 2, 0.5, 1.5]);
+        const ratio = base * Math.pow(2, (Math.random() - 0.5) * (pd < 0 ? 0.03 * (1 + pd) : 0.03)), span = dur * ratio;
         let off = Math.random() < 0.7 - 0.4 * ZH ? cl.head / sr + Math.random() * 0.4 : Math.random() * sec;
         off = Math.max(0, Math.min(off % sec, sec - span - 0.01));
         const pv = (Math.random() - 0.5) * 1.6, rev = revAt(b, ts);
@@ -1043,7 +1052,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         const pans = ctx.createStereoPanner ? [-0.8, -0.4, 0, 0.4, 0.8].map(v => { const n = ctx.createStereoPanner(); n.pan.value = v; n.connect(out); return n; }) : null;
         b.cl = { size, data: new Float32Array(size), w: 0, head: 0, buf: ctx.createBuffer(1, size, sr), rbuf: ctx.createBuffer(1, size, sr), rdata: new Float32Array(size), out, lp, pans, timer: 0, until: 0, vel: 1, next: 0 };
       }
-      const cl = b.cl, w0 = cl.w, chunk = new Float32Array(L);
+      const cl = b.cl, w0 = cl.w, chunk = new Float32Array(L), frozen = PX.on;   // P tap: while the second finger lies the memory keeps what it has, new notes ring but are not written
+      if (!frozen) {
       parts.forEach(p => {
         const d = Math.exp(-1 / (sr * p.tau)), dp = 2 * Math.PI * p.fr / sr;
         let env = p.a, ph = 0;
@@ -1058,6 +1068,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       for (let i = 0; i < size; i++) cl.rdata[i] = cl.data[size - 1 - i];   // the same memory played backwards: a source node cannot run with a negative rate
       cl.rbuf.copyToChannel(cl.rdata, 0);
       cl.until = t0 + 2.2;
+      }
       cloudRun(b);
       return t0 + Math.min(6.5, 5 * Math.max(...parts.map(p => p.tau)));   // the oscillators are stopped at this time: it must be after the tail has died away, or the cut clicks
     },
@@ -2423,6 +2434,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     press();
   }
   function up() {
+    endP();
     if (!holding) return;
     holding = false;
     go.classList.remove('down');
@@ -2433,17 +2445,19 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   // XY: where the finger is. x, y are 0..1 over the screen (y down), nx, ny are -1..1 from the centre (ny up). applyXY maps it to sound and each skin reads it for the picture;
   // other code can read window.subversum.xy or listen to the 'subversum:xy' event
   const XY = { x: 0.5, y: 0.5, nx: 0, ny: 0, down: false };
-  window.subversum = { seed: () => curSeed == null ? null : seedToStr(curSeed), version: SEED_VERSION, patch: debugPatch, xy: XY, z: () => ZH, rev: () => seq && seq.rev, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // debug snapshot of the live sound state
+  window.subversum = { seed: () => curSeed == null ? null : seedToStr(curSeed), version: SEED_VERSION, patch: debugPatch, xy: XY, z: () => ZH, p: () => Object.assign({}, PX), rev: () => seq && seq.rev, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // debug snapshot of the live sound state
   function place(cx, cy, snap) {
     const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844);
     XY.x = cx / W; XY.y = cy / H; XY.nx = XY.x * 2 - 1; XY.ny = 1 - XY.y * 2;
     FP.vx = (cx - W / 2) / sc; FP.vy = (cy - H / 2) / sc;
+    P1.x = cx; P1.y = cy;
     if (snap) root.classList.add('snap');
     root.style.setProperty('--tx', (cx - W / 2).toFixed(1) + 'px');
     root.style.setProperty('--ty', (cy - H / 2).toFixed(1) + 'px');
     if (snap) { void root.offsetWidth; root.classList.remove('snap'); if (SK.touch) SK.touch(FP); }
     if (SK.xy) SK.xy(XY);
     if (holding) applyXY(XY.nx, XY.ny);
+    if (PX.on) pinch();
     dispatchEvent(new CustomEvent('subversum:xy', { detail: XY }));
   }
   // a quick horizontal flick (within 300 ms) changes the skin: left = next, right = previous. Slower movement moves the world (xy)
@@ -2551,12 +2565,33 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   surface.addEventListener('pointercancel', stripEnd);
   Object.assign(window.subversum, { lock: setLock, locked: () => locked, fan: () => fanOpen, stripH });
 
-  // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody (it is free for the service strip and fan)
-  let activeId = null;
+  // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
+  let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
+  function pinch() {
+    const raw = Math.log2(Math.max(24, Math.hypot(pX - P1.x, pY - P1.y)) / pDist0);
+    PX.d = Math.abs(raw) < 0.08 ? 0 : clamp(raw, -1, 1);   // a small dead zone: a tap with a slightly moving finger is just a tap
+  }
+  function startP(e) {
+    if (!holding || swiped || switching || fanOpen || PX.on) return;
+    pId = e.pointerId; pX = e.clientX; pY = e.clientY;
+    try { surface.setPointerCapture(e.pointerId); } catch (err) {}
+    pDist0 = Math.max(90, Math.hypot(pX - P1.x, pY - P1.y));
+    PX.on = true; PX.d = 0;
+  }
+  function endP() {
+    if (!PX.on) return;
+    PX.on = false; PX.d = 0; pId = null;
+    if (lastBus && lastBus.cl) lastBus.cl.until = ctx.currentTime + 1.5;   // clouds: the held cloud fades out on its own
+  }
+  surface.addEventListener('pointermove', e => { if (e.pointerId === pId) { pX = e.clientX; pY = e.clientY; pinch(); } });
+  const pEnd = e => { if (e.pointerId === pId) endP(); };
+  surface.addEventListener('pointerup', pEnd);
+  surface.addEventListener('pointercancel', pEnd);
+  surface.addEventListener('lostpointercapture', pEnd);
   surface.addEventListener('pointerdown', e => {
     e.preventDefault();
     if (stripDown(e)) return;
-    if (activeId !== null && activeId !== e.pointerId) return;
+    if (activeId !== null && activeId !== e.pointerId) { startP(e); return; }
     activeId = e.pointerId;
     attempted = false;
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
