@@ -1160,15 +1160,21 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     },
     // matrix: chip blips, four stuttering sub-steps, crushed and run through a stepped band-pass
     matrix: c => {
-      const { t0, f, vel, b, r } = c, sub = c.dur / 4, tau = 0.03 + b.len * b.len * 0.3, ratios = [1, 2, 1.5, 3, 4, 0.5];
-      const o = c.osc(r[0] < 0.5 ? 'square' : 'sawtooth', f);
-      for (let i = 0; i < 4; i++) o.frequency.setValueAtTime(f * (i ? pick(ratios) : 1), t0 + i * sub);
+      // P pinch (in steps, like the bits of this world): how many sub-steps the arpeggio has inside a step. Together 8 (a trill), in the middle 4 (as it was), apart 2 (one leap per step)
+      const n = PX.d < -0.33 ? 8 : PX.d > 0.33 ? 2 : 4, boom = !!c.boom;   // the P tap, a ratchet: the same note struck 4 times in a row
+      const { t0, f, vel, b, r } = c, sub = c.dur / (boom ? 4 : n), tau = (0.03 + b.len * b.len * 0.3) * Math.min(1, 4 / n);
+      // y: the range of the arpeggio. Down every sub-step stays on the note (a plain blip), in the middle the old set of jumps, up the jumps get wide and the filter hops more
+      const ar = clamp(b.arp || 0, -1, 1), pool = ar < -0.6 ? [1] : ar < -0.2 ? [1, 1, 2] : ar < 0.3 ? [1, 2, 1.5, 3, 4, 0.5] : ar < 0.7 ? [2, 3, 4, 1.5, 0.5, 6] : [3, 4, 6, 8, 0.5, 0.25];
+      const jump = () => { if (boom) return 1; const q = pick(pool); return f * q > 9000 ? 1 : q; };
+      const o = c.osc(r[0] < 0.5 ? 'square' : 'sawtooth', f), ns = boom ? 4 : n;
+      for (let i = 0; i < ns; i++) o.frequency.setValueAtTime(f * (i ? jump() : 1), t0 + i * sub);
       const cr = c.shaper(crushCurve(Math.max(2, Math.min(40, 3 + Math.floor(r[1] * 14) + (b.xc || 0))))), bp = c.bq('bandpass', 1000, 0.8 + b.res * 0.2), v = c.g(0);
-      for (let i = 0; i < 8; i++) bp.frequency.setValueAtTime(lrnd(300, 5000), t0 + i * sub / 2);
+      const hops = ns * 2 * (ar > 0.3 ? 2 : 1);
+      for (let i = 0; i < hops; i++) bp.frequency.setValueAtTime(lrnd(300, 5000), t0 + i * (ns * sub) / hops);
       v.gain.setValueAtTime(0, t0);
-      for (let i = 0; i < 4; i++) { v.gain.setValueAtTime(1.6 * vel * (i ? 0.7 : 1), t0 + i * sub); v.gain.setTargetAtTime(0, t0 + i * sub, tau); }
+      for (let i = 0; i < ns; i++) { v.gain.setValueAtTime((boom ? 2 : 1.6) * vel * (i ? 0.7 : 1), t0 + i * sub); v.gain.setTargetAtTime(0, t0 + i * sub, tau); }
       o.connect(cr); cr.connect(bp); bp.connect(v); v.connect(c.out);
-      return t0 + 4 * sub + tau * 5;
+      return t0 + ns * sub + tau * 5;
     }
   };
 
@@ -1529,11 +1535,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     riso:    { x: ['hit'],   y: ['ring', 'space'] },
     scope:   { x: ['color'], y: ['echo'] },
     topo:    { x: ['cut'],   y: ['color', 'space'] },
-    matrix:  { x: ['color'], y: ['res'] },
+    matrix:  { x: ['color'], y: ['arp'] },
     ridges:  { x: ['cut'],   y: ['res'] },
     clouds:  { x: ['color'], y: ['space', 'cut'] }
   };
-  const MAC = { cut: 0, res: 0, echo: 0, space: 0, color: 0, lpg: 0, hit: 0, ring: 0 };   // -1..1 around the press patch
+  const MAC = { cut: 0, res: 0, echo: 0, space: 0, color: 0, lpg: 0, hit: 0, ring: 0, arp: 0 };   // -1..1 around the press patch
   let glide = null, glideTimer = 0;
   function applyXY(nx, ny) {
     const ax = AXES[skin];
@@ -1585,6 +1591,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * rb;
       b.sh.shout.gain.setTargetAtTime(Math.min(0.7, 0.18 + 0.36 * sw + 0.2 * ZH), now, 0.1); b.sh.shfb.gain.setTargetAtTime(Math.min(0.4, 0.18 + 0.14 * sw + 0.1 * ZH), now, 0.1);
     }
+    if (sk === 'matrix') b.arp = MAC.arp;
     if (sk === 'riso') { b.len = clamp(b.base.len + 0.55 * MAC.ring, 0.02, 0.95); b.hit = MAC.hit; }
     b.xt = Math.pow(2, MAC.color * 1.2); b.xc = Math.round(MAC.color * 7);
     if (sk === 'topo' && cont && cont.xy) cont.xy(b.cut, (MAC.color + 1) / 2, ZH);
@@ -2349,11 +2356,19 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     for (let i = 0; i < 13; i++) for (let j = 0; j < 28; j++) dots.push([-180 + i * 30, -406 + j * 30]);
     const bins = [0, 1, 2, 3, 4].map(n => se('path', { class: 'mx mx' + n, d: '' }));
     // rings run out of the finger, two slow interference waves shimmer across the whole field, so nothing is ever dark or empty
+    let burst = 0;   // the P tap (a ratchet): a ring leaves the second finger fast
+    SK.pTap = () => { burst = performance.now(); };
     function draw(t, env, kick) {
       const gain = (0.8 + 0.5 * env + 0.5 * kick) * (1 + 0.8 * XV.y), ds = ['', '', '', '', ''], lv = 2 + Math.round(3 * XV.x), sharp = 1 + 2.5 * XV.y;
+      // the P pinch (the arpeggio rate, in steps) shows in the rings: 8 sub-steps make them tight, 2 make them wide; they are drawn round the second finger too while it lies
+      const an = PX.d < -0.33 ? 8 : PX.d > 0.33 ? 2 : 4, wl = 24 * 4 / an, bAge = burst ? (performance.now() - burst) / 1000 : 9;
       for (let n = 0; n < dots.length; n++) {
-        const q = dots[n], d = Math.hypot(q[0] - FP.vx, q[1] - FP.vy);
-        const w = 0.34 * (0.5 + 0.5 * Math.cos(d / 24 - t * 2.4)) + 0.33 * (0.5 + 0.5 * Math.sin(q[0] * 0.021 + q[1] * 0.012 + t * 0.9)) + 0.33 * (0.5 + 0.5 * Math.sin(q[1] * 0.017 - q[0] * 0.013 - t * 0.6));
+        const q = dots[n];
+        let d = Math.hypot(q[0] - FP.vx, q[1] - FP.vy);
+        if (PX.on) d = Math.min(d, Math.hypot(q[0] - FP2.vx, q[1] - FP2.vy));
+        let ring = 0.5 + 0.5 * Math.cos(d / wl - t * 2.4);
+        if (bAge < 0.9) { const d2 = Math.hypot(q[0] - FP2.vx, q[1] - FP2.vy); ring = Math.min(1, ring + 0.9 * (1 - bAge / 0.9) * Math.exp(-Math.pow(d2 - bAge * 520, 2) / 1200)); }
+        const w = 0.34 * ring + 0.33 * (0.5 + 0.5 * Math.sin(q[0] * 0.021 + q[1] * 0.012 + t * 0.9)) + 0.33 * (0.5 + 0.5 * Math.sin(q[1] * 0.017 - q[0] * 0.013 - t * 0.6));
         const s = Math.min(0.999, Math.pow(w, sharp) * gain);
         ds[Math.round(Math.min(lv - 1, Math.floor(s * lv)) * 4 / (lv - 1))] += 'M' + q[0] + ' ' + q[1] + 'h0';
       }
@@ -2674,7 +2689,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
   let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
-  const P_WORLDS = { clouds: true, ridges: true, amber: true, riso: true, mandala: true, scope: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
+  const P_WORLDS = { clouds: true, ridges: true, amber: true, riso: true, mandala: true, scope: true, matrix: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
   const setFP2 = (x, y) => { const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844); pX = x; pY = y; FP2.vx = (x - W / 2) / sc; FP2.vy = (y - H / 2) / sc; };   // the second finger in the skin's coordinates, so a world can animate it like the first
   function pinch() {
     const raw = Math.log2(Math.max(24, Math.hypot(pX - P1.x, pY - P1.y)) / pDist0);
@@ -2690,6 +2705,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (skin === 'ridges' && seq && seq.acidV) seq.acidV.stab(ctx.currentTime + 0.01);   // the tap of each world
     if (skin === 'amber') amberStab();
     if (skin === 'mandala') mandalaThrow();
+    if (skin === 'matrix' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.1, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // matrix: a ratchet
     if (skin === 'scope' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.3, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // scope: a shot
     if (skin === 'riso' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.25, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // riso: the last chord struck again, hard, with a wide open noise
     if (SK.pTap) SK.pTap();
@@ -2777,7 +2793,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
   const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
     amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
-    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM'], matrix: ['CRUSH', 'FOCUS'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW']
+    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW']
   };
   let hudEl = null, hudRaf = 0;
   function hudStart() {
