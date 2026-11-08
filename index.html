@@ -2553,7 +2553,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     // drops of paint on glass. The whole screen is one flat colour (a different one every press) and 2-3 colours of paint lie on it as small round drops. A finger is a big drop: it runs over the glass,
     // takes every drop it meets into itself (the mass adds up) and leaves a wet trail of small drops that dries; drawing a path between two drops makes them run together, like children joining raindrops on a window.
     // The drops are flat metaballs with hard edges (flat, one colour). The sound moves them: every harmonic the melody sings is a new drop (its place across the screen is the number of the harmonic),
-    // X is how many drops there are, Y how big the new ones are and how fast the big ones slide, the P pinch how liquid the paint is (together the drops swell and flow into each other, apart they hold their shape),
+    // X is how many drops there are, Y how big the new ones are (the drops stand still on the glass: only the finger moves them), the P pinch how liquid the paint is (together the drops swell and flow into each other, apart they hold their shape),
     // the P tap splashes the finger's drop into a spray, Z makes every drop wobble (the bell of the morph), and the drops near the formant of the drone breathe.
     // (Earlier pictures of this world: the Chladni plate, commit 7810c06, and the flat lava lamp, commit 5c6141a.)
     const wrap = document.createElement('div'); wrap.className = 'skinsvg'; wrap.id = 'ovwrap'; wrap.style.background = '#2B2D6E';
@@ -2594,12 +2594,12 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     }
     function merge(a, b) {   // b runs into a: the area adds up, the place is the middle of the masses, the colour is the bigger one's
       const A = a.m * a.m, Bm = b.m * b.m, S = A + Bm;
-      a.x = (a.x * A + b.x * Bm) / S; a.y = (a.y * A + b.y * Bm) / S; a.m = Math.min(0.11, Math.sqrt(S)); a.vx += b.vx * 0.3; a.vy += b.vy * 0.3;
+      a.x = (a.x * A + b.x * Bm) / S; a.y = (a.y * A + b.y * Bm) / S; a.m = Math.min(0.11, Math.sqrt(S)); 
       if (!a.finger && b.m > a.m * 0.9) a.ci = b.ci;
       a.r += 0.006; a.trail = a.trail && b.trail;
     }
     function step(dt) {
-      const slide = 0.6 * Math.pow(2, 1.5 * MAC.ring), tgt = Math.round(90 * (0.55 + 0.9 * x01));
+      const tgt = Math.round(90 * (0.55 + 0.9 * x01));
       // the finger: a big drop that follows it
       const down = (XY.down || holding) && seq;
       if (down && !fd) { fd = mk(XY.x, XY.y * asp, 0.032, Math.floor(rr() * 3), { finger: true, r: 0.01 }); drops.push(fd); trailX = fd.x; trailY = fd.y; }
@@ -2618,8 +2618,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       for (let i = drops.length - 1; i >= 0; i--) {
         const d = drops[i];
         d.r += (d.m - d.r) * (1 - Math.exp(-dt * 9)) + (d.m - d.r) * 0.0;   // grows with a little spring: it overshoots when pushed
-        d.x += d.vx * dt; d.y += d.vy * dt; const dm = Math.exp(-dt * 2.5); d.vx *= dm; d.vy *= dm;
-        if (!d.finger && d.m > 0.03) d.y += slide * 0.012 * Math.pow(d.m / 0.03, 2) * dt * 10;   // the big ones slide down
+        
         if (d.trail) d.m *= Math.exp(-dt / 9);
         if (d.m < 0.004 || d.y - d.r > asp + 0.05 || d.x < -0.1 || d.x > 1.1) { if (d === fd) fd = null; drops.splice(i, 1); }
       }
@@ -2687,7 +2686,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       flash = 1;
       const ox = fd ? fd.x : lastTouch[0], oy = fd ? fd.y : lastTouch[1], ci = fd ? fd.ci : 0;
       if (fd) fd.m = Math.max(0.02, fd.m * 0.8);
-      for (let k = 0; k < 9 && drops.length < 200; k++) { const a = k / 9 * 6.2832 + rr() * 0.5, sp = 0.25 + rr() * 0.35, d = mk(ox, oy, 0.008 + rr() * 0.012, ci, { r: 0.006 }); d.vx = Math.cos(a) * sp; d.vy = Math.sin(a) * sp; drops.push(d); }
+      for (let k = 0; k < 9 && drops.length < 200; k++) { const a = k / 9 * 6.2832 + rr() * 0.5, sp = 0.07 + rr() * 0.09; drops.push(mk(ox + Math.cos(a) * sp, oy + Math.sin(a) * sp, 0.008 + rr() * 0.012, ci, { r: 0 })); }
     };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
   }
