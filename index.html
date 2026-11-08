@@ -403,20 +403,20 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 <style id="service">
 /* service layer: lock frame, the quiet strip at the bottom, the fan. Only the fan carries text; the rest of the screen stays without labels. */
 /* debug HUD (?hud=1): the axes and their values as a game readout; never on by default */
-#hud { position: fixed; z-index: 8; left: max(8px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 8px); width: 168px; pointer-events: none; font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; -webkit-user-select: none; user-select: none; }
-#hud .hd-top { display: flex; justify-content: space-between; align-items: center; height: 16px; padding: 0 5px; margin-bottom: 3px; background: rgba(0,0,0,.62); border: 2px solid var(--accent); box-shadow: 3px 3px 0 rgba(0,0,0,.6); color: var(--accent); }
+#hud { position: fixed; z-index: 8; left: max(8px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 8px); width: 168px; pointer-events: none; font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: #f1ece4; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; -webkit-user-select: none; user-select: none; }
+#hud .hd-top { display: flex; justify-content: space-between; align-items: center; height: 16px; padding: 0 5px; margin-bottom: 3px; background: rgba(0,0,0,.62); border: 2px solid hsl(var(--hue) 100% 64%); box-shadow: 3px 3px 0 rgba(0,0,0,.6); color: hsl(var(--hue) 100% 64%); }
 #hud .hd-top span { display: flex; gap: 4px; }
-#hud .hd-top span b { padding: 1px 3px; background: var(--accent); color: #000; text-shadow: none; }
+#hud .hd-top span b { padding: 1px 3px; background: hsl(var(--hue) 100% 64%); color: #000; text-shadow: none; }
 #hud .hd-row { position: relative; display: grid; grid-template-columns: 10px 1fr 34px; grid-template-rows: 10px 8px; column-gap: 4px; padding: 3px 5px 4px; margin-bottom: 3px; background: rgba(0,0,0,.55); border: 2px solid rgba(255,255,255,.28); box-shadow: 3px 3px 0 rgba(0,0,0,.5); }
 #hud .hd-row.off { opacity: .45; }
-#hud .hd-row i { font-style: normal; color: var(--accent); grid-row: 1; }
+#hud .hd-row i { font-style: normal; color: hsl(var(--hue) 100% 64%); grid-row: 1; }
 #hud .hd-row u { text-decoration: none; grid-row: 1; white-space: nowrap; overflow: hidden; }
 #hud .hd-row em { font-style: normal; grid-row: 1; grid-column: 3; text-align: right; font-variant-numeric: tabular-nums; }
 #hud .hd-bar { grid-row: 2; grid-column: 1 / 4; position: relative; border: 2px solid rgba(255,255,255,.5); background: rgba(255,255,255,.08); }
 #hud .hd-bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: rgba(255,255,255,.7); }
-#hud .hd-bar s { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; background: var(--accent); -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); }
+#hud .hd-bar s { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; background: hsl(var(--hue) 100% 64%); -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); }
 #hud .hd-raw { padding: 3px 5px; background: rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.18); font-size: 9px; line-height: 12px; color: rgba(241,236,228,.82); white-space: pre; }
-#hud .hd-pop { position: absolute; left: calc(100% + 8px); top: 2px; white-space: nowrap; color: var(--accent); animation: hdpop .95s steps(10) forwards; }
+#hud .hd-pop { position: absolute; left: calc(100% + 8px); top: 2px; white-space: nowrap; color: hsl(var(--hue) 100% 64%); animation: hdpop .95s steps(10) forwards; }
 #hud .hd-pop.ev { color: #fff; top: -9px; }
 @keyframes hdpop { 0% { opacity: 0; transform: translateY(6px); } 12% { opacity: 1; } 100% { opacity: 0; transform: translateY(-16px); } }
 #lockframe { position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0; transition: opacity .25s;
@@ -1036,10 +1036,14 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   const VOICES = {
     // riso: a bank of resonators tuned to a major or minor chord, struck by a burst of ink noise (a bit like Rings fed with noise)
     riso: c => {
-      const { t0, vel, b, r } = c, T = 0.25 + b.len * 1.6;
+      const { t0, vel, b, r } = c, boom = !!c.boom, T = (0.25 + b.len * 1.6) * (boom ? 1.3 : 1);
       const ex = c.g(0), sum = c.g(1), cr = c.shaper(crushCurve(14 + Math.floor(r[0] * 50))), lp = c.bq('lowpass', b.cut, 0.7 + b.res * 0.3);
-      ex.gain.setValueAtTime(0, t0); ex.gain.linearRampToValueAtTime(vel, t0 + 0.001); ex.gain.setTargetAtTime(0, t0 + 0.001, 0.008);
-      c.noise().connect(ex);
+      // x: what strikes the resonators: dark and soft on the left (the noise is low passed from 0,5 kHz), bright and snappy on the right (up to 6 kHz); a P tap strikes wide open
+      const hit = clamp(b.hit || 0, -1, 1), exLp = c.bq('lowpass', Math.min(16000, 500 * Math.pow(2, (hit + 1) * 3.6 + (boom ? 2 : 0))), 0.7);
+      // P pinch: the envelope of the strike. Together a sharper click, apart it swells and lasts, as if the chord were bowed
+      const pd = PX.d, att = boom ? 0.0005 : 0.0008 + 0.09 * Math.pow(Math.max(0, pd), 2), tauE = boom ? 0.02 : pd >= 0 ? 0.008 * Math.pow(15, pd) : 0.008 * Math.pow(2, 1.5 * pd);
+      ex.gain.setValueAtTime(0, t0); ex.gain.linearRampToValueAtTime(vel / Math.sqrt(Math.max(1, tauE / 0.008)), t0 + att); ex.gain.setTargetAtTime(0, t0 + att, tauE);
+      c.noise().connect(exLp); exLp.connect(ex);
       const n = c.chord.length;
       c.chord.forEach(m => {
         const f0 = 440 * Math.pow(2, (m - 69) / 12);
@@ -1052,7 +1056,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         });
       });
       sum.connect(cr); cr.connect(lp); lp.connect(c.out);
-      return t0 + 0.003 + Math.min(T * 3, 1.6);
+      return t0 + 0.003 + Math.min(T * 3, 1.6) + att + tauE * 4;
     },
     // clouds: a kalimba tine (fundamental plus two quickly dying beam overtones and a thumb click) is struck and written into a 4 s memory
     // together with the last notes; cloudRun cuts grains out of that memory. x makes the grains small and dense, a beads-to-fog axis.
@@ -1162,7 +1166,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const srcs = [], nodes = [kill];
     if (pn) { nodes.push(pn); kill.connect(pn); pn.connect(b.inp); } else kill.connect(b.inp);
     const c = {
-      t0, f, vel: st.vel, b, r: b.r, dur: s.dur, out: kill, chord: st.chord || [st.midi],
+      t0, f, vel: st.vel, boom: st.boom, b, r: b.r, dur: s.dur, out: kill, chord: st.chord || [st.midi],
       osc: (type, fr, det) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = fr; if (det) o.detune.value = det; srcs.push(o); return o; },
       noise: () => { const n = ctx.createBufferSource(); n.buffer = getNoise(); n.loop = true; srcs.push(n); return n; },
       g: v => { const n = ctx.createGain(); n.gain.value = v === undefined ? 1 : v; nodes.push(n); return n; },
@@ -1423,6 +1427,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     s.i = (s.i + 1) % STEPS;
     if (s.rev && s.dub) { const m = s.dub.revMap || (s.dub.revMap = []); m.push({ t, rev: s.rev[idx] }); if (m.length > 24) m.shift(); }
     if (!st) return;
+    s.lastSt = st;   // for the P tap of the worlds that strike the last step again
     if (s.acid) { s.acidV.step(t + 0.012, st, idx); return; }
     if (s.cont) return;
     if (s.voice) { hitVoice(s, st, idx, t); return; }
@@ -1496,7 +1501,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
      x (left to right) and y (down to up) are relative to what the press rolled, so the patch keeps its character and the finger bends it.
        amber    x how the gate opens (decay)     y a path through timbres (carrier, FM, fold); brightness follows
        mandala  x echo (amount and feedback)     y filter cutoff and resonance: the dub pair
-       riso     x brightness of the chord        y ring length and reverb
+       riso     x what strikes the chord (dark soft .. bright snap)   y how long it rings (damping), reverb a little
        scope    x laser pitch (sweep and grains) y echo (amount and feedback)
        topo     x drone filter                   y pulse-width sweep (PWM) and reverb
        matrix   x crush depth                    y filter focus (resonance)
@@ -1508,14 +1513,14 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   const AXES = {
     amber:   { x: ['lpg'],   y: ['color'] },
     mandala: { x: ['echo'],  y: ['cut', 'res'] },
-    riso:    { x: ['cut'],   y: ['space'] },
+    riso:    { x: ['hit'],   y: ['ring', 'space'] },
     scope:   { x: ['color'], y: ['echo'] },
     topo:    { x: ['cut'],   y: ['color', 'space'] },
     matrix:  { x: ['color'], y: ['res'] },
     ridges:  { x: ['cut'],   y: ['res'] },
     clouds:  { x: ['color'], y: ['space', 'cut'] }
   };
-  const MAC = { cut: 0, res: 0, echo: 0, space: 0, color: 0, lpg: 0 };   // -1..1 around the press patch
+  const MAC = { cut: 0, res: 0, echo: 0, space: 0, color: 0, lpg: 0, hit: 0, ring: 0 };   // -1..1 around the press patch
   let glide = null, glideTimer = 0;
   function applyXY(nx, ny) {
     const ax = AXES[skin];
@@ -1525,6 +1530,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (g) { k = Math.min(1, (performance.now() - g.t0) / 1500); k = k * k * (3 - 2 * k); if (k >= 1) glide = null; }
     const set = (list, v) => list.forEach(m => { MAC[m] = g ? g.from[m] + (v - g.from[m]) * k : v; });
     set(ax.x, nx); set(ax.y, ny);
+    for (const m in MAC) if (ax.x.indexOf(m) < 0 && ax.y.indexOf(m) < 0) MAC[m] = g ? g.from[m] * (1 - k) : 0;   // what this world's axes do not use is let go of, so it does not carry another world's setting
     applyMacros();
   }
   function applyMacros() {
@@ -1558,7 +1564,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (b.mg.revAmt) b.mg.revAmt.g.gain.value = b.mg.revAmt.d * 0.5 * rb;
       b.sh.shout.gain.setTargetAtTime(Math.min(0.7, 0.18 + 0.36 * sw + 0.2 * ZH), now, 0.1); b.sh.shfb.gain.setTargetAtTime(Math.min(0.4, 0.18 + 0.14 * sw + 0.1 * ZH), now, 0.1);
     }
-    if (sk === 'riso') b.len = clamp(b.base.len + 0.4 * MAC.space, 0.02, 0.95);
+    if (sk === 'riso') { b.len = clamp(b.base.len + 0.55 * MAC.ring, 0.02, 0.95); b.hit = MAC.hit; }
     b.xt = Math.pow(2, MAC.color * 1.2); b.xc = Math.round(MAC.color * 7);
     if (sk === 'topo' && cont && cont.xy) cont.xy(b.cut, (MAC.color + 1) / 2, ZH);
     if (acid && seq && seq.acidV) seq.acidV.setRes(b.res);
@@ -2079,11 +2085,13 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       discs.push({ el, o: o ? 0.9 : 0.78, r, x: rnd(-190, 190), y: rnd(-400, 400), vx: rnd(-9, 9), vy: rnd(-9, 9), pop: 0 });
     }
     const flashes = [];
-    function flash(i, vel) {
+    function flash(i, vel, o) {
+      o = o || FP;
       const el = se('circle', { class: 'rs-c', r: 10 });
       el.style.fill = '#F2EBDC';
-      flashes.push({ el, x: FP.vx, y: FP.vy, r: 24 + 70 * vel, age: 0, life: 0.6 + 1.6 * XV.y, col: COL[i % 3] });
-      const near = discs.reduce((m, d) => Math.hypot(d.x - FP.vx, d.y - FP.vy) < Math.hypot(m.x - FP.vx, m.y - FP.vy) ? d : m, discs[0]);
+      // the P pinch (the strike envelope) stays visible: apart the spots swell slowly and last, together they are short and sharp
+      flashes.push({ el, x: o.vx, y: o.vy, r: 24 + 70 * vel, age: 0, life: (0.6 + 1.6 * XV.y) * (PX.d > 0 ? 1 + 1.6 * PX.d : 1 + 0.45 * PX.d), col: COL[i % 3] });
+      const near = discs.reduce((m, d) => Math.hypot(d.x - o.vx, d.y - o.vy) < Math.hypot(m.x - o.vx, m.y - o.vy) ? d : m, discs[0]);
       near.pop = 1;
     }
     let last = 0, lastDraw = 0, raf = 0, dead = false;
@@ -2118,7 +2126,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     }
     draw(0, 0, 0);
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = lastDraw = performance.now(); raf = requestAnimationFrame(frame); }
-    SK.note = flash; SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
+    SK.note = (i, vel) => { flash(i, vel, FP); if (PX.on) flash(i, vel, FP2); };   // the second finger, while it lies, flashes its own discs
+    SK.pTap = () => flash(1, 1.5, FP2);
+    SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
   }
 
   function buildMandala() {
@@ -2637,7 +2647,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
   let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
-  const P_WORLDS = { clouds: true, ridges: true, amber: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
+  const P_WORLDS = { clouds: true, ridges: true, amber: true, riso: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
   const setFP2 = (x, y) => { const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844); pX = x; pY = y; FP2.vx = (x - W / 2) / sc; FP2.vy = (y - H / 2) / sc; };   // the second finger in the skin's coordinates, so a world can animate it like the first
   function pinch() {
     const raw = Math.log2(Math.max(24, Math.hypot(pX - P1.x, pY - P1.y)) / pDist0);
@@ -2651,6 +2661,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     PX.on = true; PX.base = PX.d;
     if (skin === 'ridges' && seq && seq.acidV) seq.acidV.stab(ctx.currentTime + 0.01);   // the tap of each world
     if (skin === 'amber') amberStab();
+    if (skin === 'riso' && seq && seq.voice && seq.lastSt) hitVoice(seq, Object.assign({}, seq.lastSt, { vel: 1.25, boom: true }), (seq.i + STEPS - 1) % STEPS, ctx.currentTime + 0.004);   // riso: the last chord struck again, hard, with a wide open noise
     if (SK.pTap) SK.pTap();
   }
   function endP() {
@@ -2736,7 +2747,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
   const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
     amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
-    riso: ['CUTOFF', 'SPACE'], scope: ['PITCH', 'ECHO'], topo: ['FILTER', 'PWM'], matrix: ['CRUSH', 'FOCUS'], mandala: ['ECHO', 'FILTER']
+    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO'], topo: ['FILTER', 'PWM'], matrix: ['CRUSH', 'FOCUS'], mandala: ['ECHO', 'FILTER']
   };
   let hudEl = null, hudRaf = 0;
   function hudStart() {
