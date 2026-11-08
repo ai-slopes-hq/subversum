@@ -1064,16 +1064,19 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (PX.on) cl.until = now + 1.5;                         // P tap: the cloud is held, it does not fade while the second finger lies
       if (now > cl.until) { clearInterval(cl.timer); cl.timer = 0; return; }
       const sr = ctx.sampleRate, sec = cl.size / sr, dens = clamp((Math.log2(b.xt || 1) / 1.2 + 1) / 2, 0, 1), rate = 16 + 36 * dens;
-      cl.lp.frequency.setTargetAtTime(clamp(b.cut * 2.5, 800, 9000), now, 0.05);
+      const tl = clamp(Math.log2(b.xt || 1) / 1.2, -1, 1);   // x as -1..1
+      cl.lp.frequency.setTargetAtTime(clamp(b.cut * Math.pow(2, 0.8 * tl), 300, 9000), now, 0.05);   // y and x both move the grain filter: dark bottom/left, bright top/right
       const lvl = clamp((cl.until - now) / 1.2, 0, 1);       // the cloud fades over the last 1.2 s
       if (cl.next < now) cl.next = now;
       while (cl.next < now + 0.12) {
         const ts = cl.next + 0.005, dur = (0.22 - 0.12 * dens) * (0.6 + Math.random() * 0.8);
         // P pinch: together pulls the grains to one pitch, apart scatters them over three octaves (down to 0.25x, up to 4x)
         const pd = PX.d;
-        const base = pd < 0 && Math.random() < -pd ? 1 : pd > 0 && Math.random() < 0.75 * pd ? pick([0.25, 0.5, 2, 2, 3, 4, 1.5]) : Math.random() < 0.35 * ZH ? pick([2, 2, 1.5, 0.5]) : pick([1, 1, 1, 1, 2, 0.5, 1.5]);
+        let base = pd < 0 && Math.random() < -pd ? 1 : pd > 0 && Math.random() < 0.75 * pd ? pick([0.25, 0.5, 2, 2, 3, 4, 1.5]) : Math.random() < 0.35 * ZH ? pick([2, 2, 1.5, 0.5]) : pick([1, 1, 1, 1, 2, 0.5, 1.5]);
+        // x also transposes the cloud: left most grains drop an octave or two (a slow dark fog), right they rise (bright glass beads)
+        if (Math.abs(tl) > 0.08 && Math.random() < Math.min(0.9, Math.abs(tl) * 1.1)) base = tl < 0 ? pick([0.5, 0.5, 0.25, 0.75]) : pick([2, 2, 3, 4]);
         const ratio = base * Math.pow(2, (Math.random() - 0.5) * (pd < 0 ? 0.03 * (1 + pd) : 0.03)), span = dur * ratio;
-        let off = Math.random() < 0.7 - 0.4 * ZH ? cl.head / sr + Math.random() * 0.4 : Math.random() * sec;
+        let off = Math.random() < clamp(0.7 - 0.4 * ZH - 0.45 * MAC.space, 0.1, 0.95) ? cl.head / sr + Math.random() * 0.4 : Math.random() * sec;
         off = Math.max(0, Math.min(off % sec, sec - span - 0.01));
         const pv = (Math.random() - 0.5) * 1.6, rev = revAt(b, ts);
         if (SK.grain) SK.grain(ts - now, dur, pv, ratio, dens, rev);
@@ -1622,7 +1625,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       return;
     }
     if (!ctx || !b || !b.base) return;
-    b.cut = clamp(b.base.cut * Math.pow(2, MAC.cut * (sk === 'mandala' || sk === 'topo' ? 1.6 : 1.5)), 60, sk === 'clouds' ? 7500 : 12000);
+    b.cut = clamp(b.base.cut * Math.pow(2, MAC.cut * (sk === 'mandala' || sk === 'topo' ? 1.6 : sk === 'clouds' ? 2.2 : 1.5)), 60, sk === 'clouds' ? 7500 : 12000);
     const acid = sk === 'ridges';
     const km = sk === 'mandala', tm = clamp((MAC.cut - 0.35) / 0.65, 0, 1);   // mandala: the resonance does not move with the cutoff, it only joins near the top and starts to whistle
     b.res = clamp(b.base.res + (km ? 7 * tm * tm * (3 - 2 * tm) : MAC.res * (acid || sk === 'matrix' ? 8 : 6)), acid ? 1 : 0, acid ? 20 : 16);
