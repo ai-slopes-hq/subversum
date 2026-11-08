@@ -418,6 +418,41 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 #hud .hd-raw { padding: 3px 5px; background: rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.18); font-size: 9px; line-height: 12px; color: rgba(241,236,228,.82); white-space: pre; }
 #hud .hd-pop { position: absolute; left: calc(100% + 8px); top: 2px; white-space: nowrap; color: hsl(var(--hue) 100% 64%); animation: hdpop .95s steps(10) forwards; }
 #hud .hd-pop.ev { color: #fff; top: -9px; }
+/* game layer (with the HUD): the Z countdown / meter on top, XP, level and discoveries at the bottom, toasts in between */
+html.gamebars #hud { top: calc(env(safe-area-inset-top, 0px) + 34px); }
+html.gamebars #handle { bottom: calc(env(safe-area-inset-bottom, 0px) + 34px); }
+#zbar, #xpbar { position: fixed; z-index: 8; left: max(8px, env(safe-area-inset-left, 0px)); right: max(8px, env(safe-area-inset-right, 0px)); pointer-events: none; -webkit-user-select: none; user-select: none;
+  font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: #f1ece4;
+  text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; }
+#zbar { top: calc(env(safe-area-inset-top, 0px) + 6px); height: 16px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px; padding: 0 6px;
+  background: rgba(0,0,0,.62); border: 2px solid hsl(var(--hue) 100% 64%); box-shadow: 3px 3px 0 rgba(0,0,0,.6); transition: opacity .2s; }
+#zbar b { color: hsl(var(--hue) 100% 64%); min-width: 62px; }
+#zbar em { font-style: normal; min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+#zbar .zb-track { display: flex; gap: 2px; height: 6px; }
+#zbar .zb-track s { flex: 1; background: rgba(255,255,255,.14); }
+#zbar .zb-track s.on { background: hsl(var(--hue) 100% 64%); }
+#zbar .zb-track s.cd { background: #fff; }
+#zbar.idle { opacity: .5; }
+#zbar.na { opacity: .32; }
+#zbar.max { animation: zbmax .5s steps(2) infinite; }
+@keyframes zbmax { 50% { border-color: #fff; } }
+#xpbar { bottom: calc(env(safe-area-inset-bottom, 0px) + 4px); }
+#xpbar .xp-row { display: flex; justify-content: space-between; align-items: flex-end; height: 15px; padding: 0 2px 3px; }
+#xpbar .xp-row b { color: hsl(var(--hue) 100% 64%); margin-right: 6px; }
+#xpbar .xp-grp { display: flex; align-items: center; gap: 3px; margin-left: 8px; color: rgba(241,236,228,.7); }
+#xpbar .xp-grp div { display: flex; gap: 2px; }
+#xpbar .xp-grp i { width: 6px; height: 6px; border: 1px solid rgba(255,255,255,.5); background: rgba(0,0,0,.5); box-shadow: 1px 1px 0 #000; }
+#xpbar .xp-grp i.on { background: hsl(var(--hue) 100% 64%); border-color: #fff; }
+#xpbar .xp-track { height: 6px; border: 2px solid rgba(255,255,255,.5); background: rgba(0,0,0,.55); box-shadow: 3px 3px 0 rgba(0,0,0,.5); }
+#xpbar .xp-track s { display: block; height: 100%; width: 0; background: hsl(var(--hue) 100% 64%);
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); }
+#xpbar.lv .xp-track { border-color: #fff; }
+#gtoast { position: fixed; z-index: 8; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 54px); display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; pointer-events: none;
+  font: 700 11px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
+#gtoast div { padding: 4px 8px; color: #fff; background: rgba(0,0,0,.72); border: 2px solid hsl(var(--hue) 100% 64%); box-shadow: 3px 3px 0 rgba(0,0,0,.6); animation: gtoast 1.8s steps(14) forwards; }
+#gtoast div.lv { color: #000; background: hsl(var(--hue) 100% 64%); border-color: #fff; }
+@keyframes gtoast { 0% { opacity: 0; transform: translateY(8px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
+@media (prefers-reduced-motion: reduce) { #zbar.max, #gtoast div { animation: none; } }
 @keyframes hdpop { 0% { opacity: 0; transform: translateY(6px); } 12% { opacity: 1; } 100% { opacity: 0; transform: translateY(-16px); } }
 #lockframe { position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0; transition: opacity .25s;
   background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.4) 100%);
@@ -2820,6 +2855,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   let hudEl = null, hudRaf = 0;
   function hudStart() {
     if (hudEl) return;
+    gameStart();
     hudEl = document.createElement('div'); hudEl.id = 'hud'; hudEl.setAttribute('aria-hidden', 'true');
     hudEl.innerHTML = '<div class="hd-top"><b></b><span></span></div>' + ['x', 'y', 'p'].map(k => '<div class="hd-row" data-k="' + k + '"><i>' + k.toUpperCase() + '</i><u></u><em>0.00</em><span class="hd-bar"><s></s></span></div>').join('') + '<div class="hd-raw"></div>';
     document.body.appendChild(hudEl);
@@ -2858,7 +2894,103 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     }
     hudRaf = requestAnimationFrame(frame);
   }
-  function hudStop() { if (!hudEl) return; cancelAnimationFrame(hudRaf); hudEl.remove(); hudEl = null; }
+  function hudStop() { gameStop(); if (!hudEl) return; cancelAnimationFrame(hudRaf); hudEl.remove(); hudEl = null; }
+  /* ---------- game layer: rides on the HUD. Top: Z countdown (1 s of nothing) and the Z meter (opens over ~11 s). Bottom: XP, level, discovered worlds and gestures. ?game=0 switches it off ---------- */
+  const GAME_KEY = 'subversum.game', GAME_WORLDS = ['amber', 'riso', 'scope', 'topo', 'matrix', 'mandala', 'ridges', 'clouds'];
+  const GAME_GEST = [['xy', 'MOVE'], ['swipe', 'SWIPE'], ['ptap', 'P TAP'], ['pinch', 'PINCH'], ['z', 'Z OPEN'], ['zmax', 'Z MAX'], ['hold', 'HOLD'], ['lock', 'LOCK']];
+  const Z_WAIT = 1, Z_OPEN = 11;   // must match the zTimer in down(): one second of nothing, then ZH opens over 11 s
+  const lvOf = xp => Math.floor(Math.sqrt(xp / 30)) + 1, lvBase = l => 30 * (l - 1) * (l - 1);   // level n starts at 30 * (n-1)^2 xp
+  const zWorld = () => skin === 'clouds' || skin === 'topo';
+  let game = null, gameRaf = 0, gameOff = /[?&]game=0/.test(location.search);
+  const G = { xp: 0, worlds: {}, gest: {} };
+  function gameLoad() { try { const g = JSON.parse(localStorage.getItem(GAME_KEY) || 'null'); if (g && typeof g.xp === 'number') { G.xp = g.xp; G.worlds = g.worlds || {}; G.gest = g.gest || {}; } } catch (e) {} }
+  function gameSave() { try { localStorage.setItem(GAME_KEY, JSON.stringify(G)); } catch (e) {} }
+  function gameStart() {
+    if (game || gameOff) return;
+    gameLoad();
+    const mk = (tag, id, html) => { const e = document.createElement(tag); e.id = id; e.setAttribute('aria-hidden', 'true'); e.innerHTML = html; document.body.appendChild(e); return e; };
+    const segs = 24;
+    const zbar = mk('div', 'zbar', '<b>Z</b><span class="zb-track">' + '<s></s>'.repeat(segs) + '</span><em></em>');
+    const pips = (list, cls) => '<div class="' + cls + '">' + list.map(() => '<i></i>').join('') + '</div>';
+    const xpbar = mk('div', 'xpbar', '<div class="xp-row"><span><b></b><em style="font-style:normal"></em></span><span style="display:flex"><span class="xp-grp">W' + pips(GAME_WORLDS, 'pw') + '</span><span class="xp-grp">G' + pips(GAME_GEST, 'pg') + '</span></span></div><div class="xp-track"><s></s></div>');
+    const toasts = mk('div', 'gtoast', '');
+    document.documentElement.classList.add('gamebars');
+    const q = (r, sel) => r.querySelector(sel);
+    const zTrack = [].slice.call(zbar.querySelectorAll('.zb-track s')), zLab = q(zbar, 'b'), zEm = q(zbar, 'em');
+    const lvEl = q(xpbar, '.xp-row b'), xpEl = q(xpbar, '.xp-row em'), fill = q(xpbar, '.xp-track s');
+    const pw = [].slice.call(xpbar.querySelectorAll('.pw i')), pg = [].slice.call(xpbar.querySelectorAll('.pg i'));
+    let toastN = 0, lv = lvOf(G.xp), lastSave = 0, lvFlash = 0;
+    const toast = (text, cls) => {
+      if (toastN >= 3) return;
+      toastN++;
+      const e = document.createElement('div'); e.textContent = text; if (cls) e.className = cls;
+      e.addEventListener('animationend', () => { e.remove(); toastN--; });
+      toasts.appendChild(e);
+    };
+    function award(n, text) {
+      G.xp += n;
+      const l = lvOf(G.xp);
+      if (l > lv) { lv = l; lvFlash = performance.now() + 900; toast('LEVEL ' + l, 'lv'); }
+      else if (text) toast(text + ' +' + n);
+      gameSave();
+    }
+    const discover = k => { if (G.gest[k]) return; G.gest[k] = 1; award(15, 'NEW ' + GAME_GEST.filter(g => g[0] === k)[0][1]); };
+    // what was seen on the previous frame (edges are detected by polling the live state, so the audio code stays untouched)
+    let pSkin = null, pSeed = undefined, pPX = false, pinched = false, pHoldOn = false, pLock = false, pZT0 = -1, zOpened = false, zMaxed = false, acc = 0, last = performance.now();
+    const cache = { z: '', lab: '', em: '', xp: '', lv: '', cls: '' };
+    function frame(now) {
+      gameRaf = requestAnimationFrame(frame);
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      // ---- events
+      if (skin !== pSkin) {
+        if (pSkin !== null) discover('swipe');
+        if (!G.worlds[skin]) { G.worlds[skin] = 1; award(pSkin === null ? 10 : 25, 'NEW WORLD ' + skin); }
+        pSkin = skin;
+      }
+      if (curSeed !== pSeed) { if (pSeed !== undefined && curSeed != null) award(5); pSeed = curSeed; }
+      if (holding && !holdOn) { acc += dt; if (acc >= 1) { acc -= 1; award(1); } }
+      if (holding && (Math.abs(XY.nx) > 0.35 || Math.abs(XY.ny) > 0.35)) discover('xy');
+      if (PX.on && !pPX) { pinched = false; award(3); discover('ptap'); }
+      if (PX.on && !pinched && Math.abs(PX.d) > 0.35) { pinched = true; award(5); discover('pinch'); }
+      pPX = PX.on;
+      if (holdOn && !pHoldOn) discover('hold'); pHoldOn = holdOn;
+      if (locked && !pLock) discover('lock'); pLock = locked;
+      // ---- Z: seconds since the press (zT0 is reset by every new patch), -1 when nothing is held
+      const ze = holding && ctx && seq ? ctx.currentTime - zT0 : -1, za = zWorld();
+      if (zT0 !== pZT0) { pZT0 = zT0; zOpened = zMaxed = false; }
+      if (za && ze > Z_WAIT && !zOpened) { zOpened = true; award(2); discover('z'); }
+      if (za && ZH > 0.999 && !zMaxed) { zMaxed = true; award(30, 'Z MAX'); discover('zmax'); }
+      // ---- top bar
+      const fillN = Math.round(clamp(ZH, 0, 1) * segs), cd = ze >= 0 && ze < Z_WAIT ? Math.ceil(4 * (1 - ze / Z_WAIT)) : 0;
+      const zKey = fillN + '/' + cd;
+      if (zKey !== cache.z) { cache.z = zKey; zTrack.forEach((t, i) => { t.className = i < cd ? 'cd' : (i < fillN && ze >= 0 ? 'on' : ''); }); }
+      let lab, em;
+      if (ze < 0) { lab = 'Z HOLD'; em = ''; }
+      else if (!za) { lab = 'Z NOT HERE'; em = ''; }
+      else if (ze < Z_WAIT) { lab = 'Z IN ' + (Z_WAIT - ze).toFixed(1); em = ''; }
+      else if (ZH > 0.999) { lab = 'Z MAX'; em = '100%'; }
+      else { lab = 'Z OPEN'; em = Math.round(ZH * 100) + '%'; }
+      if (lab !== cache.lab) { cache.lab = lab; zLab.textContent = lab; }
+      if (em !== cache.em) { cache.em = em; zEm.textContent = em; }
+      const zc = (ze < 0 ? 'idle' : !za ? 'na' : ZH > 0.999 ? 'max' : '');
+      if (zc !== cache.cls) { cache.cls = zc; zbar.className = zc; }
+      // ---- bottom bar
+      const b0 = lvBase(lv), b1 = lvBase(lv + 1), xk = lv + '|' + G.xp;
+      if (xk !== cache.xp) {
+        cache.xp = xk;
+        lvEl.textContent = 'LV ' + lv; xpEl.textContent = (G.xp - b0) + '/' + (b1 - b0);
+        fill.style.width = clamp((G.xp - b0) / (b1 - b0), 0, 1) * 100 + '%';
+        GAME_WORLDS.forEach((w, i) => pw[i].classList.toggle('on', !!G.worlds[w]));
+        GAME_GEST.forEach((g, i) => pg[i].classList.toggle('on', !!G.gest[g[0]]));
+      }
+      const lf = now < lvFlash; if (lf !== !!cache.lv) { cache.lv = lf ? '1' : ''; xpbar.classList.toggle('lv', lf); }
+      if (now - lastSave > 5000) { lastSave = now; gameSave(); }
+    }
+    game = { els: [zbar, xpbar, toasts] };
+    gameRaf = requestAnimationFrame(frame);
+  }
+  function gameStop() { if (!game) return; cancelAnimationFrame(gameRaf); gameSave(); game.els.forEach(e => e.remove()); game = null; document.documentElement.classList.remove('gamebars'); }
+  Object.assign(window.subversum, { game: () => JSON.parse(JSON.stringify(G)), gameReset: () => { G.xp = 0; G.worlds = {}; G.gest = {}; gameSave(); if (game) { gameStop(); gameStart(); } } });
   window.subversum.hud = v => { if (v) hudStart(); else hudStop(); try { localStorage.setItem('subversum.hud', v ? '1' : '0'); } catch (e) {} };
   const HUD_DEFAULT = true;   // while the gestures are being tuned the HUD is on everywhere; set to false to bring it back to opt-in (?hud=1)
   let hudWanted = HUD_DEFAULT || /[?&]hud=1/.test(location.search);
