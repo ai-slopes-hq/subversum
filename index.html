@@ -2459,7 +2459,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     let phase = 0, touch = 0, flash = 0, wS = 0, vig = null, FILL = null, FL = null, T = 0;
     function rebuild(r) {   // a new press: new floor (cell size, number of steps, size of the blocks, how many directions), from the dice of the press
       const rr = mulb(Math.floor(r[0] * 4e9) ^ Math.floor(r[3] * 1e9));
-      look = { seed: Math.floor(r[2] * 4e9) | 0, s0: 36 + 20 * r[0], P: 4 + Math.floor(r[1] * 4), zk: 1.0 + 0.3 * r[2], B: 4 + Math.floor(r[3] * 3), nd: 3 + Math.floor(rr() * 4), dx: 3 + 5 * rr() };
+      look = { seed: Math.floor(r[2] * 4e9) | 0, s0: 36 + 20 * r[0], P: 4 + Math.floor(r[1] * 4), zk: 1.0 + 0.3 * r[2], B: 4 + Math.floor(r[3] * 3), nd: 3 + Math.floor(rr() * 4), dx: 3 + 5 * rr(), h0: rr() * 360, hs: (rr() < 0.5 ? -1 : 1) * (90 + 60 * rr()) };   // a new pair of colours every press: any start hue, 90-150 degrees of drift either way
       const s = look.s0, dx = s * 0.866, dy = s * 0.5, B = look.B, xmin = -ox / kk - 2 * s, xmax = (W - ox) / kk + 2 * s, ymin = -oy / kk - 3 * s, ymax = (H - oy) / kk + 3 * s + look.P * dy * look.zk;
       const N = Math.ceil((ymax - ymin) / dy) + 30, cx = (xmin + xmax) / 2, cy = ymin - 2 * s, list = [], ori = {};
       for (let d = -N; d <= N * 1.2; d++) for (let i = -N; i <= N; i++) {
@@ -2503,7 +2503,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = rgb(BG); g.fillRect(0, 0, W, H);
       g.setTransform(kk, 0, 0, kk, ox, oy); g.lineJoin = 'round'; g.lineWidth = 2.2;
       const x01 = (wS + 1) / 2, sgV = 0.3 + 0.22 * x01, s = look.s0, dy = s * 0.5, zh = dy * look.zk;
-      const Pe = look.P, topEdge = -oy / kk, hue0 = 268, hueSpan = 128, row = 2 * dy;   // violet (268) through magenta and red to amber (396 = 36)
+      const Pe = look.P, topEdge = -oy / kk, hue0 = look.h0, hueSpan = look.hs, row = 2 * dy;   // the hue runs from h0 over hs degrees (a new one every press)
       const fx = VW / 2 + FP.vx, fy = VH / 2 + FP.vy, f2x = VW / 2 + FP2.vx, f2y = VH / 2 + FP2.vy;
       const decay = Math.exp(-dt / 0.45), decay2 = Math.exp(-dt / 0.35);
       // the whole picture slides down the screen at one slow, even speed: T is the way it has gone. A slot of the lattice shows the step that has come to it, so new stairs enter from above and old ones leave
