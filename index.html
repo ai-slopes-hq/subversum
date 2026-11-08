@@ -2614,7 +2614,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   window.subversum = { seed: () => curSeed == null ? null : seedToStr(curSeed), version: SEED_VERSION, patch: debugPatch, xy: XY, z: () => ZH, p: () => Object.assign({}, PX), rev: () => seq && seq.rev, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // debug snapshot of the live sound state
   function place(cx, cy, snap) {
     const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844);
-    XY.x = cx / W; XY.y = cy / H; XY.nx = XY.x * 2 - 1; XY.ny = 1 - XY.y * 2;
+    XY.x = cx / W; XY.y = cy / H; XY.nx = clamp(XY.x * 2 - 1, -1, 1); XY.ny = clamp(1 - XY.y * 2, -1, 1);   // a finger that leaves the screen stays at the edge value: the macros and the HUD are -1..1
     FP.vx = (cx - W / 2) / sc; FP.vy = (cy - H / 2) / sc;
     P1.x = cx; P1.y = cy;
     if (snap) root.classList.add('snap');
@@ -2883,7 +2883,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     function frame(now) {
       modRaf = requestAnimationFrame(frame);
       const dt = Math.min(0.1, (now - last) / 1000), kk = 1 - Math.exp(-dt * 14); last = now;
-      const M = MOD[skin] || MOD.amber, tgt = { x: XY.nx, y: XY.ny, p: PX.d };
+      const M = MOD[skin] || MOD.amber, tgt = { x: clamp(XY.nx, -1, 1), y: clamp(XY.ny, -1, 1), p: clamp(PX.d, -1, 1) };
       // X, Y follow the finger and P the pinch. Nothing counts as a change until the finger really moves: a new press snaps to its position quietly
       ['x', 'y', 'p'].forEach(a => {
         const r = E[a], live = a === 'p' ? PX.on : holding;
