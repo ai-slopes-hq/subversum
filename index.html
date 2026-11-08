@@ -402,8 +402,46 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 <script defer src="/_vercel/insights/script.js"></script>
 <style id="service">
 /* service layer: lock frame, the quiet strip at the bottom, the fan. Only the fan carries text; the rest of the screen stays without labels. */
+/* modulation HUD: four quiet readouts at the top (X, Y, P, Z). The look follows the world through the --k-* tokens; the text says what the axis changes and which way */
+#mod { position: fixed; z-index: 8; left: 0; right: 0; top: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; pointer-events: none; -webkit-user-select: none; user-select: none;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) max(18px, env(safe-area-inset-right, 0px)) 30px max(18px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(rgba(0,0,0,.46), rgba(0,0,0,.2) 62%, transparent);
+  font: var(--k-fst, normal) var(--k-fw, 600) var(--k-fs, 9.5px)/1 var(--k-font, ui-sans-serif, system-ui, sans-serif); letter-spacing: var(--k-ls, .12em); text-transform: var(--k-case, uppercase);
+  color: var(--k-ink, #f1ece4); text-shadow: var(--k-tx, 0 1px 2px rgba(0,0,0,.7)); transition: color .4s; }
+#mod .md { min-width: 0; opacity: .42; transition: opacity .35s; }
+#mod .md.live { opacity: 1; }
+#mod .md.off { visibility: hidden; }
+#mod .mh { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 7px; white-space: nowrap; }
+#mod .mh span { overflow: hidden; }
+#mod .mh i { font-style: normal; opacity: .5; margin-right: .9em; }
+#mod .mh b { font-weight: inherit; }
+#mod .mh em { font-style: normal; color: var(--k-hi, #ffd28a); font-variant-numeric: tabular-nums; }
+#mod .mb { position: relative; display: block; height: var(--k-th, 3px); background: var(--k-track, rgba(255,255,255,.18)); border-radius: var(--k-r, 2px); }
+#mod .bi .mb::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; margin-left: -.5px; background: currentColor; opacity: .38; }
+#mod .mb s { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: inherit; background: var(--k-fill, var(--k-hi, #ffd28a)); box-shadow: var(--k-glow, none); -webkit-mask: var(--k-mask, none); mask: var(--k-mask, none); }
+#mod .mb s.cd { background: repeating-linear-gradient(90deg, var(--k-ink, #fff) 0 3px, transparent 3px 7px); box-shadow: none; -webkit-mask: none; mask: none; opacity: .85; }
+#mod .mb u { position: absolute; top: 50%; left: 0; width: var(--k-hd, 7px); height: var(--k-hdh, var(--k-hd, 7px)); margin: calc(var(--k-hdh, var(--k-hd, 7px)) / -2) 0 0 calc(var(--k-hd, 7px) / -2);
+  background: var(--k-head, var(--k-hi, #ffd28a)); border: var(--k-hb, 0); box-sizing: border-box; border-radius: var(--k-hr, 50%); transform: rotate(var(--k-hrot, 0deg)); box-shadow: var(--k-glow, none); }
+html[data-skin="amber"] #mod { --k-ink: #ffe9fc; --k-hi: hsl(var(--hue) 100% 74%); --k-fill: linear-gradient(90deg, hsl(var(--hue) 100% 66%), hsl(calc(var(--hue) + 70) 100% 72%)); --k-fw: 700; --k-ls: .22em; --k-th: 2px; --k-track: hsl(var(--hue) 60% 80% / .22);
+  --k-glow: 0 0 8px hsl(var(--hue) 100% 62% / .85); --k-tx: 0 0 8px hsl(var(--hue) 100% 60% / .65), 0 1px 2px rgba(0,0,0,.7); --k-hr: 1px; --k-hrot: 45deg; --k-hd: 7px; }
+html[data-skin="riso"] #mod { --k-ink: #F2EBDC; --k-hi: hsl(var(--rh) 100% 70%); --k-font: ui-rounded, "SF Pro Rounded", system-ui, sans-serif; --k-fw: 800; --k-ls: .05em; --k-th: 5px; --k-r: 3px; --k-track: rgba(242,235,220,.22);
+  --k-glow: 2px 2px 0 hsl(var(--rb) 100% 62%); --k-hd: 11px; --k-hb: 2px solid #F2EBDC; --k-head: hsl(var(--rh) 100% 65%); --k-tx: 1px 1px 0 rgba(0,0,0,.55); }
+html[data-skin="scope"] #mod { --k-ink: hsl(var(--sh) 100% 80%); --k-hi: hsl(var(--sh) 100% 66%); --k-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --k-fw: 600; --k-ls: .1em; --k-th: 5px; --k-r: 0; --k-track: repeating-linear-gradient(90deg, hsl(var(--sh) 60% 28% / .8) 0 3px, transparent 3px 5px);
+  --k-mask: repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 5px); --k-glow: 0 0 6px hsl(var(--sh) 100% 60% / .9); --k-tx: 0 0 7px hsl(var(--sh) 100% 60% / .75); --k-hd: 5px; --k-hdh: 11px; --k-hr: 0; }
+html[data-skin="topo"] #mod { --k-ink: hsl(var(--tp) 60% 88%); --k-hi: hsl(var(--tp) 90% 80%); --k-font: ui-serif, Georgia, "Times New Roman", serif; --k-fst: italic; --k-fw: 500; --k-fs: 11.5px; --k-ls: .03em; --k-case: none; --k-th: 1px; --k-r: 0; --k-track: hsl(var(--tp) 50% 80% / .32);
+  --k-hd: 8px; --k-head: transparent; --k-hb: 1.5px solid hsl(var(--tp) 90% 82%); --k-tx: 0 1px 3px rgba(0,0,0,.8); }
+html[data-skin="matrix"] #mod { --k-ink: #f4dcea; --k-hi: hsl(var(--mh) 100% 68%); --k-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --k-fw: 700; --k-ls: .1em; --k-th: 6px; --k-r: 0;
+  --k-track: radial-gradient(circle, rgba(255,255,255,.26) 1.3px, transparent 1.7px) 0 50% / 7px 100% repeat-x; --k-mask: radial-gradient(circle, #000 2px, transparent 2.5px) 0 50% / 7px 100% repeat-x; --k-glow: none; --k-hd: 9px; --k-hr: 50%; --k-head: transparent; --k-hb: 2px solid hsl(var(--mh) 100% 78%); }
+html[data-skin="mandala"] #mod { --k-ink: hsl(var(--hue) 60% 90%); --k-hi: hsl(var(--hue) 100% 76%); --k-font: ui-serif, Georgia, "Times New Roman", serif; --k-fw: 500; --k-fs: 9px; --k-ls: .26em; --k-th: 1px; --k-r: 0; --k-track: hsl(var(--hue) 60% 80% / .3);
+  --k-glow: 0 0 9px hsl(var(--hue) 100% 70% / .8); --k-tx: 0 0 8px hsl(var(--hue) 100% 60% / .55), 0 1px 2px rgba(0,0,0,.7); --k-hd: 8px; --k-hr: 1px; --k-hrot: 45deg; }
+html[data-skin="ridges"] #mod { --k-ink: hsl(var(--hue) 45% 84%); --k-hi: hsl(var(--hue) 100% 74%); --k-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --k-fw: 500; --k-fs: 10px; --k-ls: .04em; --k-case: lowercase; --k-th: 1px; --k-r: 0; --k-track: hsl(var(--hue) 40% 70% / .3);
+  --k-hd: 2px; --k-hdh: 11px; --k-hr: 0; }
+html[data-skin="clouds"] #mod { --k-ink: hsl(var(--hue) 45% 92%); --k-hi: hsl(var(--hue) 100% 80%); --k-fw: 300; --k-fs: 10px; --k-ls: .16em; --k-case: lowercase; --k-th: 3px; --k-r: 2px;
+  --k-track: radial-gradient(circle, rgba(255,255,255,.34) 1px, transparent 1.4px) 0 50% / 5px 100% repeat-x; --k-mask: radial-gradient(circle, #000 1.4px, transparent 1.9px) 0 50% / 5px 100% repeat-x;
+  --k-glow: 0 0 12px hsl(var(--hue) 100% 72% / .9); --k-hd: 7px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
+@media (prefers-reduced-motion: reduce) { #mod, #mod .md { transition: none; } }
 /* debug HUD (?hud=1): the axes and their values as a game readout; never on by default */
-#hud { position: fixed; z-index: 8; left: max(8px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 8px); width: 168px; pointer-events: none; font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: #f1ece4; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; -webkit-user-select: none; user-select: none; }
+#hud { position: fixed; z-index: 8; left: max(8px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 78px); width: 168px; pointer-events: none; font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: #f1ece4; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; -webkit-user-select: none; user-select: none; }
 #hud .hd-top { display: flex; justify-content: space-between; align-items: center; height: 16px; padding: 0 5px; margin-bottom: 3px; background: rgba(0,0,0,.62); border: 2px solid hsl(var(--hue) 100% 64%); box-shadow: 3px 3px 0 rgba(0,0,0,.6); color: hsl(var(--hue) 100% 64%); }
 #hud .hd-top span { display: flex; gap: 4px; }
 #hud .hd-top span b { padding: 1px 3px; background: hsl(var(--hue) 100% 64%); color: #000; text-shadow: none; }
@@ -2812,6 +2850,63 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (e.code === 'Space' || e.code === 'Enter') up();
   });
 
+  /* ---------- modulation HUD (permanent): X, Y, P, Z as four quiet bars at the top. The text says what the axis changes and which way; the look comes from the world's --k-* tokens in CSS. ?mod=0 hides it ---------- */
+  // per world: x and y are [what, finger left/down, finger right/up]; p is [what, fingers together, fingers apart] plus what a P tap does (pt); z is [what, how it moves] (only clouds and topo have it)
+  const MOD = {
+    amber:   { x: ['gate', 'pluck', 'ring'],       y: ['timbre', 'pure', 'fold'],       p: ['fm ratio', 'pure', 'bell'],    pt: 'accent' },
+    mandala: { x: ['echo', 'dry', 'wet'],          y: ['filter', 'dark', 'bright'],     p: ['echo time', 'short', 'long'],  pt: 'throw' },
+    riso:    { x: ['strike', 'soft', 'snap'],      y: ['damping', 'damped', 'ringing'], p: ['envelope', 'click', 'bow'],    pt: 'hit' },
+    scope:   { x: ['pitch', 'low', 'high'],        y: ['echo', 'dry', 'wet'],           p: ['hit type', 'zap', 'noise'],    pt: 'shot' },
+    topo:    { x: ['filter', 'dark', 'open'],      y: ['pulse', 'narrow', 'wide'],      p: ['interval'], pLive: 1,          pt: 'swell', z: ['unison', 'wider'] },
+    matrix:  { x: ['bit depth', 'crushed', 'clean'], y: ['arp', 'plain', 'busy'],       p: ['arp rate', 'fast', 'slow'],    pt: 'ratchet' },
+    ridges:  { x: ['cutoff', 'closed', 'open'],    y: ['resonance', 'calm', 'squeal'],  p: ['env depth', 'flat', 'deep'],   pt: 'stab' },
+    clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] }
+  };
+  let modEl = null, modRaf = 0;
+  function modStart() {
+    if (modEl) return;
+    modEl = document.createElement('div'); modEl.id = 'mod'; modEl.setAttribute('aria-hidden', 'true');
+    const cell = (k, bi) => '<div class="md ' + (bi ? 'bi' : 'uni') + '" data-k="' + k + '"><div class="mh"><span><i>' + k.toUpperCase() + '</i><b></b></span><em></em></div><span class="mb"><s></s><u></u></span></div>';
+    modEl.innerHTML = cell('x', 1) + cell('y', 1) + cell('p', 1) + cell('z', 0);
+    document.body.appendChild(modEl);
+    const R = {};
+    ['x', 'y', 'p', 'z'].forEach(k => { const e = modEl.querySelector('[data-k=' + k + ']'); R[k] = { e, b: e.querySelector('b'), em: e.querySelector('em'), s: e.querySelector('s'), u: e.querySelector('u'), v: 0, tb: null, te: null, live: null, off: null, cd: null }; });
+    const txt = (r, key, v) => { if (r[key] !== v) { r[key] = v; (key === 'tb' ? r.b : r.em).textContent = v; } };   // the DOM is touched only when the text changes
+    const flag = (r, cls, v) => { v = !!v; if (r[cls] !== v) { r[cls] = v; r.e.classList.toggle(cls, v); } };
+    const bar = (r, v) => { const a = Math.abs(v); r.s.style.left = (v >= 0 ? 50 : 50 + v * 50) + '%'; r.s.style.width = a * 50 + '%'; r.u.style.left = (50 + v * 50) + '%'; };
+    const AR = { x: ['◂', '▸'], y: ['▾', '▴'], p: ['›‹', '‹›'] };   // finger left / right, down / up, together / apart
+    const dir = (k, v, lo, hi) => Math.abs(v) < 0.1 ? '·' : v < 0 ? AR[k][0] + ' ' + lo : hi + ' ' + AR[k][1];
+    let pOn = false, tapUntil = 0, last = performance.now();
+    function frame(now) {
+      modRaf = requestAnimationFrame(frame);
+      const dt = Math.min(0.1, (now - last) / 1000), k = 1 - Math.exp(-dt * 14); last = now;
+      const M = MOD[skin] || MOD.amber, tgt = { x: XY.nx, y: XY.ny, p: PX.d };
+      ['x', 'y', 'p'].forEach(a => { const r = R[a]; r.v += (tgt[a] - r.v) * k; if (Math.abs(tgt[a] - r.v) < 0.002) r.v = tgt[a]; });
+      // X and Y: the finger's position is the value
+      ['x', 'y'].forEach(a => { const r = R[a], m = M[a]; txt(r, 'tb', m[0]); txt(r, 'te', dir(a, r.v, m[1], m[2])); bar(r, r.v); flag(r, 'live', holding); });
+      // P: the pinch value stays where the fingers left it; a touch of the second finger first shows what its tap does
+      if (PX.on && !pOn) tapUntil = now + 900; pOn = PX.on;
+      { const r = R.p, m = M.p; txt(r, 'tb', m[0]);
+        txt(r, 'te', now < tapUntil ? 'tap · ' + M.pt : M.pLive ? topoIv()[3].toLowerCase() : dir('p', r.v, m[1], m[2])); bar(r, r.v); flag(r, 'live', PX.on); }
+      // Z: how long the finger has been held. A second of nothing (the countdown drains), then it opens over ~11 s
+      { const r = R.z, z = M.z, ze = holding && ctx && seq ? ctx.currentTime - zT0 : -1;
+        flag(r, 'off', !z);
+        if (z) {
+          txt(r, 'tb', z[0]);
+          const wait = ze >= 0 && ze < 1;
+          if (wait !== r.cd) { r.cd = wait; r.s.classList.toggle('cd', wait); }
+          const w = wait ? 1 - ze : ZH;
+          r.s.style.left = '0'; r.s.style.width = clamp(w, 0, 1) * 100 + '%'; r.u.style.left = clamp(w, 0, 1) * 100 + '%';
+          txt(r, 'te', ze < 0 ? '·' : wait ? 'in ' + (1 - ze).toFixed(1) + 's' : ZH > 0.995 ? 'full' : z[1] + ' ' + Math.round(ZH * 100) + '%');
+          flag(r, 'live', ze >= 0);
+        }
+      }
+    }
+    modRaf = requestAnimationFrame(frame);
+  }
+  function modStop() { if (!modEl) return; cancelAnimationFrame(modRaf); modEl.remove(); modEl = null; }
+  Object.assign(window.subversum, { mod: v => { if (v) modStart(); else modStop(); try { localStorage.setItem('subversum.mod', v ? '1' : '0'); } catch (e) {} } });
+  { let want = !/[?&]mod=0/.test(location.search); try { const ls = localStorage.getItem('subversum.mod'); if (ls === '0' && !/[?&]mod=1/.test(location.search)) want = false; } catch (e) {} if (want) modStart(); }
   /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
   const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
     amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
@@ -2860,7 +2955,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
   function hudStop() { if (!hudEl) return; cancelAnimationFrame(hudRaf); hudEl.remove(); hudEl = null; }
   window.subversum.hud = v => { if (v) hudStart(); else hudStop(); try { localStorage.setItem('subversum.hud', v ? '1' : '0'); } catch (e) {} };
-  const HUD_DEFAULT = true;   // while the gestures are being tuned the HUD is on everywhere; set to false to bring it back to opt-in (?hud=1)
+  const HUD_DEFAULT = false;   // the permanent modulation HUD (#mod) replaces it; this one is for debugging only (?hud=1)
   let hudWanted = HUD_DEFAULT || /[?&]hud=1/.test(location.search);
   try { const ls = localStorage.getItem('subversum.hud'); if (/[?&]hud=0/.test(location.search) || ls === '0') hudWanted = false; else if (ls === '1') hudWanted = true; } catch (e) { if (/[?&]hud=0/.test(location.search)) hudWanted = false; }
   if (hudWanted) hudStart();
