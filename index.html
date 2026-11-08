@@ -1137,10 +1137,10 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const { t0, f, vel, s, idx } = c, boom = !!c.boom, sp = s.sp, m = (MAC.color + 1) / 2, k = Math.pow(2, 1.5 * PX.d);   // the pinch scales decay, release and key length together
     const dA = sp.d * k, rA = sp.r * k, gate = c.dur * sp.gate * (boom ? 1.4 : 1) * Math.min(k, 2.5), ta = t0 + sp.a, tg = ta + gate, end = tg + rA * 5;
     const cut = clamp(sp.cut * Math.pow(2, 2.2 * MAC.cut) * Math.sqrt(f / 65), 120, 9000), envOct = sp.env0 + (3.6 - sp.env0) * ZH, pk = Math.min(12000, cut * Math.pow(2, envOct)), sus = Math.min(12000, cut * Math.pow(2, envOct * sp.s));
-    const lp1 = c.bq('lowpass', cut, 0.4 + sp.res), lp2 = c.bq('lowpass', cut, 0.5), vca = c.g(0);
+    const res = clamp(sp.res + 6 * PX.d, 0, 14), lp1 = c.bq('lowpass', cut, 0.4 + res), lp2 = c.bq('lowpass', cut, 0.5), vca = c.g(0), trim = 1 - 0.035 * res;   // the pinch moves the resonance with the amp envelope (together: dry and short, apart: ringing and long); the seed sets where it starts
     [lp1, lp2].forEach(l => { l.frequency.setValueAtTime(cut, t0); l.frequency.linearRampToValueAtTime(pk, ta); l.frequency.setTargetAtTime(sus, ta, dA / 3); l.frequency.setTargetAtTime(cut, tg, rA / 3); });
-    vca.gain.setValueAtTime(0, t0); vca.gain.linearRampToValueAtTime(0.5 * vel * (idx % 4 === 0 ? 1 : 0.85) * (boom ? 1.2 : 1), ta);
-    vca.gain.setTargetAtTime(0.5 * vel * sp.s, ta, dA / 3); vca.gain.setTargetAtTime(0, tg, rA / 3);
+    vca.gain.setValueAtTime(0, t0); vca.gain.linearRampToValueAtTime(0.5 * trim * vel * (idx % 4 === 0 ? 1 : 0.85) * (boom ? 1.2 : 1), ta);
+    vca.gain.setTargetAtTime(0.5 * trim * vel * sp.s, ta, dA / 3); vca.gain.setTargetAtTime(0, tg, rA / 3);
     [['sawtooth', -sp.det, Math.cos(m * Math.PI / 2)], ['square', sp.det, 0.8 * Math.sin(m * Math.PI / 2)]].forEach(w => {
       const o = c.osc(w[0], f, w[1]), g = c.g(w[2]); o._end = end + 0.05; o.connect(g); g.connect(lp1);
     });
@@ -1666,7 +1666,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       s.hset = pick(HSETS); s.steps.forEach(st => { if (st) st.k = (st.midi - LOW) / (HIGH - LOW); }); s.sc = { name: 'HARMONICS', iv: sc.iv };
     }
     if (skin === 'shepard') {   // a soft subtractive patch rolled by the seed: a saw, square or triangle pair, a 24 dB low pass with its own ADSR, a gentle attack, a short key
-      s.sp = { det: rnd(3, 11), cut: lrnd(350, 1400), env0: rnd(0.3, 1.0), res: rnd(0, 3), a: rnd(0.002, 0.007), d: rnd(0.07, 0.22), s: rnd(0, 0.1), r: rnd(0.06, 0.18), gate: rnd(0.3, 0.7) };   // a pluck: a click of an attack, a quick decay to almost nothing, a short key
+      s.sp = { det: rnd(3, 11), cut: lrnd(350, 1400), env0: rnd(0.3, 1.0), res: rnd(0, 6), a: rnd(0.002, 0.007), d: rnd(0.07, 0.22), s: rnd(0, 0.1), r: rnd(0.06, 0.18), gate: rnd(0.3, 0.7) };   // a pluck: a click of an attack, a quick decay to almost nothing, a short key
     }
     return s;
   }
@@ -2443,7 +2443,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const mulb = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
     let look = null, lookBus = null, nC = 0, CI = null, CJ = null, CX = null, CY = null, CO = null, CB = null, LIFT = null;
     const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1]];
-    let phase = 0, touch = 0, flash = 0, wS = 0, brick = null, brickSlot = -1, vig = null, FILL = null, FL = null, T = 0;
+    let phase = 0, touch = 0, flash = 0, wS = 0, vig = null, FILL = null, FL = null, T = 0;
     function rebuild(r) {   // a new press: new floor (cell size, number of steps, size of the blocks, how many directions), from the dice of the press
       const rr = mulb(Math.floor(r[0] * 4e9) ^ Math.floor(r[3] * 1e9));
       look = { seed: Math.floor(r[2] * 4e9) | 0, s0: 36 + 20 * r[0], P: 4 + Math.floor(r[1] * 4), zk: 1.0 + 0.3 * r[2], B: 4 + Math.floor(r[3] * 3), nd: 3 + Math.floor(rr() * 4), dx: 3 + 5 * rr() };
@@ -2493,11 +2493,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const Pe = look.P, topEdge = -oy / kk, hue0 = 268, hueSpan = 128, row = 2 * dy;   // violet (268) through magenta and red to amber (396 = 36)
       const fx = VW / 2 + FP.vx, fy = VH / 2 + FP.vy, f2x = VW / 2 + FP2.vx, f2y = VH / 2 + FP2.vy;
       const decay = Math.exp(-dt / 0.45), decay2 = Math.exp(-dt / 0.35);
-      // the whole picture slides down the screen at one slow, even speed: T is the way it has gone. A slot of the lattice shows the step that has come to it, so new stairs enter from above and old ones leave
-      // below through the dark of the window. The stairs are a function of the lattice place alone (the block, its direction and its place on the stair), so the picture goes on for ever.
+      // the whole picture slides up the screen at one slow, even speed: T is the way it has gone. A slot of the lattice shows the step that has come to it, so new stairs enter from below and old ones leave
+      // above through the dark of the window. The stairs are a function of the lattice place alone (the block, its direction and its place on the stair), so the picture goes on for ever.
       const nT = Math.floor(T / row), fT = T - nT * row;
       for (let n = 0; n < nC; n++) {
-        const ii = CI[n] - nT, jj = CJ[n] - nT, st = stairAt(ii, jj, Pe), Y = CY[n] + fT, X = CX[n], u = st.u, fl = Math.floor(u);
+        const ii = CI[n] + nT, jj = CJ[n] + nT, st = stairAt(ii, jj, Pe), Y = CY[n] - fT, X = CX[n], u = st.u, fl = Math.floor(u);
         let h = fl + sst(0.55, 1, u - fl) + LIFT[n];
         LIFT[n] *= decay; FL[n] *= decay2;
         if (touch > 0.02) { const dxx = X - fx, dyy = Y - fy, dd = dxx * dxx + dyy * dyy; if (dd < 14000) h += touch * 1.5 * Math.exp(-dd / 3200); }
@@ -2508,11 +2508,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         const cols = [hslRgb(hh, 62, L), hslRgb(hh + 10, 62, L * 0.62), hslRgb(hh - 10, 62, L * 0.38)];
         if (FL[n] > 0.02) cols[0] = mixc(cols[0], [255, 232, 176], FL[n]);   // the step that has just been hit lights its top
         drawCell(X, Y, s, h, zh, cols, wv, (fl === Pe - 1 || fl === 0) ? hslRgb(hh + 25, 100, 82) : null);
-        if (n === brickSlot && brick) {   // the brick of the last note: it falls from above the screen onto this step and is taken into it
-          brick.y -= (brick.vy += 140 * dt) * dt;
-          if (brick.y <= 0) { brick = null; FL[n] = 1; LIFT[n] -= 0.35; }
-          else drawCell(X, Y, s, h + brick.y + 1, zh, [hslRgb(40, 100, 80), hslRgb(44, 100, 52), hslRgb(34, 100, 36)], 1, hslRgb(40, 100, 94), 1);
-        }
       }
       g.setTransform(1, 0, 0, 1, 0, 0);
       if (flash > 0.02) { g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,170,90,' + (0.22 * flash).toFixed(3) + ')'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over'; }
@@ -2527,7 +2522,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       wS += (MAC.cut - wS) * (1 - Math.exp(-dt * 8));   // the cutoff opens the window of light
       touch += ((XY.down || holding ? 1 : 0) - touch) * (1 - Math.exp(-dt * 10));
       flash *= Math.exp(-dt * 5);
-      T += (live ? 15 + 12 * ZH : 6) * dt;   // slow and even, a little quicker while the finger stays (Z)
+      T += (live ? 15 + 12 * ZH : 6) * dt;   // slow and even, a little quicker while the finger stays (Z); the picture goes up
       draw(dt);
       if (!started) started = tn;
       if (tn - started > 2500) {
@@ -2537,14 +2532,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     }
     last = lastDraw = performance.now(); draw(0.016);
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) raf = requestAnimationFrame(frame);
-    SK.note = (i, vel) => {   // every note drops one brick on a step in the light (never more than one at a time)
-      if (brick || !nC || !look) return;
-      const row = look.s0, nT = Math.floor(T / row), fT = T - nT * row, zh = look.s0 * 0.5 * look.zk, Hv = (H / kk) || VH, topEdge = -oy / kk;
-      for (let tries = 0; tries < 30; tries++) {
-        const n = Math.floor(Math.random() * nC), vy = (CY[n] + fT - topEdge) / Hv;
-        if (vy > 0.25 && vy < 0.75) { const st = stairAt(CI[n] - nT, CJ[n] - nT, look.P); brickSlot = n; brick = { y: (CY[n] + fT - topEdge) / zh + st.u + 3, vy: 0 }; break; }
-      }
-    };
     SK.pTap = () => { flash = 1; };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
   }
@@ -3432,7 +3419,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     matrix:  { x: ['bit depth', 'crushed', 'clean'], y: ['arp', 'plain', 'busy'],       p: ['arp rate', 'fast', 'slow'],    pt: 'ratchet', z: ['arp', 'busier'] },
     ridges:  { x: ['cutoff', 'closed', 'open'],    y: ['resonance', 'calm', 'squeal'],  p: ['env depth', 'flat', 'deep'],   pt: 'stab', z: ['squeal', 'higher'] },
     clouds:  { x: ['density', 'sparse', 'dense'],  y: ['space', 'dry', 'wet'],          p: ['pitch spread', 'unison', 'wide'], pt: 'freeze', z: ['bloom', 'wider'] },
-    shepard: { x: ['wave', 'saw', 'square'],       y: ['cutoff', 'closed', 'open'],      p: ['amp env', 'short', 'long'],      pt: 'hit', z: ['filter env', 'deeper'] },
+    shepard: { x: ['wave', 'saw', 'square'],       y: ['cutoff', 'closed', 'open'],      p: ['env + reso', 'short', 'long'],   pt: 'hit', z: ['filter env', 'deeper'] },
     overtones: { x: ['drone', 'dark', 'bright'],   y: ['register', 'low', 'high'],       p: ['harmonics', 'sparse', 'dense'], pt: 'jump', z: ['climb', 'higher'] },
     vector:  { x: ['timbre', 'soft', 'bright'],    y: ['body', 'short', 'long'],         p: ['border', 'soft', 'sharp'],    pt: 'snap', z: ['orbit', 'wider'] }
   };
@@ -3503,7 +3490,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
   const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
     amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
-    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM', 'INTERVAL', 'SWELL'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW'], vector: ['TIMBRE', 'BODY', 'BORDER', 'SNAP'], shepard: ['WAVE', 'CUTOFF', 'AMP ENV', 'HIT'], overtones: ['DRONE', 'REGISTER', 'HARMONICS', 'JUMP']
+    riso: ['STRIKE', 'DAMPING', 'ENVELOPE', 'HIT'], scope: ['PITCH', 'ECHO', 'HIT TYPE', 'SHOT'], topo: ['FILTER', 'PWM', 'INTERVAL', 'SWELL'], matrix: ['CRUSH', 'ARP RANGE', 'ARP RATE', 'RATCHET'], mandala: ['THROW', 'FILTER', 'ECHO TIME', 'THROW'], vector: ['TIMBRE', 'BODY', 'BORDER', 'SNAP'], shepard: ['WAVE', 'CUTOFF', 'ENV + RESO', 'HIT'], overtones: ['DRONE', 'REGISTER', 'HARMONICS', 'JUMP']
   };
   let hudEl = null, hudRaf = 0;
   function hudStart() {
