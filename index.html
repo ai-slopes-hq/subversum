@@ -2792,8 +2792,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
   function hudStop() { if (!hudEl) return; cancelAnimationFrame(hudRaf); hudEl.remove(); hudEl = null; }
   window.subversum.hud = v => { if (v) hudStart(); else hudStop(); try { localStorage.setItem('subversum.hud', v ? '1' : '0'); } catch (e) {} };
-  let hudWanted = /[?&]hud=1/.test(location.search);
-  try { if (!hudWanted && !/[?&]hud=0/.test(location.search) && localStorage.getItem('subversum.hud') === '1') hudWanted = true; } catch (e) {}
+  const HUD_DEFAULT = true;   // while the gestures are being tuned the HUD is on everywhere; set to false to bring it back to opt-in (?hud=1)
+  let hudWanted = HUD_DEFAULT || /[?&]hud=1/.test(location.search);
+  try { const ls = localStorage.getItem('subversum.hud'); if (/[?&]hud=0/.test(location.search) || ls === '0') hudWanted = false; else if (ls === '1') hudWanted = true; } catch (e) { if (/[?&]hud=0/.test(location.search)) hudWanted = false; }
   if (hudWanted) hudStart();
 })();
 </script>
