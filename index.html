@@ -415,23 +415,23 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 #sabprobe { position: fixed; left: 0; top: 0; width: 0; height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); visibility: hidden; pointer-events: none; }
 #fan { position: fixed; inset: 0; z-index: 9; display: none; pointer-events: none; color: #f1ece4;
   font: 500 13px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-user-select: none; user-select: none;
-  background: linear-gradient(to top, rgba(0,0,0,.84) 0, rgba(0,0,0,.6) 17%, rgba(0,0,0,0) 42%); }
+  background: linear-gradient(to bottom, rgba(0,0,0,.62) 0, rgba(0,0,0,0) 34%), linear-gradient(to top, rgba(0,0,0,.84) 0, rgba(0,0,0,.6) 17%, rgba(0,0,0,0) 42%); }
 #fan.open { display: block; animation: fanin .09s ease-out; }
 @keyframes fanin { from { opacity: 0; } to { opacity: 1; } }
-/* the fan lives in the bottom sixth of the screen: the lock on top in the middle, the readout and the share link a little lower on either side */
+/* the icons live in the bottom sixth of the screen: the lock on top in the middle, the share link a little lower to the right; tempo and key are big text at the top */
 .fan-arc { position: absolute; left: 0; right: 0; bottom: 0; height: calc(100% / 6); }
-.fan-item, .fan-read { position: absolute; display: flex; align-items: center; justify-content: center; background: rgba(10,10,14,.55);
+.fan-item { position: absolute; display: flex; align-items: center; justify-content: center; background: rgba(10,10,14,.55);
   border: 1.5px solid rgba(255,255,255,.34); transition: background .08s, border-color .08s, transform .08s, opacity .08s, color .08s; }
 .fan-item { width: 56px; height: 56px; margin-left: -28px; border-radius: 50%; }
 .fan-item svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 #fanLock { left: 50%; top: 6px; }
-#fanShare { left: calc(50% + 96px); top: 32px; }
+#fanShare { left: calc(50% + 84px); top: 30px; }
 #fanLock .shut, #fanLock.on .open { display: none; }
 #fanLock.on .shut { display: inline; }
-.fan-read { left: calc(50% - 96px); top: 32px; width: 124px; height: 56px; margin-left: -62px; border-radius: 28px; flex-direction: column; gap: 3px; }
-.fan-read div { display: flex; align-items: center; gap: 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fan-read svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: .9; }
-.fan-read b { font-weight: 600; font-size: 16px; }
+.fan-top { position: absolute; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 44px); text-align: center; text-shadow: 0 1px 16px rgba(0,0,0,.65); }
+.fan-top b { font: 600 76px/1 system-ui, -apple-system, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.fan-top i { font-style: normal; font-size: 18px; letter-spacing: .12em; opacity: .65; margin-left: 8px; }
+.fan-top span { display: block; margin-top: 10px; font-size: 30px; font-weight: 500; opacity: .92; }
 .fan-item.hot { background: hsl(var(--hue, 38) 80% 60% / .32); border-color: hsl(var(--hue, 38) 85% 70%); transform: scale(1.12); }
 .fan-item.on { border-color: hsl(var(--hue, 38) 85% 70%); color: hsl(var(--hue, 38) 90% 78%); }
 .fan-item.dis { opacity: .3; }
@@ -454,11 +454,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 <div id="lockframe" aria-hidden="true"></div>
 <div id="handle" aria-hidden="true"></div>
 <div id="sabprobe" aria-hidden="true"></div>
-<div id="fan" aria-hidden="true"><div class="fan-arc">
-  <div class="fan-read">
-    <div><svg viewBox="0 0 24 24"><path d="M8.5 21 10.4 4h3.2l1.9 17z"/><path d="M12 16.5 16.2 7.5"/><circle cx="16.4" cy="7" r="1.2"/></svg><b id="fanBpm">—</b></div>
-    <div><svg viewBox="0 0 24 24"><path d="M9 18V5l10-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg><span id="fanKey"></span></div>
-  </div>
+<div id="fan" aria-hidden="true">
+  <div class="fan-top"><b id="fanBpm">—</b><i>BPM</i><span id="fanKey"></span></div>
+  <div class="fan-arc">
   <div class="fan-item" id="fanLock" data-act="lock">
     <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shut" d="M8 11V8a4 4 0 0 1 8 0v3"/><path class="open" d="M8 11V8a4 4 0 0 1 7.6-1.7"/></svg>
   </div>
