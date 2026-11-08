@@ -1141,39 +1141,44 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   function shepSpacing() { const d = PX.d; return Math.pow(2, 1 - (d < 0 ? d * 0.585 : d * 0.415)); }   // together: wide (up to a twelfth), apart: close (down to a fifth)
   function shepSigma() { return 0.9 + 1.7 * (MAC.color + 1) / 2; }   // octaves: x from a narrow bell to an organ
   function shepFc(b) { return Math.log2(300) + ((b && b.r ? b.r[1] : 0.5) - 0.5) * 0.8; }
+  const shepMorph = (sp, t) => 0.5 + 0.5 * Math.sin(6.2832 * t / sp.mp + sp.mph);   // 0 saw, 1 square
   const shepW = (lf, fc, sg) => Math.exp(-0.5 * Math.pow((lf - fc) / sg, 2));
   const SHEP_VOICE = c => {
-    // calm techno: a soft FM bell (the patch is rolled by the seed, like amber's, but its ranges are the quiet ones) is struck as a pitch class: one copy of the bell per octave inside the window, loudness by the bell curve
+    // calm techno: a soft subtractive note (the patch is rolled by the seed) is played as a pitch class: one copy per octave inside the window, loudness by the bell curve
     const { t0, f, vel, b, s, idx } = c, boom = !!c.boom, sp = s.sp;
     if (SHEP.b !== b) { SHEP.b = b; SHEP.gl = 0; SHEP.t = t0; SHEP.dir = 1; }
     const rate = shepRate(b);
     SHEP.gl += (SHEP.rate || 0) * (t0 - SHEP.t); SHEP.t = t0; SHEP.rate = rate;
     const midi = Math.round(69 + 12 * Math.log2(f / 440)), pc = ((midi % 12) + 12) % 12;
-    const sg = shepSigma(), fc = shepFc(b), lsp = Math.log2(shepSpacing()), D = sp.decay * (boom ? 1.2 : 1) * (0.8 + 0.4 * ZH), L = Math.min(2.4, D * 1.2), drift = rate / 12 * L;
+    const sg = shepSigma(), fc = shepFc(b), lsp = Math.log2(shepSpacing()), L = Math.min(2.4, c.dur * sp.gate + sp.a + sp.r * 3), drift = rate / 12 * L;
     const lb = Math.log2(16.3516) + (pc + SHEP.gl) / 12, copies = [];
     for (let k = Math.ceil((Math.log2(40) - lb) / lsp); copies.length < 5; k++) {
       const lf = lb + k * lsp;
       if (lf > Math.log2(5000)) break;
       const w0 = shepW(lf, fc, sg), w1 = shepW(lf + drift, fc, sg);
-      if (Math.max(w0, w1) < 0.08) continue;
+      if (Math.max(w0, w1) < 0.1) continue;
       copies.push({ lf, w0, w1 });
     }
     let s2 = 0; copies.forEach(q => { const w = Math.max(q.w0, q.w1); s2 += w * w; });
-    const beat = idx % 4 === 0 ? 1 : 0.8, A = 0.48 * vel * beat * (boom ? 1.2 : 1) / Math.sqrt(Math.max(1, s2)), tau = D / 3.2, bri = Math.pow(2, 0.6 * MAC.color);
+    const beat = idx % 4 === 0 ? 1 : 0.85, A = 0.4 * vel * beat * (boom ? 1.2 : 1) / Math.sqrt(Math.max(1, s2)), bri = Math.pow(2, 0.6 * MAC.color);
+    const gate = c.dur * sp.gate * (boom ? 1.4 : 1), tg = t0 + sp.a + gate, ta = t0 + sp.a, end = tg + sp.r * 5;   // gate: how long the key is held, then the release
     copies.forEach(q => {
-      const fHz = Math.pow(2, q.lf), fr = sp.fmRatio * (PX.d > 0.2 ? 1 + 0.02 * PX.d : 1), car = c.osc(sp.wave, fHz), mod = c.osc('sine', fHz * fr), mg = c.g(0), lp = c.bq('lowpass', 800, 0.5 + sp.res), vca = c.g(0), wg = c.g(0);
-      const dev = sp.fmIdx * fHz * fr * Math.min(1.6, bri);
-      mg.gain.setValueAtTime(dev, t0); mg.gain.setTargetAtTime(dev * sp.fmSweep, t0, tau * 0.8);   // the FM index falls as the gate closes
-      mod.connect(mg); mg.connect(car.frequency);
-      if (Math.abs(rate) > 1e-4) { const f1 = fHz * Math.pow(2, drift); car.frequency.setValueAtTime(fHz, t0); car.frequency.exponentialRampToValueAtTime(f1, t0 + L); mod.frequency.setValueAtTime(fHz * fr, t0); mod.frequency.exponentialRampToValueAtTime(f1 * fr, t0 + L); }
-      const cut = Math.min(9000, Math.max(300, fHz * sp.cutMul * bri));   // the low pass gate: it opens with the level and closes faster
-      lp.frequency.setValueAtTime(Math.max(120, fHz * 0.8), t0); lp.frequency.linearRampToValueAtTime(cut, t0 + sp.attack + 0.01); lp.frequency.setTargetAtTime(Math.max(120, fHz * 1.1), t0 + sp.attack + 0.01, tau * 0.6);
-      vca.gain.setValueAtTime(0, t0); vca.gain.linearRampToValueAtTime(1, t0 + sp.attack); vca.gain.setTargetAtTime(0, t0 + sp.attack, tau);
-      if (Math.abs(rate) > 1e-4) { const cv = new Float32Array(10); for (let i = 0; i < 10; i++) cv[i] = A * shepW(q.lf + drift * i / 9, fc, sg); wg.gain.setValueCurveAtTime(cv, t0, L); } else wg.gain.value = A * q.w0;
-      car.connect(lp); lp.connect(vca); vca.connect(wg); wg.connect(c.out);
-      car._end = mod._end = t0 + sp.attack + tau * 7 + 0.05;
+      const fHz = Math.pow(2, q.lf), vca = c.g(0), wg = c.g(0), lp1 = c.bq('lowpass', 800, 0.4 + sp.res), lp2 = c.bq('lowpass', 800, 0.5);
+      // subtractive: two detuned oscillators into a 24 dB low pass; the filter has its own ADSR (the cutoff opens by env octaves, falls to the sustain) and the level has another
+      const cut = Math.min(8000, Math.max(200, fHz * sp.cutMul * bri)), pk = Math.min(12000, cut * Math.pow(2, sp.env * 3.5)), sus = cut * Math.pow(2, sp.env * 3.5 * sp.s);
+      [lp1, lp2].forEach(l => { l.frequency.setValueAtTime(cut * 0.7, t0); l.frequency.linearRampToValueAtTime(pk, ta); l.frequency.setTargetAtTime(sus, ta, sp.d / 3); l.frequency.setTargetAtTime(cut * 0.7, tg, sp.r / 3); });
+      [['sawtooth', -sp.det], ['square', sp.det]].forEach((w, k) => {   // a saw and a square, detuned against each other; their balance is the morph, which drifts slowly with the clock (the same for every note, so it sweeps across the melody)
+        const o = c.osc(w[0], fHz, w[1]), mg = c.g(0), m0 = shepMorph(sp, t0), m1 = shepMorph(sp, end), gq = m => k ? 0.8 * Math.sin(m * Math.PI / 2) : Math.cos(m * Math.PI / 2);
+        mg.gain.setValueAtTime(gq(m0), t0); mg.gain.linearRampToValueAtTime(gq(m1), end);
+        if (Math.abs(rate) > 1e-4) { o.frequency.setValueAtTime(fHz, t0); o.frequency.exponentialRampToValueAtTime(fHz * Math.pow(2, drift), t0 + Math.max(L, end - t0)); }
+        o._end = end + 0.05; o.connect(mg); mg.connect(lp1);
+      });
+      lp1.connect(lp2); lp2.connect(vca);
+      vca.gain.setValueAtTime(0, t0); vca.gain.linearRampToValueAtTime(1, ta); vca.gain.setTargetAtTime(sp.s, ta, sp.d / 3); vca.gain.setTargetAtTime(0, tg, sp.r / 3);
+      if (Math.abs(rate) > 1e-4) { const T = Math.max(L, end - t0), cv = new Float32Array(10); for (let i = 0; i < 10; i++) cv[i] = A * shepW(q.lf + rate / 12 * T * i / 9, fc, sg); wg.gain.setValueCurveAtTime(cv, t0, T); } else wg.gain.value = A * q.w0;
+      vca.connect(wg); wg.connect(c.out);
     });
-    return t0 + sp.attack + tau * 7 + 0.1;
+    return end + 0.1;
   };
 
   /* ---------- overtones: a quiet drone of the harmonic series and a melody sung on its upper harmonics ---------- */
@@ -1693,8 +1698,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (skin === 'overtones') {   // the pool position of every step decides which harmonic of the seed's set it sings; the key and the scale name belong to the drone
       s.hset = pick(HSETS); s.steps.forEach(st => { if (st) st.k = (st.midi - LOW) / (HIGH - LOW); }); s.sc = { name: 'HARMONICS', iv: sc.iv };
     }
-    if (skin === 'shepard') {   // a calm patch rolled by the seed: a sine or triangle carrier, a consonant FM ratio and a low index, a soft low pass gate, a gentle attack
-      s.sp = { wave: pick(['sine', 'triangle', 'triangle']), fmRatio: pick([0.5, 1, 1, 2, 2, 3, 4]), fmIdx: rnd(0.05, 1.1), fmSweep: rnd(0.1, 0.8), decay: lrnd(0.35, 1.3), attack: rnd(0.006, 0.04), cutMul: rnd(2, 6), res: rnd(0, 2.5) };
+    if (skin === 'shepard') {   // a soft subtractive patch rolled by the seed: a saw, square or triangle pair, a 24 dB low pass with its own ADSR, a gentle attack, a short key
+      s.sp = { mp: rnd(5, 14), mph: rnd(0, 6.28), det: rnd(3, 11), cutMul: rnd(1.6, 5), env: rnd(0.2, 0.8), res: rnd(0, 3), a: rnd(0.006, 0.05), d: rnd(0.12, 0.5), s: rnd(0.15, 0.55), r: rnd(0.12, 0.45), gate: rnd(0.7, 1.6) };
     }
     return s;
   }
@@ -2471,7 +2476,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const mulb = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
     let look = null, lookBus = null, nC = 0, CI = null, CJ = null, CX = null, CY = null, CO = null, CB = null, LIFT = null;
     const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1]];
-    let phase = 0, touch = 0, flash = 0, wS = 0.5, drops = [], vig = null;
+    let phase = 0, touch = 0, flash = 0, wS = 0, drops = [], vig = null, FILL = null, FL = null;
     function rebuild(r) {   // a new press: new floor (cell size, number of steps, size of the blocks, how many directions), from the dice of the press
       const rr = mulb(Math.floor(r[0] * 4e9) ^ Math.floor(r[3] * 1e9));
       look = { s0: 36 + 20 * r[0], P: 4 + Math.floor(r[1] * 4), zk: 1.0 + 0.3 * r[2], B: 4 + Math.floor(r[3] * 3), nd: 3 + Math.floor(rr() * 4), dx: 3 + 5 * rr() };
@@ -2484,7 +2489,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         if (!(k in ori)) ori[k] = Math.floor(rr() * look.nd);
         list.push([i, j, X, Y, ori[k], ((bi * 37 + bj * 11) % 5 + 5) % 5]);
       }
-      nC = list.length; CI = new Int16Array(nC); CJ = new Int16Array(nC); CX = new Float32Array(nC); CY = new Float32Array(nC); CO = new Uint8Array(nC); CB = new Uint8Array(nC); LIFT = new Float32Array(nC);
+      nC = list.length; CI = new Int16Array(nC); CJ = new Int16Array(nC); CX = new Float32Array(nC); CY = new Float32Array(nC); CO = new Uint8Array(nC); CB = new Uint8Array(nC); LIFT = new Float32Array(nC); FILL = new Float32Array(nC); FL = new Float32Array(nC);
       list.forEach((q, n) => { CI[n] = q[0]; CJ[n] = q[1]; CX[n] = q[2]; CY[n] = q[3]; CO[n] = q[4]; CB[n] = q[5]; });
       drops = [];
     }
@@ -2507,6 +2512,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       poly([X, top, X + dx, top + dy, X, top + 2 * dy, X - dx, top + dy], hue[0]);
       if (edge) { g.strokeStyle = rgb(mixc(BG, edge, wv)); g.lineWidth = 1.3; g.beginPath(); g.moveTo(X - dx, top + dy); g.lineTo(X, top); g.lineTo(X + dx, top + dy); g.stroke(); g.lineWidth = 2.2; }
     }
+    const win0 = n => { const vy = (CY[n] + oy / kk) / (H / kk); return Math.exp(-Math.pow((vy - 0.5) / (0.3 + 0.22 * (wS + 1) / 2), 2)); };
     function draw(dt) {
       if (!look || lookBus !== lastBus) { if (lastBus !== lookBus || !look) { lookBus = lastBus; rebuild(diceOf()); } }
       g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = rgb(BG); g.fillRect(0, 0, W, H);
@@ -2514,29 +2520,34 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       const x01 = (wS + 1) / 2, sgV = 0.3 + 0.22 * x01, s = look.s0, dy = s * 0.5, zh = dy * look.zk;
       const Pe = look.P / Math.max(0.55, Math.log2(shepSpacing())), Hd = (H - oy * 2) / kk || VH;
       const fx = VW / 2 + FP.vx, fy = VH / 2 + FP.vy, f2x = VW / 2 + FP2.vx, f2y = VH / 2 + FP2.vy;
-      const decay = Math.exp(-dt / 0.45);
+      const decay = Math.exp(-dt / 0.45), decay2 = Math.exp(-dt / 0.35);
       const hue0 = 268, hueSpan = 128;   // violet (268) through magenta and red to amber (396 = 36)
       for (let n = 0; n < nC; n++) {
         const Y = CY[n], X = CX[n], vy = (Y - (-oy / kk)) / ((H / kk) || VH), win = Math.exp(-Math.pow((vy - 0.5) / sgV, 2)), wv = Math.min(1, win * 1.3);
         if (wv < 0.02) continue;
         const o = DIRS[CO[n]], raw = o[0] * CI[n] + o[1] * CJ[n] + phase * Pe, u = ((raw % Pe) + Pe) % Pe, fl = Math.floor(u), hgt = fl + sst(0.55, 1, u - fl);
-        let h = hgt + LIFT[n];
-        LIFT[n] *= decay;
+        let h = hgt + FILL[n] + LIFT[n];
+        LIFT[n] *= decay; FL[n] *= decay2;
         if (touch > 0.02) { const dxx = X - fx, dyy = Y - fy, dd = dxx * dxx + dyy * dyy; if (dd < 14000) h += touch * 1.5 * Math.exp(-dd / 3200); }
         if (PX.on) { const dxx = X - f2x, dyy = Y - f2y, dd = dxx * dxx + dyy * dyy; if (dd < 14000) h += 1.1 * Math.exp(-dd / 3200); }
-        const t = clamp(u / Pe, 0, 1), hh = hue0 + hueSpan * t + CB[n] * look.dx, L = 0.58 * (0.6 + 0.55 * t) * 100;
+        const t = clamp(u / Pe, 0, 1), hh = hue0 + hueSpan * t - CB[n] * look.dx, L = 0.58 * (0.6 + 0.55 * t) * 100;
         const cols = [hslRgb(hh, 62, L), hslRgb(hh + 10, 62, L * 0.62), hslRgb(hh - 10, 62, L * 0.38)];
+        if (FL[n] > 0.02) cols[0] = mixc(cols[0], [255, 232, 176], FL[n]);   // the cube that has just landed lights the top of its step
         drawCell(X, Y, s, h, zh, cols, wv, (fl === look.P - 1 || fl === 0) ? hslRgb(hh + 25, 100, 82) : null);
       }
-      // the cubes that fall on a step: they land on the top of a column, flash, and the column settles under the weight
+      // tetris: a cube falls from above the screen and lands on the lowest step in the light of the window; the floor fills from the bottom level up, and when every step of the window
+      // has a cube on it the whole floor sinks by one level, as if the picture climbed
+      const topEdge = -oy / kk;
       for (let q = drops.length - 1; q >= 0; q--) {
-        const d = drops[q]; d.vy += 30 * dt; d.y -= d.vy * dt;
-        if (d.y <= 0 && !d.landed) { d.landed = true; d.y = 0; d.vy = 0; LIFT[d.c] += 1.0; d.age = 0; }
-        if (d.landed) { d.age += dt; if (d.age > 0.5) { drops.splice(q, 1); continue; } }
-        const X = CX[d.c], Y = CY[d.c], vy = (Y + oy / kk) / (H / kk), win = Math.exp(-Math.pow((vy - 0.5) / sgV, 2)), wv = Math.min(1, win * 1.4 + 0.25);
-        const o = DIRS[CO[d.c]], raw = o[0] * CI[d.c] + o[1] * CJ[d.c] + phase * Pe, u = ((raw % Pe) + Pe) % Pe, fl = Math.floor(u), base = fl + sst(0.55, 1, u - fl) + (d.landed ? LIFT[d.c] - 1 : LIFT[d.c]);
-        const a = d.landed ? 1 - d.age / 0.5 : 1, hh = 36 + 6 * a;
-        drawCell(X, Y, s, base + d.y + (d.landed ? 1 : 1), zh, [hslRgb(hh, 100, 62 + 24 * a), hslRgb(hh + 8, 100, 40 + 14 * a), hslRgb(hh - 8, 100, 28 + 10 * a)], wv * (0.55 + 0.45 * a), hslRgb(hh, 100, 92), 1);
+        const d = drops[q]; d.vy += 60 * dt; d.y -= d.vy * dt;
+        const X = CX[d.c], Y = CY[d.c], o = DIRS[CO[d.c]], raw = o[0] * CI[d.c] + o[1] * CJ[d.c] + phase * Pe, u = ((raw % Pe) + Pe) % Pe, fl = Math.floor(u), base = fl + sst(0.55, 1, u - fl) + FILL[d.c] + LIFT[d.c];
+        if (d.y <= 0) {
+          drops.splice(q, 1); FILL[d.c] += 1; LIFT[d.c] -= 0.5; FL[d.c] = 1;
+          let full = true; for (let n = 0; n < nC; n++) if (win0(n) > 0.5 && FILL[n] < 1) { full = false; break; }
+          if (full) for (let n = 0; n < nC; n++) if (FILL[n] >= 1) { FILL[n] -= 1; LIFT[n] += 1; }   // a full level: the floor sinks and settles
+          continue;
+        }
+        drawCell(X, Y, s, base + d.y + 1, zh, [hslRgb(40, 100, 80), hslRgb(44, 100, 52), hslRgb(34, 100, 36)], 1, hslRgb(40, 100, 94), 1);
       }
       g.setTransform(1, 0, 0, 1, 0, 0);
       if (flash > 0.02) { g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,170,90,' + (0.22 * flash).toFixed(3) + ')'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over'; }
@@ -2562,13 +2573,17 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     last = lastDraw = performance.now(); draw(0.016);
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) raf = requestAnimationFrame(frame);
     SK.note = (i, vel) => {
-      if (!nC) return;
-      const Hv = (H / kk) || VH;
-      for (let tries = 0; tries < 40; tries++) {   // a step in the light of the window
-        const c = Math.floor(Math.random() * nC), vy = (CY[c] + oy / kk) / Hv;
-        if (vy > 0.18 && vy < 0.82 && Math.abs(vy - 0.5) < 0.3 * (0.5 + Math.random())) { drops.push({ c, y: 6 + 3 * vel, vy: 0, landed: false, age: 0 }); break; }
+      if (!nC || drops.length > 10) return;
+      const Pe = look.P / Math.max(0.55, Math.log2(shepSpacing())), taken = {}; drops.forEach(d => { taken[d.c] = 1; });
+      let lo = 1e9; const cand = [];
+      for (let n = 0; n < nC; n++) {   // the lowest step in the light of the window (where the cubes already on the way are counted)
+        if (win0(n) < 0.5 || taken[n]) continue;
+        const o = DIRS[CO[n]], u = (((o[0] * CI[n] + o[1] * CJ[n] + phase * Pe) % Pe) + Pe) % Pe, h = Math.floor(u) + FILL[n];
+        cand.push([n, h]); if (h < lo) lo = h;
       }
-      if (drops.length > 14) drops.shift();
+      const low = cand.filter(q => q[1] <= lo + 0.01); if (!low.length) return;
+      const c = low[Math.floor(Math.random() * low.length)][0], zh = look.s0 * 0.5 * look.zk;
+      drops.push({ c, y: (CY[c] + oy / kk) / zh + 3, vy: 0 });   // it starts above the top edge of the screen
     };
     SK.pTap = () => { flash = 1; };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); removeEventListener('resize', resize); wrap.remove(); };
