@@ -449,6 +449,16 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   const lrnd = (a, b) => Math.exp(rnd(Math.log(a), Math.log(b)));
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
+  /* ---------- seed: one 32-bit number decides a press's patch, scale, key, tempo and 16-step pattern ---------- */
+  const SEED_VERSION = 1;   // bump when any range or roll order changes: the same seed then means something else
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const MATH_RANDOM = Math.random;
+  const newSeed = () => (MATH_RANDOM() * 4294967296) >>> 0;
+  const seedToStr = n => (n >>> 0).toString(36);
+  const strToSeed = t => { if (!/^[0-9a-z]{1,7}$/.test(t)) return null; const n = parseInt(t, 36); return n >= 0 && n < 4294967296 ? n : null; };
+  // runs fn with Math.random replaced by the seeded generator, so every roll inside it is a pure function of the seed; real randomness comes back after
+  function withSeed(seed, fn) { Math.random = mulberry32(seed); try { return fn(); } finally { Math.random = MATH_RANDOM; } }
+
   /* ---------- audio ---------- */
   let ctx = null, master = null, foldCurve = null, voice = null, pending = false, queued = [];
 
@@ -1239,6 +1249,9 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 
   /* ---------- melody generator ---------- */
   let seq = null;
+  let curSeed = null;      // the seed of the press that is playing or played last
+  let pendingSeed = null;  // a seed handed in (by a link) that the next press plays instead of rolling a new one
+  try { const q = /[?&]seed=([0-9a-zA-Z]+)/.exec(location.search); if (q) pendingSeed = strToSeed(q[1].toLowerCase()); } catch (e) {}
 
   function makeStep(s) {
     if (s.acid) {
@@ -1338,10 +1351,13 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 
   function startSeq() {
     const prev = tapPatch;
-    tapPatch = roll();
-    // every press rolls a new patch, scale, tempo and pattern
+    // every press rolls a new seed (unless a link handed one in); the seed alone decides patch, scale, key, tempo and pattern
+    const seed = pendingSeed != null ? pendingSeed : newSeed();
+    pendingSeed = null; curSeed = seed;
+    const handed = !!carry;   // a tempo, key and scale carried over a swipe are not a function of the seed alone
     stopCont();
-    seq = makeSeq();
+    withSeed(seed, () => { tapPatch = roll(); seq = makeSeq(); });
+    seq.seed = seed; seq.pure = !handed;
     setAccent(tapPatch, characterOf(seq, tapPatch));
     if (seq.cont) { cont = CONT[seq.cont](seq); startMod(); }
     // a fresh press starts from the finger; a press that continues after a swipe keeps the macros and glides to the new axes
@@ -2370,7 +2386,7 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
   // XY: where the finger is. x, y are 0..1 over the screen (y down), nx, ny are -1..1 from the centre (ny up). applyXY maps it to sound and each skin reads it for the picture;
   // other code can read window.subversum.xy or listen to the 'subversum:xy' event
   const XY = { x: 0.5, y: 0.5, nx: 0, ny: 0, down: false };
-  window.subversum = { xy: XY, z: () => ZH, rev: () => seq && seq.rev, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // debug snapshot of the live sound state
+  window.subversum = { seed: () => curSeed == null ? null : seedToStr(curSeed), version: SEED_VERSION, patch: debugPatch, xy: XY, z: () => ZH, rev: () => seq && seq.rev, sound: () => lastBus ? { cut: lastBus.cut, res: lastBus.res, len: lastBus.len, delAmt: lastBus.delAmt, delFb: lastBus.delFb, revAmt: lastBus.revAmt, xt: lastBus.xt, xc: lastBus.xc, xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } : { xm: Object.assign({}, XM), mac: Object.assign({}, MAC), seq: seq ? { bpm: seq.bpm, root: seq.root, sc: seq.sc.name } : null } };   // debug snapshot of the live sound state
   function place(cx, cy, snap) {
     const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844);
     XY.x = cx / W; XY.y = cy / H; XY.nx = XY.x * 2 - 1; XY.ny = 1 - XY.y * 2;
@@ -2398,6 +2414,19 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
       down();
     });
   }
+  // a plain-data snapshot of what the seed decided, for checks that the same seed gives the same patch
+  function debugPatch() {
+    if (!seq) return null;
+    const nums = o => { const r = {}; if (o) for (const k in o) { if (k === 'lfoT0') continue; const v = o[k]; if (typeof v === 'number') r[k] = +v.toFixed(6); else if (typeof v === 'string' || typeof v === 'boolean') r[k] = v; else if (Array.isArray(v) && v.every(x => typeof x === 'number')) r[k] = v.map(x => +x.toFixed(6)); } return r; };
+    return {
+      seed: seedToStr(seq.seed), pure: seq.pure, skin: document.documentElement.dataset.skin,
+      bpm: seq.bpm, root: seq.root, sc: seq.sc.name, idx: seq.idx,
+      steps: seq.steps.map(x => x ? [x.midi, +x.vel.toFixed(4), x.chord || 0, x.slide ? 1 : 0] : null),
+      timbre: nums(seq.timbre), lfo: (seq.timbre.lfo || []).map(nums), vis: (seq.timbre.vis || []).map(nums),
+      dub: nums(seq.dub), rev: seq.rev || null
+    };
+  }
+
   surface.addEventListener('pointerdown', e => {
     e.preventDefault();
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
