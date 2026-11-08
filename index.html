@@ -402,9 +402,6 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 <script defer src="/_vercel/insights/script.js"></script>
 <style id="service">
 /* service layer: lock frame, the quiet strip at the bottom, the fan. Only the fan carries text; the rest of the screen stays without labels. */
-/* the second finger (P axis): a ring under it in the accent colour; it breathes with the pinch and fades when the finger lifts */
-#pring { position: fixed; left: -30px; top: -30px; width: 60px; height: 60px; border-radius: 50%; z-index: 6; pointer-events: none; opacity: 0; border: 1.5px solid var(--accent); background: radial-gradient(circle, color-mix(in srgb, var(--accent) 28%, transparent), transparent 70%); box-shadow: 0 0 22px -4px var(--accent); transition: opacity .18s; will-change: transform; }
-#pring.on { opacity: .75; }
 #lockframe { position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0; transition: opacity .25s;
   background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.4) 100%);
   box-shadow: inset 0 0 0 1.5px hsl(var(--hue, 38) 85% 62% / .5), inset 0 0 64px 4px hsl(var(--hue, 38) 85% 55% / .26); }
@@ -454,7 +451,6 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   </section>
 </main>
 <div id="lockframe" aria-hidden="true"></div>
-<div id="pring" aria-hidden="true"></div>
 <div id="handle" aria-hidden="true"></div>
 <div id="sabprobe" aria-hidden="true"></div>
 <div id="fan" aria-hidden="true">
@@ -953,6 +949,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   // Worlds that have not been given a P action ignore it.
   const PX = { on: false, d: 0 };
   const P1 = { x: 0, y: 0 };   // the playing finger in screen pixels
+  const FP2 = { vx: 0, vy: 0 };   // the second finger in the coordinates of the skin layer, like FP
   let ZH = 0, zT0 = 0, zTimer = 0;   // Z: how long the finger has been held, 0..1 (one second of nothing, then it opens over about 11 s); only clouds and topo use it
   const CURVES = new Map();
   // a backwards grain swells slowly and stops short, like a reversed pluck; the last tenth is a quick fade so it does not click
@@ -1959,17 +1956,18 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const field = [];
     for (let i = 0; i < 90; i++) field.push({ x: (Math.random() - 0.5) * 420, y: (Math.random() - 0.5) * 900, ph: Math.random() * 6.28, sp: 0.1 + Math.random() * 0.2 });
     const mem = [], grains = [];
-    function smudge(vel) {
+    function smudge(vel, o) {
       const n = Math.round(22 + 22 * vel), sg = 16 + 12 * XV.y;
-      for (let i = 0; i < n; i++) mem.push({ x: FP.vx + rnd2() * sg * 1.6, y: FP.vy + rnd2() * sg * 1.6, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5 - 2, age: 0, life: 4 });
+      for (let i = 0; i < n; i++) mem.push({ x: o.vx + rnd2() * sg * 1.6, y: o.vy + rnd2() * sg * 1.6, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5 - 2, age: 0, life: 4 });
       while (mem.length > 320) mem.shift();
     }
     // called by the sound for every grain it schedules: delay seconds from now, dur seconds long, pan -0.8..0.8, ratio of the playback rate
     SK.grain = (delay, dur, pan, ratio, dens, rev) => {
       if (grains.length > 160) return;
+      const o = PX.on && Math.random() < 0.5 ? FP2 : FP;   // P: while the second finger lies, half of the grains bloom around it
       const reach = (70 + 130 * XV.y) * (1 + 0.7 * ZH), n = 2 + Math.round(4 * (1 - dens)), sg = 3 + 10 * (dur / 0.22), pts = [];
       for (let i = 0; i < n; i++) pts.push([rnd2() * sg * 1.6, rnd2() * sg * 1.6]);
-      grains.push({ t0: performance.now() + delay * 1000, dur: dur * 1000, x: FP.vx + pan * reach * 1.2 + rnd2() * 20, y: FP.vy + rnd2() * (24 + 220 * XV.y) * (1 + 0.5 * ZH), pts, z: dur > 0.14 ? 2 : dur > 0.08 ? 1 : 0, up: (Math.random() * 0.5 + 0.2) * (ratio >= 2 ? 1.6 : 1), boost: ratio >= 2 ? 1 : 0, rev: !!rev });
+      grains.push({ t0: performance.now() + delay * 1000, dur: dur * 1000, x: o.vx + pan * reach * 1.2 + rnd2() * 20, y: o.vy + rnd2() * (24 + 220 * XV.y) * (1 + 0.5 * ZH), pts, z: dur > 0.14 ? 2 : dur > 0.08 ? 1 : 0, up: (Math.random() * 0.5 + 0.2) * (ratio >= 2 ? 1.6 : 1), boost: ratio >= 2 ? 1 : 0, rev: !!rev });
     };
     let T = 0, last = 0, lastDraw = 0, raf = 0, dead = false;
     function draw(dt, env, kick) {
@@ -2008,9 +2006,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     draw(0.016, 0, 0);
     if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { last = lastDraw = performance.now(); raf = requestAnimationFrame(frame); }
     SK.note = (i, vel) => {
-      smudge(vel);
-      const t = performance.now(), n = 6;   // the strike itself: a quick bright puff at the finger
-      for (let k = 0; k < n; k++) grains.push({ t0: t, dur: 260 + Math.random() * 120, x: FP.vx + rnd2() * 14, y: FP.vy + rnd2() * 14, pts: [[rnd2() * 8, rnd2() * 8], [rnd2() * 8, rnd2() * 8]], z: 2, up: 0.2, boost: 1 });
+      const t = performance.now(), n = 6;   // the strike itself: a quick bright puff at the finger, and at the second finger too while it lies
+      for (const o of PX.on ? [FP, FP2] : [FP]) {
+        smudge(vel, o);
+        for (let k = 0; k < n; k++) grains.push({ t0: t, dur: 260 + Math.random() * 120, x: o.vx + rnd2() * 14, y: o.vy + rnd2() * 14, pts: [[rnd2() * 8, rnd2() * 8], [rnd2() * 8, rnd2() * 8]], z: 2, up: 0.2, boost: 1 });
+      }
     };
     SK.dispose = () => { dead = true; cancelAnimationFrame(raf); };
   }
@@ -2572,28 +2572,24 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
   let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
   const P_WORLDS = { clouds: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
-  const pring = $('#pring');
-  const ringAt = () => { pring.style.transform = 'translate(' + pX.toFixed(1) + 'px,' + pY.toFixed(1) + 'px) scale(' + (1 + 0.4 * PX.d).toFixed(2) + ')'; };
+  const setFP2 = (x, y) => { const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844); pX = x; pY = y; FP2.vx = (x - W / 2) / sc; FP2.vy = (y - H / 2) / sc; };   // the second finger in the skin's coordinates, so a world can animate it like the first
   function pinch() {
     const raw = Math.log2(Math.max(24, Math.hypot(pX - P1.x, pY - P1.y)) / pDist0);
     PX.d = Math.abs(raw) < 0.08 ? 0 : clamp(raw, -1, 1);   // a small dead zone: a tap with a slightly moving finger is just a tap
-    ringAt();
   }
   function startP(e) {
     if (!holding || swiped || switching || fanOpen || PX.on || !P_WORLDS[skin]) return;
-    pId = e.pointerId; pX = e.clientX; pY = e.clientY;
+    pId = e.pointerId; setFP2(e.clientX, e.clientY);
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
     pDist0 = Math.max(90, Math.hypot(pX - P1.x, pY - P1.y));
     PX.on = true; PX.d = 0;
-    ringAt(); pring.classList.add('on');
   }
   function endP() {
     if (!PX.on) return;
     PX.on = false; PX.d = 0; pId = null;
-    pring.classList.remove('on');
     if (lastBus && lastBus.cl) lastBus.cl.until = ctx.currentTime + 1.5;   // clouds: the held cloud fades out on its own
   }
-  surface.addEventListener('pointermove', e => { if (e.pointerId === pId) { pX = e.clientX; pY = e.clientY; pinch(); } });   // pinch also moves the ring
+  surface.addEventListener('pointermove', e => { if (e.pointerId === pId) { setFP2(e.clientX, e.clientY); pinch(); } });
   const pEnd = e => { if (e.pointerId === pId) endP(); };
   surface.addEventListener('pointerup', pEnd);
   surface.addEventListener('pointercancel', pEnd);
