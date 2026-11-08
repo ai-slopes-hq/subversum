@@ -402,6 +402,23 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 <script defer src="/_vercel/insights/script.js"></script>
 <style id="service">
 /* service layer: lock frame, the quiet strip at the bottom, the fan. Only the fan carries text; the rest of the screen stays without labels. */
+/* debug HUD (?hud=1): the axes and their values as a game readout; never on by default */
+#hud { position: fixed; z-index: 8; left: max(8px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 8px); width: 168px; pointer-events: none; font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; -webkit-user-select: none; user-select: none; }
+#hud .hd-top { display: flex; justify-content: space-between; align-items: center; height: 16px; padding: 0 5px; margin-bottom: 3px; background: rgba(0,0,0,.62); border: 2px solid var(--accent); box-shadow: 3px 3px 0 rgba(0,0,0,.6); color: var(--accent); }
+#hud .hd-top span { display: flex; gap: 4px; }
+#hud .hd-top span b { padding: 1px 3px; background: var(--accent); color: #000; text-shadow: none; }
+#hud .hd-row { position: relative; display: grid; grid-template-columns: 10px 1fr 34px; grid-template-rows: 10px 8px; column-gap: 4px; padding: 3px 5px 4px; margin-bottom: 3px; background: rgba(0,0,0,.55); border: 2px solid rgba(255,255,255,.28); box-shadow: 3px 3px 0 rgba(0,0,0,.5); }
+#hud .hd-row.off { opacity: .45; }
+#hud .hd-row i { font-style: normal; color: var(--accent); grid-row: 1; }
+#hud .hd-row u { text-decoration: none; grid-row: 1; white-space: nowrap; overflow: hidden; }
+#hud .hd-row em { font-style: normal; grid-row: 1; grid-column: 3; text-align: right; font-variant-numeric: tabular-nums; }
+#hud .hd-bar { grid-row: 2; grid-column: 1 / 4; position: relative; border: 2px solid rgba(255,255,255,.5); background: rgba(255,255,255,.08); }
+#hud .hd-bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: rgba(255,255,255,.7); }
+#hud .hd-bar s { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; background: var(--accent); -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); }
+#hud .hd-raw { padding: 3px 5px; background: rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.18); font-size: 9px; line-height: 12px; color: rgba(241,236,228,.82); white-space: pre; }
+#hud .hd-pop { position: absolute; left: calc(100% + 8px); top: 2px; white-space: nowrap; color: var(--accent); animation: hdpop .95s steps(10) forwards; }
+#hud .hd-pop.ev { color: #fff; top: -9px; }
+@keyframes hdpop { 0% { opacity: 0; transform: translateY(6px); } 12% { opacity: 1; } 100% { opacity: 0; transform: translateY(-16px); } }
 #lockframe { position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0; transition: opacity .25s;
   background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.4) 100%);
   box-shadow: inset 0 0 0 1.5px hsl(var(--hue, 38) 85% 62% / .5), inset 0 0 64px 4px hsl(var(--hue, 38) 85% 55% / .26); }
@@ -2715,6 +2732,58 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   addEventListener('keyup', e => {
     if (e.code === 'Space' || e.code === 'Enter') up();
   });
+
+  /* ---------- HUD (debug): ?hud=1 shows what the fingers do, in the style of a game readout. Off by default, window.subversum.hud(true/false) switches it ---------- */
+  const HUD_LABELS = {   // x, y, P pinch, P tap, per world (what the finger moves there)
+    amber: ['GATE', 'TIMBRE', 'FM RATIO', 'ACCENT'], clouds: ['DENSITY', 'SPACE', 'PITCH SPREAD', 'FREEZE'], ridges: ['CUTOFF', 'RESONANCE', 'ENV DEPTH', 'STAB'],
+    riso: ['CUTOFF', 'SPACE'], scope: ['PITCH', 'ECHO'], topo: ['FILTER', 'PWM'], matrix: ['CRUSH', 'FOCUS'], mandala: ['ECHO', 'FILTER']
+  };
+  let hudEl = null, hudRaf = 0;
+  function hudStart() {
+    if (hudEl) return;
+    hudEl = document.createElement('div'); hudEl.id = 'hud'; hudEl.setAttribute('aria-hidden', 'true');
+    hudEl.innerHTML = '<div class="hd-top"><b></b><span></span></div>' + ['x', 'y', 'p'].map(k => '<div class="hd-row" data-k="' + k + '"><i>' + k.toUpperCase() + '</i><u></u><em>0.00</em><span class="hd-bar"><s></s></span></div>').join('') + '<div class="hd-raw"></div>';
+    document.body.appendChild(hudEl);
+    const q = sel => hudEl.querySelector(sel), rows = {};
+    ['x', 'y', 'p'].forEach(k => { const r = q('.hd-row[data-k=' + k + ']'); rows[k] = { r, u: r.querySelector('u'), em: r.querySelector('em'), s: r.querySelector('s'), shown: 0 }; });
+    const worldEl = q('.hd-top b'), chipEl = q('.hd-top span'), rawEl = q('.hd-raw');
+    let pSkin = null, pHold = false, pLock = false, pOn = false, pops = 0;
+    const pop = (host, text, ev) => {
+      if (pops > 8) return;
+      pops++;
+      const e = document.createElement('div'); e.className = 'hd-pop' + (ev ? ' ev' : ''); e.textContent = text;
+      e.addEventListener('animationend', () => { e.remove(); pops--; });
+      host.appendChild(e);
+    };
+    const f2 = v => (v >= 0 ? '+' : '') + v.toFixed(2);
+    function frame() {
+      hudRaf = requestAnimationFrame(frame);
+      const lab = HUD_LABELS[skin] || ['X', 'Y'], vals = { x: XY.nx, y: XY.ny, p: PX.d }, names = { x: lab[0], y: lab[1], p: lab[2] };
+      if (skin !== pSkin) { pSkin = skin; worldEl.textContent = skin; pop(rows.x.r, 'WORLD ' + skin, true); ['x', 'y', 'p'].forEach(k => { rows[k].shown = vals[k]; }); }
+      if (holdOn !== pHold) { pHold = holdOn; pop(rows.y.r, 'HOLD ' + (holdOn ? 'ON' : 'OFF'), true); }
+      if (locked !== pLock) { pLock = locked; pop(rows.y.r, 'LOCK ' + (locked ? 'ON' : 'OFF'), true); }
+      if (PX.on !== pOn) { pOn = PX.on; if (PX.on && lab[3]) pop(rows.p.r, 'TAP ' + lab[3], true); }
+      ['x', 'y', 'p'].forEach(k => {
+        const R = rows[k], v = vals[k], nm = names[k];
+        R.r.classList.toggle('off', k === 'p' ? !nm : !holding);
+        R.u.textContent = nm || '-';
+        R.em.textContent = nm || k !== 'p' ? f2(v) : '--';
+        R.s.style.left = (v >= 0 ? 50 : 50 + v * 50) + '%'; R.s.style.width = Math.abs(v) * 50 + '%';
+        if (nm && Math.abs(v - R.shown) >= 0.25 && (k !== 'p' || PX.on || true)) { pop(R.r, f2(v - R.shown) + ' ' + nm, false); R.shown = v; }
+      });
+      chipEl.innerHTML = (holdOn ? '<b>HOLD</b>' : '') + (locked ? '<b>LOCK</b>' : '') + (PX.on ? '<b>P</b>' : '') + (seq ? '<i style="font-style:normal">' + seq.bpm + '</i>' : '');
+      const b = lastBus;
+      rawEl.textContent = skin === 'amber'
+        ? 'DEC x' + XM.dec.toFixed(2) + '  CUT x' + XM.cut.toFixed(2) + '\nFM  x' + XM.fm.toFixed(2) + '  FOLD x' + XM.fold.toFixed(2)
+        : b ? 'CUT ' + Math.round(b.cut || 0) + '  RES ' + (b.res || 0).toFixed(1) + '\nECHO ' + (b.delAmt || 0).toFixed(2) + '  REV ' + (b.revAmt || 0).toFixed(2) : '';
+    }
+    hudRaf = requestAnimationFrame(frame);
+  }
+  function hudStop() { if (!hudEl) return; cancelAnimationFrame(hudRaf); hudEl.remove(); hudEl = null; }
+  window.subversum.hud = v => { if (v) hudStart(); else hudStop(); try { localStorage.setItem('subversum.hud', v ? '1' : '0'); } catch (e) {} };
+  let hudWanted = /[?&]hud=1/.test(location.search);
+  try { if (!hudWanted && !/[?&]hud=0/.test(location.search) && localStorage.getItem('subversum.hud') === '1') hudWanted = true; } catch (e) {}
+  if (hudWanted) hudStart();
 })();
 </script>
 
