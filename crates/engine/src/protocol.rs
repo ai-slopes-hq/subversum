@@ -98,6 +98,12 @@ pub trait World {
     fn render(&mut self, l: &mut [f32], r: &mut [f32]);
     /// Returns the world to its initial state, deterministically from `seed`.
     fn reset(&mut self, seed: u32);
+    /// The world's own tempo (melody bpm); the engine adopts it on reset. `None` keeps the current clock.
+    fn bpm(&self) -> Option<f32> {
+        None
+    }
+    /// Hold mode state from the host (also replayed on reset / world swap).
+    fn on_hold(&mut self, _held: bool) {}
     /// Pattern-tap from the host; worlds that have no use for it ignore it.
     fn on_ptap(&mut self) {}
     /// Fills the world-owned telemetry fields (bpm..pattern); called once per `process`.

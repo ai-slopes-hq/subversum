@@ -288,3 +288,39 @@ fn steal_of_audible_channel_has_no_click() {
         );
     }
 }
+
+fn z_gesture(z: f32) -> Gesture {
+    Gesture {
+        x: 0.5,
+        y: 0.5,
+        z,
+        pinch: 0.0,
+    }
+}
+
+#[test]
+fn zhold_legacy_semantics() {
+    let sr = 48000.0;
+    let mut w = AmberWorld::new(sr, 3);
+    // with a finger it grows
+    w.on_gesture(&z_gesture(1.0));
+    render(&mut w, 6 * 48000, MAX_BLOCK);
+    let grown = w.zh();
+    assert!(grown > 0.1, "{grown}");
+    // hold mode without a finger decays (0.8 per 100 ms), not at once
+    w.on_hold(true);
+    w.on_gesture(&z_gesture(0.0));
+    render(&mut w, 5200, MAX_BLOCK);
+    let d = w.zh();
+    assert!(d > 0.0 && d < grown, "{d} {grown}");
+    render(&mut w, 10 * 48000, MAX_BLOCK);
+    assert_eq!(w.zh(), 0.0);
+    // full release (no hold mode) resets at once
+    w.on_hold(false);
+    w.on_gesture(&z_gesture(1.0));
+    render(&mut w, 6 * 48000, MAX_BLOCK);
+    assert!(w.zh() > 0.1);
+    w.on_gesture(&z_gesture(0.0));
+    render(&mut w, 1, 1);
+    assert_eq!(w.zh(), 0.0);
+}

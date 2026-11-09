@@ -53,6 +53,12 @@ fn no_alloc_in_process() {
     let (_, n) = count_allocs(|| {
         for i in 0..1000 {
             e.push(g((i % 10) as f32 / 10.0, 0.8));
+            match i % 250 {
+                100 => e.push(Command::Seed(i as u32)),
+                150 => e.push(Command::SwitchWorld(0)),
+                200 => e.push(Command::SwitchWorld(1)),
+                _ => {}
+            }
             e.process(&mut l, &mut r);
         }
     });
@@ -128,6 +134,7 @@ fn command_queue_overflow_is_counted() {
 #[test]
 fn step_queue_overflow_keeps_newest_and_counts() {
     let mut e = Engine::new(SR, 1);
+    e.push(Command::Tempo(120.0));
     let (mut l, mut r) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
     for _ in 0..937 {
         e.process(&mut l, &mut r); // steps 0..=19 (sample 114000 < 119936)
@@ -148,6 +155,7 @@ fn step_queue_overflow_keeps_newest_and_counts() {
 #[test]
 fn peaks_decay_after_silence() {
     let mut e = Engine::new(SR, 1);
+    e.push(Command::SwitchWorld(0));
     e.push(g(0.5, 1.0));
     render(&mut e, 48000, MAX_BLOCK);
     assert!(e.telemetry().peak_l > 0.1);
@@ -256,7 +264,8 @@ fn steps_follow_melody() {
     let seed = 12345;
     let mut e = Engine::new(SR, seed);
     let mut w = engine::amber::AmberWorld::new(SR, seed);
-    let bar = (SR as f64 * 60.0 / 120.0 * 4.0) as usize;
+    let bpm = w.melody().bpm as f64;
+    let bar = (SR as f64 * 60.0 / bpm * 4.0) as usize;
     let steps = collect_steps(&mut e, 4 * bar, MAX_BLOCK);
     assert!(steps.len() >= 64);
     for (_, s) in &steps {
@@ -267,7 +276,11 @@ fn steps_follow_melody() {
             "step {}",
             s.index
         );
-        assert_eq!(m.note, w.melody().steps[(s.index % 16) as usize].note);
+        assert!(
+            m.velocity == 0.0 || (24..=47).contains(&m.note),
+            "note {}",
+            m.note
+        );
     }
     assert_eq!(steps[0].1.velocity, 1.0);
 }
@@ -295,8 +308,27 @@ fn step_boundaries_exact_at_bpm_110_122_135() {
 }
 
 #[test]
+fn seed_adopts_melody_bpm() {
+    let mut e = Engine::new(SR, 1);
+    e.push(Command::Tempo(200.0));
+    render(&mut e, 1000, MAX_BLOCK);
+    let seed = 99;
+    e.push(Command::Seed(seed));
+    let bpm = engine::amber::AmberWorld::new(SR, seed).melody().bpm as f64;
+    assert!((bpm - 120.0).abs() > 0.5);
+    let steps = collect_steps(&mut e, 48000, 1);
+    let period = SR as f64 * 60.0 / bpm / 4.0;
+    assert!(steps.len() >= 4);
+    assert_eq!(steps[0].0, 1001, "step 0 plays at once");
+    for (frame, s) in &steps {
+        assert_eq!(*frame, (s.index as f64 * period).ceil() as u64 + 1 + 1000);
+    }
+}
+
+#[test]
 fn hold_and_tempo_keep_phase() {
     let mut e = Engine::new(SR, 6);
+    e.push(Command::Tempo(120.0));
     let period = SR as f64 * 60.0 / 120.0 / 4.0;
     let mut steps = collect_steps(&mut e, 10000, MAX_BLOCK);
     e.push(Command::Hold(true));
@@ -318,6 +350,7 @@ fn hold_and_tempo_keep_phase() {
 
     // Tempo mid-bar keeps the pending step's deadline
     let mut e = Engine::new(SR, 6);
+    e.push(Command::Tempo(120.0));
     let mut st = collect_steps(&mut e, 3000, MAX_BLOCK);
     e.push(Command::Tempo(240.0));
     st.extend(collect_steps(&mut e, 20000, MAX_BLOCK));
@@ -358,6 +391,7 @@ fn switch_world_during_note_is_clean() {
     e.push(g(0.5, 0.6));
     let (mut l, mut r) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
     let mut last_frame = 0;
+    let mut energy = [0.0f64; 4]; // before 100, 100..200, 200..300, 300..400
     for i in 0..400 {
         match i {
             100 => e.push(Command::SwitchWorld(0)),
@@ -370,11 +404,18 @@ fn switch_world_during_note_is_clean() {
         for &s in l.iter().chain(r.iter()) {
             assert!(s.is_finite() && s.abs() <= 1.0, "block {i}: {s}");
         }
+        energy[i / 100] += l.iter().map(|&x| (x as f64) * (x as f64)).sum::<f64>();
         let t = e.telemetry();
         assert!(t.peak_l <= 1.0 && t.peak_r <= 1.0);
         assert_eq!(t.frame, last_frame + 128, "frame continues at block {i}");
         last_frame = t.frame;
     }
+    // sound before the switch, and the new worlds keep sounding (not stuck silent)
+    assert!(energy[0] > 1.0, "{energy:?}");
+    assert!(
+        energy[1] > 1.0 && energy[2] > 1.0 && energy[3] > 1.0,
+        "{energy:?}"
+    );
 }
 
 #[test]

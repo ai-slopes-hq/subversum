@@ -108,7 +108,11 @@ impl Engine {
             self.dc[i].reset();
             self.peak[i].reset();
         }
+        self.world.on_hold(self.hold);
         self.clock.reset();
+        if let Some(b) = self.world.bpm() {
+            self.clock.set_bpm(b as f64);
+        }
         self.step_index = 0;
         self.tel.peak_l = 0.0;
         self.tel.peak_r = 0.0;
@@ -137,7 +141,10 @@ impl Engine {
             Command::Tempo(b) => {
                 self.clock.set_bpm(b as f64);
             }
-            Command::Hold(h) => self.hold = h,
+            Command::Hold(h) => {
+                self.hold = h;
+                self.world.on_hold(h);
+            }
             Command::Lock(l) => self.lock = l,
             Command::PTap => self.world.on_ptap(),
         }

@@ -297,6 +297,8 @@ pub struct AmberWorld {
     lfos: [Option<LfoSlot>; 2],
     gesture: Gesture,
     zhold: ZHold,
+    hold_mode: bool,
+    zh: f32,
     last_midi: Option<u32>,
     gate_env: f32,
 }
@@ -341,6 +343,8 @@ impl AmberWorld {
                 pinch: 0.0,
             },
             zhold: ZHold::new(sr),
+            hold_mode: false,
+            zh: 0.0,
             last_midi: None,
             gate_env: 0.0,
         };
@@ -350,6 +354,24 @@ impl AmberWorld {
 
     pub fn melody(&self) -> &Melody {
         &self.melody
+    }
+
+    /// Legacy Z semantics: a finger opens Z; no finger in hold mode decays it; no finger otherwise zeroes it at once.
+    fn zh_advance(&mut self, n: usize) -> f32 {
+        self.zh = if self.gesture.z > 0.0 {
+            self.zhold.tick_block(true, n)
+        } else if self.hold_mode {
+            self.zhold.tick_block(false, n)
+        } else {
+            self.zhold.reset();
+            0.0
+        };
+        self.zh
+    }
+
+    /// Current Z-hold value (0..1) as of the last rendered sample.
+    pub fn zh(&self) -> f32 {
+        self.zh
     }
 
     fn build_lfos(&mut self) {
@@ -381,7 +403,7 @@ impl AmberWorld {
 
     /// Starts a note on the quietest channel; the other one fades out.
     fn start_note(&mut self, midi: u32, step_vel: f32, stab: bool) {
-        let zh = self.zhold.tick_block(self.gesture.z > 0.0, 0);
+        let zh = self.zh_advance(0);
         let x: Xm = xm(&self.gesture, zh);
         let p = self.patch;
         let (attack, cutoff, fm_idx, decay, vel) = if stab {
@@ -506,6 +528,14 @@ impl World for AmberWorld {
         }
     }
 
+    fn bpm(&self) -> Option<f32> {
+        Some(self.melody.bpm)
+    }
+
+    fn on_hold(&mut self, held: bool) {
+        self.hold_mode = held;
+    }
+
     fn on_ptap(&mut self) {
         if let Some(m) = self.last_midi {
             self.start_note(m, 1.2, true);
@@ -516,8 +546,7 @@ impl World for AmberWorld {
         let fade_step = 1.0 / (CROSSFADE_S * self.sr);
         let mut env = 0.0f32;
         for (ls, rs) in l.iter_mut().zip(r.iter_mut()) {
-            let held = self.gesture.z > 0.0;
-            self.zhold.tick_block(held, 1);
+            self.zh_advance(1);
             let m = self.mods();
             let mut y = 0.0f32;
             env = 0.0;
@@ -549,6 +578,7 @@ impl World for AmberWorld {
         }
         self.build_lfos();
         self.zhold.reset();
+        self.zh = 0.0;
         self.last_midi = None;
         self.gate_env = 0.0;
     }

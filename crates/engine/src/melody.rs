@@ -83,13 +83,19 @@ pub fn make_seq(rng: &mut Rng) -> Melody {
     let bpm = (BPM_MIN + rng.next_f64() * (BPM_MAX - BPM_MIN)).round();
     let root = (rng.next_f64() * 12.0).floor() as u32;
     let scale = (rng.next_f64() * SCALES.len() as f64).floor() as usize;
-    let pool: Vec<u32> = (LOW..=HIGH)
-        .filter(|m| SCALES[scale].contains(&((m + 12 - root) % 12)))
-        .collect();
+    let mut pool_buf = [0u32; (HIGH - LOW + 1) as usize];
+    let mut n = 0;
+    for m in LOW..=HIGH {
+        if SCALES[scale].contains(&((m + 12 - root) % 12)) {
+            pool_buf[n] = m;
+            n += 1;
+        }
+    }
+    let pool = &pool_buf[..n];
     let mut idx = (rng.next_f64() * pool.len() as f64).floor() as usize;
     let mut steps = [REST; STEPS];
     for s in steps.iter_mut() {
-        *s = make_step(rng, &pool, &mut idx);
+        *s = make_step(rng, pool, &mut idx);
     }
     // the first step is always a clear note (legacy): a rest becomes the pool note at the current index
     if steps[0].velocity == 0.0 {
