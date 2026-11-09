@@ -449,3 +449,16 @@ fn engine_starts_in_amber() {
     assert!(t.bpm > 0.0, "amber fills telemetry");
     assert!(t.pattern.iter().any(|&p| p > 0.0));
 }
+
+#[test]
+fn probe_switch_resets_clock_to_default_bpm() {
+    let mut e = Engine::new(SR, 99);
+    render(&mut e, 1000, MAX_BLOCK);
+    e.push(Command::SwitchWorld(0));
+    let steps = collect_steps(&mut e, 48000, 1);
+    let period = SR as f64 * 60.0 / 120.0 / 4.0;
+    assert!(steps.len() >= 4);
+    for (frame, s) in &steps {
+        assert_eq!(*frame, (s.index as f64 * period).ceil() as u64 + 1 + 1000);
+    }
+}

@@ -110,9 +110,8 @@ impl Engine {
         }
         self.world.on_hold(self.hold);
         self.clock.reset();
-        if let Some(b) = self.world.bpm() {
-            self.clock.set_bpm(b as f64);
-        }
+        self.clock
+            .set_bpm(self.world.bpm().unwrap_or(DEFAULT_BPM) as f64);
         self.step_index = 0;
         self.tel.peak_l = 0.0;
         self.tel.peak_r = 0.0;

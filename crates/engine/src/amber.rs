@@ -50,7 +50,7 @@ struct LpgMap {
 }
 
 impl LpgMap {
-    // tuned by ear in Task 13
+    // Starting values; the constants below are tuned by ear against the legacy sound.
     fn new(tau: f32, attack_s: f32, cutoff_hz: f32, res_db: f32, vel: f32) -> LpgMap {
         let cut_norm =
             ((cutoff_hz.max(84.0) / 70.0).ln() / (16000.0f32 / 70.0).ln()).clamp(0.0, 1.0);
@@ -431,6 +431,7 @@ impl AmberWorld {
         let cut_eff = (cutoff * x.cut).clamp(84.0, 16000.0);
         let sr = self.sr;
 
+        let lpg = LpgMap::new(tau, attack, cut_eff, p.res_db, vel);
         let u = Setup {
             wave: match p.wave {
                 Wave::Sine => SINE,
@@ -446,12 +447,8 @@ impl AmberWorld {
             sym: p.sym,
             fm_k: (-1.0 / (tau * 0.7 * sr)).exp(),
             fold_k: (-1.0 / (tau * 0.9 * sr)).exp(),
-            lpg: LpgMap::new(tau, attack, cut_eff, p.res_db, vel),
-            left: 0,
-        };
-        let u = Setup {
-            left: (u.lpg.hold_s * sr).round() as u32,
-            ..u
+            lpg,
+            left: (lpg.hold_s * sr).round() as u32,
         };
 
         let pick = if !self.chans[0].active {
@@ -519,13 +516,8 @@ impl World for AmberWorld {
         if s.velocity > 0.0 {
             self.last_midi = Some(s.note);
             self.start_note(s.note, s.velocity, false);
-        } else {
-            // a rest lets the voice fade out in the crossfade time
-            for c in self.chans.iter_mut() {
-                c.target = 0.0;
-                c.pending = None;
-            }
         }
+        // a rest does nothing: legacy `stepNote` returns early and the voice rings on its own envelope
     }
 
     fn bpm(&self) -> Option<f32> {
@@ -549,7 +541,6 @@ impl World for AmberWorld {
             self.zh_advance(1);
             let m = self.mods();
             let mut y = 0.0f32;
-            env = 0.0;
             for c in self.chans.iter_mut() {
                 if c.active {
                     y += c.tick(&m, fade_step);

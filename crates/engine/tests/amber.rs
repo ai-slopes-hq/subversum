@@ -224,15 +224,15 @@ fn ptap_replaces_voice_and_is_brighter() {
 }
 
 #[test]
-fn pause_silences() {
+fn rest_then_voice_decays_on_its_own() {
     for seed in [1u32, 8, 30] {
         let mut w = AmberWorld::new(SR, seed);
         w.on_step(&note(0, 36, 1.0));
         let y = render(&mut w, 4800, 128);
         assert!(y.iter().any(|s| s.abs() > 1e-3));
         w.on_step(&note(1, 0, 0.0));
-        let tail = render(&mut w, 24000, 128);
-        let peak = tail[(24000 - 100)..]
+        let tail = render(&mut w, 480000, 128);
+        let peak = tail[(480000 - 100)..]
             .iter()
             .fold(0.0f32, |m, s| m.max(s.abs()));
         assert!(peak < 1e-3, "seed {seed}: peak {peak}");
@@ -323,4 +323,19 @@ fn zhold_legacy_semantics() {
     w.on_gesture(&z_gesture(0.0));
     render(&mut w, 1, 1);
     assert_eq!(w.zh(), 0.0);
+}
+
+#[test]
+fn rest_lets_the_note_ring() {
+    for seed in [1u32, 8, 30] {
+        let mut w = AmberWorld::new(SR, seed);
+        w.on_step(&note(0, 36, 1.0));
+        render(&mut w, 2400, 128);
+        w.on_step(&note(1, 0, 0.0));
+        // skip well past the crossfade (5 ms): what remains is the voice's own envelope
+        render(&mut w, 1200, 128);
+        let y = render(&mut w, 2400, 128);
+        let rms = (y.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / y.len() as f64).sqrt();
+        assert!(rms > 1e-3, "seed {seed}: rms {rms}");
+    }
 }
