@@ -1,6 +1,7 @@
 import { AudioHost } from '../audio/host';
 import { DebugSkin } from '../gfx/debug-skin';
 import { GestureTracker } from '../input/gesture';
+import { isTap } from '../input/tap';
 import type { Telemetry } from '../audio/protocol';
 import type { Controls } from '../gfx/skin';
 
@@ -34,11 +35,15 @@ const tracker = new GestureTracker((g) => {
 // Only the first finger drives the gesture; other pointers are ignored until it lifts.
 let activePointer: number | null = null;
 let downAt = 0;
+let downX = 0;
+let downY = 0;
 
 canvas.addEventListener('pointerdown', (e) => {
   if (activePointer !== null) return;
   activePointer = e.pointerId;
   downAt = performance.now();
+  downX = e.clientX;
+  downY = e.clientY;
   canvas.setPointerCapture(e.pointerId);
   tracker.down(e.clientX, e.clientY, canvas.clientWidth, canvas.clientHeight);
 });
@@ -46,16 +51,21 @@ canvas.addEventListener('pointermove', (e) => {
   if (e.pointerId !== activePointer) return;
   tracker.move(e.clientX, e.clientY, canvas.clientWidth, canvas.clientHeight);
 });
-const TAP_MAX_S = 0.25;
-const release = (e: PointerEvent): void => {
+const release = (e: PointerEvent, cancelled: boolean): void => {
   if (e.pointerId !== activePointer) return;
   activePointer = null;
-  // Short tap = P-tap; a longer press already acted as Z (hold) via the gesture stream.
-  if ((performance.now() - downAt) / 1000 < TAP_MAX_S) host?.send({ kind: 'ptap' });
+  // Short, nearly still press = P-tap; a longer press already acted as Z (hold) via the gesture stream.
+  const tap = isTap({
+    cancelled,
+    heldS: (performance.now() - downAt) / 1000,
+    movedPx: Math.hypot(e.clientX - downX, e.clientY - downY),
+    viewportPx: Math.max(canvas.clientWidth, canvas.clientHeight),
+  });
+  if (tap) host?.send({ kind: 'ptap' });
   tracker.up();
 };
-canvas.addEventListener('pointerup', release);
-canvas.addEventListener('pointercancel', release);
+canvas.addEventListener('pointerup', (e) => release(e, false));
+canvas.addEventListener('pointercancel', (e) => release(e, true));
 
 const idle: Telemetry = {
   version: 2, frame: 0, peakL: 0, peakR: 0, droppedSteps: 0, droppedCommands: 0, steps: [],
@@ -81,15 +91,14 @@ startBtn.addEventListener('click', async () => {
     await ctx.resume();
     const seedParam = params.get('seed');
     const parsed = seedParam === null || seedParam === '' ? NaN : Number(seedParam);
-    const seed = Number.isFinite(parsed) ? parsed : crypto.getRandomValues(new Uint32Array(1))[0];
+    const seed = Number.isInteger(parsed) ? parsed >>> 0 : crypto.getRandomValues(new Uint32Array(1))[0];
     const h = await AudioHost.create(ctx, `${import.meta.env.BASE_URL}engine.wasm`, seed);
     h.onTelemetry = (t) => {
       telemetry = t;
       for (const s of t.steps) skin.note(s.index, s.velocity);
     };
     h.onError = () => { msg.textContent = 'audio processor failed (see console)'; };
-    h.send({ kind: 'world', id: 1 }); // amber
-    h.send({ kind: 'seed', seed });
+    // the engine already starts in amber with this seed (Engine::new via processorOptions)
     h.connect(ctx.destination);
     host = h;
     startBtn.remove();
