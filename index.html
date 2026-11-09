@@ -3689,7 +3689,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (holdOn !== pHold) { pHold = holdOn; txt(E.hold, 'tb', 'hold'); txt(E.hold, 'te', holdOn ? 'on' : 'off'); act('hold', now, true); }
       if (locked !== pLock) { pLock = locked; txt(E.lock, 'tb', 'lock'); txt(E.lock, 'te', locked ? 'on' : 'off'); act('lock', now, true); }
       // Z: a new press starts the countdown (one second of nothing), then it opens; it wakes its line at the start, at the opening and at full, and keeps it alive in between
-      const ze = holding && ctx && seq ? ctx.currentTime - zT0 : -1;
+      const ze = holding && ctx && seq && !(holdOn && activeId === null) ? ctx.currentTime - zT0 : -1;   // hold with no finger on the glass: no countdown (zT0 is held at 'now' there, the line would show a full wait bar)
       if (M.z && ze >= 0) {
         if (zT0 !== pZT0) { pZT0 = zT0; zStep = -1; act('z', now, true); }
         if (ze < 1) act('z', now, false);
