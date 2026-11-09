@@ -25,7 +25,7 @@ describe('protocol vs real wasm', () => {
     expect(ex.engine_telemetry_size()).toBe(TELEMETRY_SIZE);
     run(ex, 512);
     const t = tel(ex);
-    expect(t.version).toBe(1);
+    expect(t.version).toBe(2);
     expect(t.frame).toBe(512);
   });
 
@@ -59,10 +59,57 @@ describe('protocol vs real wasm', () => {
   it('encode_command_matches_wasm_kinds', () => {
     expect(encodeCommand({ kind: 'gesture', x: 1, y: 2, z: 3, pinch: 4 })).toEqual([0, 1, 2, 3, 4]);
     expect(encodeCommand({ kind: 'world', id: 2 })).toEqual([1, 2, 0, 0, 0]);
-    expect(encodeCommand({ kind: 'seed', seed: 7 })).toEqual([2, 7, 0, 0, 0]);
     expect(encodeCommand({ kind: 'tempo', bpm: 90 })).toEqual([3, 90, 0, 0, 0]);
     expect(encodeCommand({ kind: 'hold', on: true })).toEqual([4, 1, 0, 0, 0]);
     expect(encodeCommand({ kind: 'lock', on: false })).toEqual([5, 0, 0, 0, 0]);
+  });
+});
+
+describe('protocol v2', () => {
+  it('encodes_seed_as_two_u16', () => {
+    expect(encodeCommand({ kind: 'seed', seed: 7 })).toEqual([2, 7, 0, 0, 0]);
+    expect(encodeCommand({ kind: 'seed', seed: 16777217 })).toEqual([2, 1, 256, 0, 0]);
+    expect(encodeCommand({ kind: 'seed', seed: 4294967295 })).toEqual([2, 65535, 65535, 0, 0]);
+  });
+
+  it('encodes_ptap', () => {
+    expect(encodeCommand({ kind: 'ptap' })).toEqual([6, 0, 0, 0, 0]);
+  });
+
+  it('decodes_telemetry_v2', () => {
+    // Offsets copied from the const _ asserts in crates/engine/src/protocol.rs.
+    const R = { bpm: 220, root: 224, scale: 228, hue: 232, brightness: 236, activity: 240, gateEnv: 244, pattern: 248, size: 312 };
+    expect(TELEMETRY_SIZE).toBe(R.size);
+    const buf = new ArrayBuffer(R.size);
+    const v = new DataView(buf);
+    v.setUint32(0, 2, true);
+    v.setUint32(4, 1234, true);
+    v.setUint32(16, 1, true); // one step
+    v.setUint32(28, 3, true);
+    v.setUint32(32, 50, true);
+    v.setFloat32(36, 0.5, true);
+    v.setFloat32(R.bpm, 133.5, true);
+    v.setUint32(R.root, 9, true);
+    v.setUint32(R.scale, 4, true);
+    v.setFloat32(R.hue, 0.25, true);
+    v.setFloat32(R.brightness, 0.75, true);
+    v.setFloat32(R.activity, 0.125, true);
+    v.setFloat32(R.gateEnv, 0.625, true);
+    for (let i = 0; i < 16; i++) v.setFloat32(R.pattern + i * 4, i / 16, true);
+    const t = decodeTelemetry(buf);
+    expect(t.version).toBe(2);
+    expect(t.frame).toBe(1234);
+    expect(t.steps).toEqual([{ index: 3, note: 50, velocity: 0.5 }]);
+    expect(t.bpm).toBe(133.5);
+    expect(t.root).toBe(9);
+    expect(t.scale).toBe(4);
+    expect(t.hue).toBe(0.25);
+    expect(t.brightness).toBe(0.75);
+    expect(t.activity).toBe(0.125);
+    expect(t.gateEnv).toBe(0.625);
+    expect(t.pattern).toHaveLength(16);
+    expect(t.pattern[15]).toBe(15 / 16);
+    expect(t.pattern[1]).toBe(1 / 16);
   });
 });
 
@@ -78,7 +125,7 @@ describe('EngineCore', () => {
     const t = decodeTelemetry(last!);
     expect(t.frame).toBe(64 * 128);
     // 240 bpm => step every 3000 samples; 8192 samples => steps 0..2 were produced across batches
-    expect(t.version).toBe(1);
+    expect(t.version).toBe(2);
   });
 
   it('emits telemetry every 8th block and acks', async () => {

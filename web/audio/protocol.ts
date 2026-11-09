@@ -1,27 +1,27 @@
 // Wire layout shared with crates/wasm (repr(C) Telemetry, little-endian).
-export const PROTOCOL_VERSION = 1;
-export const TELEMETRY_SIZE = 220;
+export const PROTOCOL_VERSION = 2;
+export const TELEMETRY_SIZE = 312;
 export const MAX_STEPS = 16;
 
 const OFF = {
   version: 0, frame: 4, peakL: 8, peakR: 12, stepCount: 16,
   droppedSteps: 20, droppedCommands: 24, steps: 28,
+  bpm: 220, root: 224, scale: 228, hue: 232, brightness: 236, activity: 240, gateEnv: 244,
+  pattern: 248,
 } as const;
 const STEP_SIZE = 12;
+export const PATTERN_LEN = 16;
 
 export type Gesture = { x: number; y: number; z: number; pinch: number };
 
-/**
- * Seed travels through engine_command's f32 argument: seeds above 2^24 lose
- * precision (known limitation, deferred).
- */
 export type Command =
   | ({ kind: 'gesture' } & Gesture)
   | { kind: 'world'; id: number }
   | { kind: 'seed'; seed: number }
   | { kind: 'tempo'; bpm: number }
   | { kind: 'hold'; on: boolean }
-  | { kind: 'lock'; on: boolean };
+  | { kind: 'lock'; on: boolean }
+  | { kind: 'ptap' };
 
 /** [kind, a, b, c, d] as passed to wasm engine_command. */
 export type EncodedCommand = [number, number, number, number, number];
@@ -30,10 +30,12 @@ export function encodeCommand(c: Command): EncodedCommand {
   switch (c.kind) {
     case 'gesture': return [0, c.x, c.y, c.z, c.pinch];
     case 'world': return [1, c.id, 0, 0, 0];
-    case 'seed': return [2, c.seed, 0, 0, 0];
+    // u32 seed as two u16 halves: each is exact in the f32 wasm argument.
+    case 'seed': return [2, c.seed & 0xffff, c.seed >>> 16, 0, 0];
     case 'tempo': return [3, c.bpm, 0, 0, 0];
     case 'hold': return [4, c.on ? 1 : 0, 0, 0, 0];
     case 'lock': return [5, c.on ? 1 : 0, 0, 0, 0];
+    case 'ptap': return [6, 0, 0, 0, 0];
   }
 }
 
@@ -48,6 +50,15 @@ export type Telemetry = {
   droppedSteps: number;
   droppedCommands: number;
   steps: Step[];
+  bpm: number;
+  root: number;
+  scale: number;
+  hue: number;
+  brightness: number;
+  activity: number;
+  gateEnv: number;
+  /** PATTERN_LEN step levels */
+  pattern: number[];
 };
 
 export function decodeTelemetry(buf: ArrayBuffer): Telemetry {
@@ -65,6 +76,8 @@ export function decodeTelemetry(buf: ArrayBuffer): Telemetry {
       velocity: v.getFloat32(o + 8, true),
     });
   }
+  const pattern: number[] = [];
+  for (let i = 0; i < PATTERN_LEN; i++) pattern.push(v.getFloat32(OFF.pattern + i * 4, true));
   return {
     version: v.getUint32(OFF.version, true),
     frame: v.getUint32(OFF.frame, true),
@@ -73,6 +86,14 @@ export function decodeTelemetry(buf: ArrayBuffer): Telemetry {
     droppedSteps: v.getUint32(OFF.droppedSteps, true),
     droppedCommands: v.getUint32(OFF.droppedCommands, true),
     steps,
+    bpm: v.getFloat32(OFF.bpm, true),
+    root: v.getUint32(OFF.root, true),
+    scale: v.getUint32(OFF.scale, true),
+    hue: v.getFloat32(OFF.hue, true),
+    brightness: v.getFloat32(OFF.brightness, true),
+    activity: v.getFloat32(OFF.activity, true),
+    gateEnv: v.getFloat32(OFF.gateEnv, true),
+    pattern,
   };
 }
 

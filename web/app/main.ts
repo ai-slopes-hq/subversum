@@ -53,7 +53,8 @@ canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', release);
 
 const idle: Telemetry = {
-  version: 1, frame: 0, peakL: 0, peakR: 0, droppedSteps: 0, droppedCommands: 0, steps: [],
+  version: 2, frame: 0, peakL: 0, peakR: 0, droppedSteps: 0, droppedCommands: 0, steps: [],
+  bpm: 0, root: 0, scale: 0, hue: 0, brightness: 0, activity: 0, gateEnv: 0, pattern: new Array(16).fill(0),
 };
 
 let last = performance.now();

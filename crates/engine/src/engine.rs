@@ -33,9 +33,13 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(sr: f32, seed: u32) -> Engine {
+        Engine::with_world(sr, Box::new(ProbeWorld::new(sr, seed)), seed)
+    }
+
+    pub fn with_world(sr: f32, world: Box<dyn World>, seed: u32) -> Engine {
         let mut e = Engine {
             sr,
-            world: Box::new(ProbeWorld::new(sr, seed)),
+            world,
             queue: [Command::Hold(false); CMD_QUEUE],
             queued: 0,
             knee: [Knee::new(1.0, 0.9, 0.1), Knee::new(1.0, 0.9, 0.1)],
@@ -104,6 +108,7 @@ impl Engine {
             }
             Command::Hold(h) => self.hold = h,
             Command::Lock(l) => self.lock = l,
+            Command::PTap => self.world.on_ptap(),
         }
     }
 
@@ -170,5 +175,6 @@ impl Engine {
         self.tel.peak_l = self.peak[0].value();
         self.tel.peak_r = self.peak[1].value();
         self.tel.frame = self.tel.frame.wrapping_add(n as u32);
+        self.world.fill_telemetry(&mut self.tel);
     }
 }

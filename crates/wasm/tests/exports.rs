@@ -19,7 +19,9 @@ fn tel() -> Telemetry {
 }
 
 fn tel_bytes() -> Vec<u8> {
-    unsafe { std::slice::from_raw_parts(engine_telemetry(), engine_telemetry_size() as usize).to_vec() }
+    unsafe {
+        std::slice::from_raw_parts(engine_telemetry(), engine_telemetry_size() as usize).to_vec()
+    }
 }
 
 fn out(p: *const f32, n: usize) -> Vec<f32> {
@@ -34,7 +36,12 @@ fn process_zero_and_oversized_frames_are_safe() {
     let (mut rl, mut rr) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
     engine_init(48000.0, 1);
     engine_command(0, 0.5, 0.9, 0.0, 0.0);
-    reference.push(Command::Gesture(engine::Gesture { x: 0.5, y: 0.9, z: 0.0, pinch: 0.0 }));
+    reference.push(Command::Gesture(engine::Gesture {
+        x: 0.5,
+        y: 0.9,
+        z: 0.0,
+        pinch: 0.0,
+    }));
     // The buffers are statics and may hold output from an earlier test: 0 must leave them as is.
     let before = out(engine_out_l(), MAX_BLOCK);
     engine_process(0);
@@ -72,7 +79,10 @@ fn init_twice_does_not_leak_or_keep_state() {
 #[test]
 fn telemetry_size_matches_struct() {
     let _g = lock();
-    assert_eq!(engine_telemetry_size() as usize, std::mem::size_of::<Telemetry>());
+    assert_eq!(
+        engine_telemetry_size() as usize,
+        std::mem::size_of::<Telemetry>()
+    );
 }
 
 #[test]
@@ -88,7 +98,10 @@ fn command_kinds_round_trip() {
         engine_process(128);
     }
     let want = unsafe {
-        std::slice::from_raw_parts(reference.telemetry() as *const Telemetry as *const u8, tel_bytes().len())
+        std::slice::from_raw_parts(
+            reference.telemetry() as *const Telemetry as *const u8,
+            tel_bytes().len(),
+        )
     };
     assert_eq!(tel_bytes(), want);
     assert!(tel().step_count > 0);
@@ -100,4 +113,57 @@ fn command_kinds_round_trip() {
     assert_ne!(tel_bytes(), want);
     engine_ack();
     assert_eq!(tel().step_count, 0);
+}
+
+/// Seed travels as two u16 halves (each exact in f32). An engine built with the seed must behave
+/// like an engine built with 0 that then receives the Seed command, observed through telemetry
+/// bytes and output (probe output depends on the seed through its rng).
+#[test]
+fn seed_roundtrips_u32() {
+    let _g = lock();
+    let (mut l, mut r) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
+    let mut seen = Vec::new();
+    for seed in [0u32, 1, 16_777_217, 4_294_967_295] {
+        let mut reference = Engine::new(48000.0, seed);
+        reference.push(Command::Gesture(engine::Gesture {
+            x: 0.5,
+            y: 0.9,
+            z: 0.0,
+            pinch: 0.0,
+        }));
+        engine_init(48000.0, 99);
+        engine_command(2, (seed & 0xffff) as f32, (seed >> 16) as f32, 0.0, 0.0);
+        engine_command(0, 0.5, 0.9, 0.0, 0.0);
+        for _ in 0..40 {
+            reference.process(&mut l, &mut r);
+            engine_process(128);
+            assert_eq!(out(engine_out_l(), MAX_BLOCK), l.to_vec(), "seed {seed}");
+        }
+        seen.push(out(engine_out_l(), MAX_BLOCK));
+    }
+    assert_ne!(seen[0], seen[1]);
+}
+
+#[test]
+fn seed_low_bit_above_2_24_is_distinct() {
+    let _g = lock();
+    let run = |seed: u32| {
+        engine_init(48000.0, 0);
+        engine_command(2, (seed & 0xffff) as f32, (seed >> 16) as f32, 0.0, 0.0);
+        engine_command(0, 0.5, 0.9, 0.0, 0.0);
+        for _ in 0..40 {
+            engine_process(128);
+        }
+        out(engine_out_l(), MAX_BLOCK)
+    };
+    assert_ne!(run(16_777_216), run(16_777_217));
+}
+
+#[test]
+fn ptap_kind_is_accepted() {
+    let _g = lock();
+    engine_init(48000.0, 1);
+    engine_command(6, 0.0, 0.0, 0.0, 0.0);
+    engine_process(128);
+    assert_eq!(tel().dropped_commands, 0);
 }

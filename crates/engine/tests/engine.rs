@@ -7,7 +7,12 @@ static A: CountingAlloc = CountingAlloc;
 const SR: f32 = 48000.0;
 
 fn g(x: f32, y: f32) -> Command {
-    Command::Gesture(Gesture { x, y, z: 0.0, pinch: 0.0 })
+    Command::Gesture(Gesture {
+        x,
+        y,
+        z: 0.0,
+        pinch: 0.0,
+    })
 }
 
 fn render(e: &mut Engine, n: usize, block: usize) -> (Vec<f32>, Vec<f32>) {
@@ -74,8 +79,17 @@ fn step_lands_on_exact_sample() {
         }
     }
     assert_eq!(at_45, 1, "only step 0 before sample 6016");
-    assert_eq!(at_46, (2, 1), "step index 1 after block covering sample 6000");
-    let first = out.iter().enumerate().skip(1000).find(|(_, x)| x.abs() > 0.01).map(|(i, _)| i);
+    assert_eq!(
+        at_46,
+        (2, 1),
+        "step index 1 after block covering sample 6000"
+    );
+    let first = out
+        .iter()
+        .enumerate()
+        .skip(1000)
+        .find(|(_, x)| x.abs() > 0.01)
+        .map(|(i, _)| i);
     assert_eq!(first, Some(6000));
 }
 
@@ -124,7 +138,10 @@ fn step_queue_overflow_keeps_newest_and_counts() {
     assert_eq!(t.steps[0].index, 4);
     assert!(t.steps.windows(2).all(|w| w[0].index < w[1].index));
     e.ack_steps();
-    assert_eq!((e.telemetry().step_count, e.telemetry().dropped_steps), (0, 0));
+    assert_eq!(
+        (e.telemetry().step_count, e.telemetry().dropped_steps),
+        (0, 0)
+    );
 }
 
 #[test]
@@ -172,4 +189,45 @@ fn frame_counts_samples() {
     e.push(Command::Seed(3));
     e.process(&mut l[..1], &mut r[..1]);
     assert_eq!(e.telemetry().frame, 514, "Seed does not reset frame");
+}
+
+struct CountWorld {
+    taps: std::rc::Rc<std::cell::Cell<u32>>,
+    fills: std::rc::Rc<std::cell::Cell<u32>>,
+}
+
+impl engine::World for CountWorld {
+    fn on_gesture(&mut self, _: &Gesture) {}
+    fn on_step(&mut self, _: &engine::StepEvent) {}
+    fn render(&mut self, _: &mut [f32], _: &mut [f32]) {}
+    fn reset(&mut self, _: u32) {}
+    fn on_ptap(&mut self) {
+        self.taps.set(self.taps.get() + 1);
+    }
+    fn fill_telemetry(&self, t: &mut engine::Telemetry) {
+        self.fills.set(self.fills.get() + 1);
+        t.bpm = 77.0;
+        t.pattern[15] = 1.0;
+    }
+}
+
+#[test]
+fn ptap_is_queued() {
+    let taps = std::rc::Rc::new(std::cell::Cell::new(0));
+    let fills = std::rc::Rc::new(std::cell::Cell::new(0));
+    let w = CountWorld {
+        taps: taps.clone(),
+        fills: fills.clone(),
+    };
+    let mut e = Engine::with_world(SR, Box::new(w), 1);
+    e.push(Command::PTap);
+    e.push(Command::PTap);
+    assert_eq!(taps.get(), 0, "applied only in process");
+    let (mut l, mut r) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
+    e.process(&mut l, &mut r);
+    assert_eq!(taps.get(), 2);
+    assert_eq!(fills.get(), 1, "fill_telemetry once per process");
+    assert_eq!(e.telemetry().bpm, 77.0);
+    assert_eq!(e.telemetry().pattern[15], 1.0);
+    assert_eq!(e.telemetry().version, 2);
 }
