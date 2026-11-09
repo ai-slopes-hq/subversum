@@ -25,6 +25,19 @@ fn patch_matches_legacy_for_all_fixture_seeds() {
         let mut rng = Rng::new(seed);
         let p = roll(&mut rng);
         let w = &s["patch"];
+        // every legacy key must be compared below (or be a known-ignored one); none silently dropped
+        let mut keys: Vec<&str> = w.as_object().unwrap().keys().map(|k| k.as_str()).collect();
+        keys.sort();
+        let mut compared = vec![
+            "oct", "semi", "freq", "wave", "fmRatio", "fmIdx", "fmSweep", "depth", "sym", "sweep",
+            "decay", "attack", "cutoff", "res", "vel", "lfo", "vis",
+            "lfoNodes", // always null in legacy roll(); runtime audio nodes, not a patch value
+        ];
+        compared.sort();
+        assert_eq!(
+            keys, compared,
+            "seed {seed}: fixture patch keys vs compared keys"
+        );
         assert_eq!(p.oct as i64, w["oct"].as_i64().unwrap(), "seed {seed} oct");
         assert_eq!(
             p.semi as i64,
