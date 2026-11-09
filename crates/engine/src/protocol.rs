@@ -38,6 +38,7 @@ pub struct StepEvent {
 #[derive(Clone, Copy, Debug)]
 pub struct Telemetry {
     pub version: u32,
+    /// Samples rendered since engine creation (not reset by Seed/SwitchWorld).
     pub frame: u32,
     pub peak_l: f32,
     pub peak_r: f32,

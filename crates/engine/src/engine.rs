@@ -169,6 +169,6 @@ impl Engine {
         }
         self.tel.peak_l = self.peak[0].value();
         self.tel.peak_r = self.peak[1].value();
-        self.tel.frame = self.tel.frame.wrapping_add(1);
+        self.tel.frame = self.tel.frame.wrapping_add(n as u32);
     }
 }

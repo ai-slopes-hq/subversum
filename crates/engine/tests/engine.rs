@@ -158,3 +158,18 @@ fn switch_world_and_seed_reset_state() {
     let o5 = take(Command::SwitchWorld(0));
     assert_eq!(bits(&o4.0), bits(&o5.0));
 }
+
+#[test]
+fn frame_counts_samples() {
+    let mut e = Engine::new(SR, 1);
+    let (mut l, mut r) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
+    for _ in 0..4 {
+        e.process(&mut l, &mut r);
+    }
+    assert_eq!(e.telemetry().frame, 512);
+    e.process(&mut l[..1], &mut r[..1]);
+    assert_eq!(e.telemetry().frame, 513);
+    e.push(Command::Seed(3));
+    e.process(&mut l[..1], &mut r[..1]);
+    assert_eq!(e.telemetry().frame, 514, "Seed does not reset frame");
+}

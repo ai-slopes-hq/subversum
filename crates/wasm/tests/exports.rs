@@ -29,7 +29,7 @@ fn out(p: *const f32, n: usize) -> Vec<f32> {
 #[test]
 fn process_zero_and_oversized_frames_are_safe() {
     let _g = lock();
-    // `frame` counts process calls, so the rendered length is checked against a reference engine.
+    // The rendered output is checked against a reference engine; `frame` counts samples.
     let mut reference = Engine::new(48000.0, 1);
     let (mut rl, mut rr) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
     engine_init(48000.0, 1);
@@ -47,7 +47,7 @@ fn process_zero_and_oversized_frames_are_safe() {
         assert_eq!(out(engine_out_r(), MAX_BLOCK), rr.to_vec());
         assert!(rl.iter().all(|x| x.is_finite()));
     }
-    assert_eq!(tel().frame, 3);
+    assert_eq!(tel().frame, 3 * MAX_BLOCK as u32);
     assert!(rl.iter().any(|&x| x != 0.0));
 }
 
