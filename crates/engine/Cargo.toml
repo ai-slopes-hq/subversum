@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", rev = "bf982023d6ee3ef0a49d7157bb9c8c1669656514" }
+versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", tag = "v0.1.0" }
 
 [dev-dependencies]
-versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", rev = "bf982023d6ee3ef0a49d7157bb9c8c1669656514", features = ["testkit"] }
+versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", tag = "v0.1.0", features = ["testkit"] }
