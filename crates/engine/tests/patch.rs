@@ -59,7 +59,7 @@ fn patch_matches_legacy_for_all_fixture_seeds() {
         close(p.sym, &w["sym"], "sym", seed);
         close(p.sweep, &w["sweep"], "sweep", seed);
         close(p.decay, &w["decay"], "decay", seed);
-        close(p.attack_ms, &w["attack"], "attack", seed);
+        close(p.attack_s, &w["attack"], "attack", seed);
         close(p.cutoff, &w["cutoff"], "cutoff", seed);
         close(p.res_db, &w["res"], "res", seed);
         close(p.vel, &w["vel"], "vel", seed);

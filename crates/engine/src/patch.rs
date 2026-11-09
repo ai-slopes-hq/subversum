@@ -79,8 +79,8 @@ pub struct Patch {
     pub sweep: f32,
     /// Seconds until the gate is nearly closed.
     pub decay: f32,
-    /// Attack in seconds (legacy `attack`).
-    pub attack_ms: f32,
+    /// Attack time in seconds (legacy `attack`).
+    pub attack_s: f32,
     pub cutoff: f32,
     pub res_db: f32,
     pub vel: f32,
@@ -164,7 +164,7 @@ pub fn roll(rng: &mut Rng) -> Patch {
         sym: sym as f32,
         sweep: sweep as f32,
         decay: decay as f32,
-        attack_ms: attack as f32,
+        attack_s: attack as f32,
         cutoff: cutoff as f32,
         res_db: res as f32,
         vel: 1.0,
