@@ -14,9 +14,12 @@ describe('gesture tracker', () => {
     const { g, out } = setup();
     g.down(-50, 900, 200, 100);
     g.move(500, -20, 200, 100);
-    for (const e of out) for (const v of [e.x, e.y, e.z, e.pinch]) {
-      expect(v).toBeGreaterThanOrEqual(0);
-      expect(v).toBeLessThanOrEqual(Math.max(1, e.z));
+    for (const e of out) {
+      for (const v of [e.x, e.y, e.pinch]) {
+        expect(v).toBeGreaterThanOrEqual(0);
+        expect(v).toBeLessThanOrEqual(1);
+      }
+      expect(e.z).toBeGreaterThanOrEqual(0);
     }
     expect(out[0]).toMatchObject({ x: 0, y: 0 });
     expect(out[1]).toMatchObject({ x: 1, y: 1 });
@@ -33,5 +36,19 @@ describe('gesture tracker', () => {
     const n = out.length;
     g.move(30, 30, 100, 100); // no touch: ignored
     expect(out.length).toBe(n);
+    g.tick();
+    expect(out.length).toBe(n);
+  });
+
+  it('gesture_tick_grows_z_while_held_still', () => {
+    const { g, out, advance } = setup();
+    g.down(10, 10, 100, 100);
+    advance(500);
+    g.tick();
+    const z1 = out[out.length - 1].z;
+    expect(z1).toBeGreaterThan(0);
+    advance(500);
+    g.tick();
+    expect(out[out.length - 1].z).toBeGreaterThan(z1);
   });
 });

@@ -27,7 +27,8 @@ export class DebugSkin implements Skin {
     ctx.fillRect(w * 0.25, h * (1 - t.peakL), w * 0.2, h * t.peakL);
     ctx.fillRect(w * 0.55, h * (1 - t.peakR), w * 0.2, h * t.peakR);
 
+    // gesture y grows upward (1 = top), so flip for canvas coordinates
     ctx.fillStyle = '#fa4';
-    ctx.fillRect(c.x * w - 2, c.y * h - 2, 4, 4);
+    ctx.fillRect(c.x * w - 2, (1 - c.y) * h - 2, 4, 4);
   }
 }

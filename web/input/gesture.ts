@@ -31,6 +31,13 @@ export class GestureTracker {
     this.emit(this.last);
   }
 
+  /** Call each frame: re-emits the last position with the current hold time. */
+  tick(): void {
+    if (this.downAt === null) return;
+    this.last = { ...this.last, z: (this.now() - this.downAt) / 1000 };
+    this.emit(this.last);
+  }
+
   private last: Gesture = { x: 0, y: 0, z: 0, pinch: 0 };
 
   private send(px: number, py: number, w: number, h: number): void {
