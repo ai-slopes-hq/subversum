@@ -416,11 +416,11 @@ html[data-skin="clouds"] body { background-color: var(--bg); background-image: n
 /* modulation HUD: a centred stack of messages at the top. A line appears when its axis changes, the newest is bright, older ones slide down and fade slowly; a static screen shows nothing.
    The look follows the world through the --k-* tokens; the text says what the axis changes and which way */
 #mod { position: fixed; z-index: 8; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 16px); height: 124px; pointer-events: none; -webkit-user-select: none; user-select: none;
-  font: var(--k-fst, normal) var(--k-fw, 600) var(--k-fs, 9.5px)/1 var(--k-font, ui-sans-serif, system-ui, sans-serif); letter-spacing: var(--k-ls, .12em); text-transform: var(--k-case, uppercase);
-  color: var(--k-ink, #f1ece4); text-shadow: var(--k-tx, 0 1px 2px rgba(0,0,0,.7)); }
-#mod .md { position: absolute; left: 50%; top: 0; width: 250px; height: 28px; margin-left: -125px; opacity: 0; transform: translateY(0); isolation: isolate;
+  font: var(--k-fst, normal) var(--k-fw, 600) var(--k-fs, 11px)/1 var(--k-font, ui-sans-serif, system-ui, sans-serif); letter-spacing: var(--k-ls, .12em); text-transform: var(--k-case, uppercase);
+  color: var(--k-ink, #f1ece4); text-shadow: var(--k-tx, 0 0 3px rgba(0,0,0,.95), 0 1px 2px rgba(0,0,0,.8)); }
+#mod .md { position: absolute; left: 50%; top: 0; width: 280px; height: 28px; margin-left: -140px; opacity: 0; transform: translateY(0); isolation: isolate;
   transition: transform .32s cubic-bezier(.2,.8,.2,1), opacity .16s linear; will-change: transform, opacity; }
-#mod .md::before { content: ""; position: absolute; inset: -9px -12px -7px; z-index: -1; background: radial-gradient(ellipse at center, rgba(0,0,0,.52), rgba(0,0,0,.26) 52%, transparent 74%); }
+#mod .md::before { content: ""; position: absolute; inset: -10px -22px -8px; z-index: -1; background: radial-gradient(ellipse at center, rgba(0,0,0,.7), rgba(0,0,0,.4) 55%, transparent 78%); }
 #mod .mh { display: flex; justify-content: center; align-items: baseline; gap: 10px; margin-bottom: 7px; white-space: nowrap; }
 #mod .mh i { font-style: normal; opacity: .5; }
 #mod .mh i:empty { display: none; }
@@ -443,17 +443,17 @@ html[data-skin="topo"] #mod { --k-ink: hsl(var(--tp) 60% 88%); --k-hi: hsl(var(-
   --k-hd: 8px; --k-head: transparent; --k-hb: 1.5px solid hsl(var(--tp) 90% 82%); --k-tx: 0 1px 3px rgba(0,0,0,.8); }
 html[data-skin="matrix"] #mod { --k-ink: #f4dcea; --k-hi: hsl(var(--mh) 100% 68%); --k-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --k-fw: 700; --k-ls: .1em; --k-th: 6px; --k-r: 0;
   --k-track: radial-gradient(circle, rgba(255,255,255,.26) 1.3px, transparent 1.7px) 0 50% / 7px 100% repeat-x; --k-mask: radial-gradient(circle, #000 2px, transparent 2.5px) 0 50% / 7px 100% repeat-x; --k-glow: none; --k-hd: 9px; --k-hr: 50%; --k-head: transparent; --k-hb: 2px solid hsl(var(--mh) 100% 78%); }
-html[data-skin="mandala"] #mod { --k-ink: hsl(var(--hue) 60% 90%); --k-hi: hsl(var(--hue) 100% 76%); --k-font: ui-serif, Georgia, "Times New Roman", serif; --k-fw: 500; --k-fs: 9px; --k-ls: .26em; --k-th: 1px; --k-r: 0; --k-track: hsl(var(--hue) 60% 80% / .3);
+html[data-skin="mandala"] #mod { --k-ink: hsl(var(--hue) 60% 90%); --k-hi: hsl(var(--hue) 100% 76%); --k-font: ui-serif, Georgia, "Times New Roman", serif; --k-fw: 500; --k-fs: 11px; --k-ls: .2em; --k-th: 1px; --k-r: 0; --k-track: hsl(var(--hue) 60% 80% / .3);
   --k-glow: 0 0 9px hsl(var(--hue) 100% 70% / .8); --k-tx: 0 0 8px hsl(var(--hue) 100% 60% / .55), 0 1px 2px rgba(0,0,0,.7); --k-hd: 8px; --k-hr: 1px; --k-hrot: 45deg; }
-html[data-skin="ridges"] #mod { --k-ink: hsl(var(--hue) 45% 84%); --k-hi: hsl(var(--hue) 100% 74%); --k-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --k-fw: 500; --k-fs: 10px; --k-ls: .04em; --k-case: lowercase; --k-th: 1px; --k-r: 0; --k-track: hsl(var(--hue) 40% 70% / .3);
+html[data-skin="ridges"] #mod { --k-ink: hsl(var(--hue) 45% 84%); --k-hi: hsl(var(--hue) 100% 74%); --k-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --k-fw: 500; --k-fs: 11px; --k-ls: .04em; --k-case: lowercase; --k-th: 1px; --k-r: 0; --k-track: hsl(var(--hue) 40% 70% / .3);
   --k-hd: 2px; --k-hdh: 11px; --k-hr: 0; }
-html[data-skin="clouds"] #mod { --k-font: Optima, Candara, "Gill Sans", "Segoe UI", sans-serif; --k-ink: hsl(var(--hue) 45% 92%); --k-hi: hsl(var(--hue) 100% 80%); --k-fw: 300; --k-fs: 10px; --k-ls: .16em; --k-case: lowercase; --k-th: 3px; --k-r: 2px;
+html[data-skin="clouds"] #mod { --k-font: Optima, Candara, "Gill Sans", "Segoe UI", sans-serif; --k-ink: hsl(var(--hue) 45% 92%); --k-hi: hsl(var(--hue) 100% 80%); --k-fw: 400; --k-fs: 11px; --k-ls: .16em; --k-case: lowercase; --k-th: 3px; --k-r: 2px;
   --k-track: radial-gradient(circle, rgba(255,255,255,.34) 1px, transparent 1.4px) 0 50% / 5px 100% repeat-x; --k-mask: radial-gradient(circle, #000 1.4px, transparent 1.9px) 0 50% / 5px 100% repeat-x;
   --k-glow: 0 0 12px hsl(var(--hue) 100% 72% / .9); --k-hd: 7px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
-html[data-skin="shepard"] #mod { --k-font: "DIN Alternate", "DIN Condensed", Bahnschrift, "Arial Narrow", "Roboto Condensed", sans-serif; --k-ink: hsl(36 40% 90%); --k-hi: hsl(36 100% 72%); --k-fw: 700; --k-fs: 10.5px; --k-ls: .2em; --k-case: uppercase; --k-th: 2px; --k-r: 0; --k-track: hsl(270 40% 70% / .3); --k-glow: 0 0 10px hsl(36 100% 70% / .7); --k-hd: 5px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
-html[data-skin="overtones"] #mod { --k-font: "Helvetica Neue", Helvetica, Arial, sans-serif; --k-ink: hsl(36 40% 92%); --k-hi: hsl(36 100% 74%); --k-fw: 200; --k-fs: 9px; --k-ls: .32em; --k-case: uppercase; --k-th: 2px; --k-r: 1px; --k-track: hsl(262 50% 70% / .3); --k-glow: 0 0 12px hsl(36 100% 70% / .8); --k-hd: 6px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
-html[data-skin="wavetable"] #mod { --k-font: "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; --k-ink: hsl(36 40% 92%); --k-hi: hsl(36 100% 74%); --k-fw: 300; --k-fs: 9px; --k-ls: .2em; --k-case: uppercase; --k-th: 2px; --k-r: 1px; --k-track: hsl(262 50% 70% / .3); --k-glow: 0 0 12px hsl(36 100% 70% / .8); --k-hd: 6px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
-html[data-skin="vector"] #mod { --k-font: Futura, "Century Gothic", "Avenir Next", "Trebuchet MS", sans-serif; --k-ink: hsl(var(--hue) 30% 92%); --k-hi: hsl(var(--hue) 70% 82%); --k-fw: 500; --k-fs: 10px; --k-ls: .24em; --k-case: lowercase; --k-th: 2px; --k-r: 0; --k-track: hsl(var(--hue) 30% 80% / .26); --k-glow: 0 0 10px hsl(var(--hue) 70% 78% / .7); --k-hd: 5px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
+html[data-skin="shepard"] #mod { --k-font: "DIN Alternate", "DIN Condensed", Bahnschrift, "Arial Narrow", "Roboto Condensed", sans-serif; --k-ink: hsl(36 40% 90%); --k-hi: hsl(36 100% 72%); --k-fw: 700; --k-fs: 11px; --k-ls: .2em; --k-case: uppercase; --k-th: 2px; --k-r: 0; --k-track: hsl(270 40% 70% / .3); --k-glow: 0 0 10px hsl(36 100% 70% / .7); --k-hd: 5px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
+html[data-skin="overtones"] #mod { --k-font: "Helvetica Neue", Helvetica, Arial, sans-serif; --k-ink: hsl(36 40% 92%); --k-hi: hsl(36 100% 74%); --k-fw: 400; --k-fs: 11px; --k-ls: .2em; --k-case: uppercase; --k-th: 2px; --k-r: 1px; --k-track: hsl(262 50% 70% / .3); --k-glow: 0 0 12px hsl(36 100% 70% / .8); --k-hd: 6px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
+html[data-skin="wavetable"] #mod { --k-font: "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; --k-ink: hsl(36 40% 92%); --k-hi: hsl(36 100% 74%); --k-fw: 400; --k-fs: 11px; --k-ls: .2em; --k-case: uppercase; --k-th: 2px; --k-r: 1px; --k-track: hsl(262 50% 70% / .3); --k-glow: 0 0 12px hsl(36 100% 70% / .8); --k-hd: 6px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
+html[data-skin="vector"] #mod { --k-font: Futura, "Century Gothic", "Avenir Next", "Trebuchet MS", sans-serif; --k-ink: hsl(var(--hue) 30% 92%); --k-hi: hsl(var(--hue) 70% 82%); --k-fw: 500; --k-fs: 11px; --k-ls: .2em; --k-case: lowercase; --k-th: 2px; --k-r: 0; --k-track: hsl(var(--hue) 30% 80% / .26); --k-glow: 0 0 10px hsl(var(--hue) 70% 78% / .7); --k-hd: 5px; --k-tx: 0 0 8px rgba(0,0,0,.8); }
 @media (prefers-reduced-motion: reduce) { #mod .md { transition: opacity .16s linear; } }
 /* debug HUD (?hud=1): the axes and their values as a game readout; never on by default */
 #hud { position: fixed; z-index: 8; left: max(8px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 150px); width: 168px; pointer-events: none; font: 700 10px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: #f1ece4; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; -webkit-user-select: none; user-select: none; }
@@ -480,8 +480,8 @@ html.locked #lockframe { opacity: 1; }
   box-shadow: inset 0 0 0 2.5px hsl(var(--hue, 38) 90% 68% / .95), inset 0 0 90px 12px hsl(var(--hue, 38) 90% 60% / .5); }
 html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cubic-bezier(.3, .6, .4, 1); }
 @keyframes lockshake { 0%, 100% { transform: translateX(0); } 18% { transform: translateX(calc(var(--shk, 1) * 14px)); } 42% { transform: translateX(calc(var(--shk, 1) * -10px)); } 66% { transform: translateX(calc(var(--shk, 1) * 6px)); } 84% { transform: translateX(calc(var(--shk, 1) * -3px)); } }
-#handle { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: 40px; height: 4px; margin-left: -20px; border-radius: 2px;
-  background: rgba(255,255,255,.16); z-index: 6; pointer-events: none; }
+#handle { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: 44px; height: 5px; margin-left: -22px; border-radius: 3px;
+  background: rgba(255,255,255,.4); box-shadow: 0 0 0 1px rgba(0,0,0,.35); z-index: 6; pointer-events: none; }
 #sabprobe { position: fixed; left: 0; top: 0; width: 0; height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); visibility: hidden; pointer-events: none; }
 #fan { position: fixed; inset: 0; z-index: 9; display: none; pointer-events: none; color: #f1ece4; background: rgba(0,0,0,.5);
   font: 500 13px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-user-select: none; user-select: none; }
@@ -490,6 +490,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 .fan-top { position: absolute; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 44px); text-align: center; text-shadow: 0 1px 16px rgba(0,0,0,.65); }
 .fan-top b { font: 600 76px/1 system-ui, -apple-system, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .fan-top i { font-style: normal; font-size: 18px; letter-spacing: .12em; opacity: .65; margin-left: 8px; }
+.fan-tip { position: absolute; left: 0; right: 0; bottom: calc(100% / 6 + 18px); text-align: center; font-size: 20px; font-weight: 600; letter-spacing: .03em; color: hsl(var(--hue, 38) 90% 82%); text-shadow: 0 1px 14px rgba(0,0,0,.8); min-height: 24px; }
 .fan-top span { display: block; margin-top: 10px; font-size: 30px; font-weight: 500; opacity: .92; }
 /* the fan: an opaque half disc on the bottom edge, as tall as the bottom sixth of the screen, cut into sectors; a whole sector is the touch target */
 .fan-arc { position: absolute; left: 50%; bottom: 0; height: calc(100% / 6); aspect-ratio: 2 / 1; transform: translateX(-50%); }
@@ -526,10 +527,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
 <div id="sabprobe" aria-hidden="true"></div>
 <div id="fan" aria-hidden="true">
   <div class="fan-top"><b id="fanBpm">—</b><i>BPM</i><span id="fanKey"></span></div>
-  <div class="fan-arc"><svg class="fan-svg" viewBox="0 0 200 100" aria-hidden="true">
-    <g class="fan-sec" id="fanHold" data-act="hold"><path class="sec" d="M100 100L0.00 100.00A100 100 0 0 1 50.00 13.40Z"/><g class="ico" transform="translate(34.3 57.0)"><circle cx="12" cy="12" r="10" stroke-dasharray="2 3.2"/><circle cx="12" cy="12" r="5.8"/><circle class="dot" cx="12" cy="12" r="2.2"/></g></g>
-    <g class="fan-sec" id="fanLock" data-act="lock"><path class="sec" d="M100 100L50.00 13.40A100 100 0 0 1 150.00 13.40Z"/><g class="ico" transform="translate(88.0 26.0)"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shut" d="M8 11V8a4 4 0 0 1 8 0v3"/><path class="open" d="M8 11V8a4 4 0 0 1 7.6-1.7"/></g></g>
-    <g class="fan-sec" id="fanShare" data-act="share"><path class="sec" d="M100 100L150.00 13.40A100 100 0 0 1 200.00 100.00Z"/><g class="ico" transform="translate(141.7 57.0)"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></g></g>
+  <div class="fan-tip" id="fanTip"></div>
+  <div class="fan-arc"><svg class="fan-svg" viewBox="0 0 200 100" role="group" aria-label="Quick actions">
+    <g class="fan-sec" id="fanHold" data-act="hold" role="button" aria-label="Hold" aria-pressed="false"><path class="sec" d="M100 100L0.00 100.00A100 100 0 0 1 50.00 13.40Z"/><g class="ico" transform="translate(34.3 57.0)"><circle cx="12" cy="12" r="10" stroke-dasharray="2 3.2"/><circle cx="12" cy="12" r="5.8"/><circle class="dot" cx="12" cy="12" r="2.2"/></g></g>
+    <g class="fan-sec" id="fanLock" data-act="lock" role="button" aria-label="Lock patch" aria-pressed="false"><path class="sec" d="M100 100L50.00 13.40A100 100 0 0 1 150.00 13.40Z"/><g class="ico" transform="translate(88.0 26.0)"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shut" d="M8 11V8a4 4 0 0 1 8 0v3"/><path class="open" d="M8 11V8a4 4 0 0 1 7.6-1.7"/></g></g>
+    <g class="fan-sec" id="fanShare" data-act="share" role="button" aria-label="Share link"><path class="sec" d="M100 100L150.00 13.40A100 100 0 0 1 200.00 100.00Z"/><g class="ico" transform="translate(141.7 57.0)"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></g></g>
   </svg></div>
 </div>
 
@@ -584,6 +586,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
     const AC = window.AudioContext || window.webkitAudioContext;
     ctx = new AC({ latencyHint: 'interactive' });
+    ctx.onstatechange = () => { if (ctx.state !== 'running' && !document.hidden) ctx.resume().catch(() => {}); };   // a call or Siri interrupts the context on iOS: take it back as soon as the page may
     master = ctx.createGain();
     master.gain.value = MASTER;
     // transparent soft limiter: linear up to 0.8, then rounds off toward 0.95
@@ -3430,7 +3433,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   }
 
   /* ---------- service layer: lock, quiet strip, fan ---------- */
-  const fan = $('#fan'), fanItems = [].slice.call(document.querySelectorAll('.fan-sec[data-act]')), lockFrame = $('#lockframe'), probe = $('#sabprobe');
+  const fan = $('#fan'), fanItems = [].slice.call(document.querySelectorAll('.fan-sec[data-act]')), lockFrame = $('#lockframe'), probe = $('#sabprobe'), fanTipEl = $('#fanTip');
   let locked = false, holdOn = false, diveFan = false, mv = [], lockWin = null, attempted = false, stripId = null, stripX0 = 0, stripY0 = 0, fanOpen = false, fanArmed = false, fanHover = null, frameTimer = 0, shakeTimer = 0, lastInfo = null;
   const KEY_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
   const stripH = () => 96 + (parseFloat(getComputedStyle(probe).paddingBottom) || 0);   // the bottom strip does not play: touches there belong to the fan
@@ -3439,11 +3442,26 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     locked = !!v; lockWin = null;
     document.documentElement.classList.toggle('locked', locked);
     $('#fanLock').classList.toggle('on', locked);
+    $('#fanLock').setAttribute('aria-pressed', locked ? 'true' : 'false');
   }
   // hold: the finger is "always down". Lifting the real finger does not stop the music; a new touch only moves the position (no new patch, no world swipe)
+  // hold plays with no finger on the glass: keep the screen awake, otherwise the phone locks after about 30 s and the sound dies with it
+  let wakeSentinel = null, wakeAsk = false;
+  function wakeOn() {
+    if (!navigator.wakeLock || wakeSentinel || wakeAsk || document.hidden) return;
+    wakeAsk = true;
+    navigator.wakeLock.request('screen').then(w => {
+      wakeAsk = false;
+      if (!holdOn) { w.release().catch(() => {}); return; }
+      wakeSentinel = w; w.addEventListener('release', () => { if (wakeSentinel === w) wakeSentinel = null; });
+    }).catch(() => { wakeAsk = false; });
+  }
+  function wakeOff() { if (wakeSentinel) { const w = wakeSentinel; wakeSentinel = null; w.release().catch(() => {}); } }
   function setHold(v) {
     v = !!v; if (v === holdOn) return;
     holdOn = v;
+    if (holdOn) wakeOn(); else wakeOff();
+    $('#fanHold').setAttribute('aria-pressed', holdOn ? 'true' : 'false');
     $('#fanHold').classList.toggle('on', holdOn);
     if (holdOn) {
       if (!holding) { place(XY.x * innerWidth, XY.y * innerHeight, true); XY.down = FP.down = true; down(); }   // nothing is playing: a virtual press at the last position
@@ -3481,17 +3499,22 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     $('#fanShare').classList.toggle('dis', !(lastInfo && lastInfo.pure));
   }
   function openFan() { fillFan(); fanOpen = true; fan.classList.add('open'); fan.setAttribute('aria-hidden', 'false'); }
-  function closeFan() { fanOpen = false; fanArmed = false; diveFan = false; fanHover = null; fan.classList.remove('open'); fan.setAttribute('aria-hidden', 'true'); fanItems.forEach(el => el.classList.remove('hot')); }
+  function closeFan() { fanOpen = false; fanArmed = false; diveFan = false; fanHover = null; fanTipEl.textContent = ''; fan.classList.remove('open'); fan.setAttribute('aria-hidden', 'true'); fanItems.forEach(el => el.classList.remove('hot')); }
   // the half disc is cut into equal sectors; the finger picks the sector it is in (any point of it), not an icon
   function hoverAt(x, y) {
     const r = $('.fan-arc').getBoundingClientRect(), px = r.left + r.width / 2, py = r.bottom, R = r.height;
     const dx = x - px, dy = py - y, d = Math.hypot(dx, dy), n = fanItems.length;
-    let best = null;
+    let best = null, tip = '';
     if (dy >= 0 && d <= R + 18) {
       const f = (Math.PI - Math.atan2(dy, dx)) / (Math.PI / n), k = Math.min(n - 1, Math.floor(f)), fr = f - k;
       const onCut = (fr < 0.05 && k > 0) || (fr > 0.95 && k < n - 1);   // a narrow dead band on the cuts between sectors
-      if (!onCut && !fanItems[k].classList.contains('dis')) best = fanItems[k];
+      if (!onCut) {
+        const it = fanItems[k], a = it.dataset.act;
+        if (it.classList.contains('dis')) tip = 'play a patch first';   // the label rides above the arc, where the thumb does not cover it
+        else { best = it; tip = a === 'hold' ? (holdOn ? 'hold off' : 'hold on') : a === 'lock' ? (locked ? 'unlock patch' : 'lock patch') : 'share link'; }
+      }
     }
+    fanTipEl.textContent = tip;
     fanHover = best ? best.dataset.act : null;
     fanItems.forEach(el => el.classList.toggle('hot', el === best));
   }
@@ -3522,7 +3545,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   Object.assign(window.subversum, { hold: setHold, held: () => holdOn, lock: setLock, locked: () => locked, fan: () => fanOpen, stripH });
 
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
-  let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0;
+  let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0, edgeDown = false;
+  const EDGE = 20;   // a touch that starts this close to the left or right edge is play only: the system edge gesture (back) lives there, so it never switches the world
   const P_WORLDS = { clouds: true, ridges: true, vector: true, amber: true, riso: true, mandala: true, scope: true, matrix: true, topo: true, shepard: true, overtones: true, wavetable: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
   const setFP2 = (x, y) => { const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844); pX = x; pY = y; FP2.vx = (x - W / 2) / sc; FP2.vy = (y - H / 2) / sc; };   // the second finger in the skin's coordinates, so a world can animate it like the first
   function pinch() {
@@ -3572,6 +3596,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (stripDown(e)) return;
     if (activeId !== null && activeId !== e.pointerId) { startP(e); return; }
     activeId = e.pointerId;
+    edgeDown = e.clientX < EDGE || e.clientX > innerWidth - EDGE;
     attempted = false; mv.length = 0; mv.push([performance.now(), e.clientY]);
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
     sx = e.clientX; sy = e.clientY; swiped = false; dragging = false; tDown = performance.now();
@@ -3591,17 +3616,17 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const dx = e.clientX - sx, dy = e.clientY - sy;
     const horizontal = Math.abs(dx) > 1.5 * Math.abs(dy);
     const early = performance.now() - tDown < 300;
-    if (early && horizontal && Math.abs(dx) > 10 && !locked && !holdOn) {
-      // feedback while flicking: the scene follows the finger and dims, the dots appear
+    const SW0 = 36;   // a sideways move shows swipe feedback only past this; before it, it is plain X play
+    if (early && horizontal && Math.abs(dx) > SW0 && !locked && !holdOn && !edgeDown) {
+      // feedback while flicking: the scene follows the finger and dims, the dots appear (the axes keep following the finger, they are never frozen)
       dragging = true;
-      root.style.setProperty('--sw', (dx * 0.45).toFixed(1) + 'px');
-      root.style.setProperty('--swo', (1 - Math.min(0.5, Math.abs(dx) / 200)).toFixed(2));
+      const ex = dx - Math.sign(dx) * SW0;
+      root.style.setProperty('--sw', (ex * 0.45).toFixed(1) + 'px');
+      root.style.setProperty('--swo', (1 - Math.min(0.5, Math.abs(ex) / 160)).toFixed(2));
       showDots();
-    } else {
-      if (dragging) { dragging = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); }
-      place(e.clientX, e.clientY, false);
-    }
-    if (early && Math.abs(dx) > 56 && horizontal && !holdOn) {   // in hold a quick sideways move is just the position, not a world swipe
+    } else if (dragging) { dragging = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); }
+    place(e.clientX, e.clientY, false);
+    if (early && Math.abs(dx) > 56 && horizontal && !holdOn && !edgeDown) {   // in hold a quick sideways move is just the position, not a world swipe
       if (!locked) { swiped = true; handoff(dx < 0 ? 1 : -1, e.clientX, e.clientY); }
       else if (!attempted) {   // locked: refuse once per touch; a repeat in the same direction within a second lifts the lock
         attempted = true;
@@ -3623,6 +3648,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   // no text, no selection, no loupe: block the long-press magnifier and selection on iOS
   ['selectstart', 'dragstart', 'gesturestart'].forEach(n => document.addEventListener(n, e => e.preventDefault()));
   addEventListener('blur', () => release(null));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { release(null); return; }   // a hidden page has no finger on it (hold keeps playing)
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (holdOn) wakeOn();   // the browser drops the wake lock when the page is hidden
+  });
   // iOS only unlocks audio inside click/touchend, so retry the pending trigger there
   surface.addEventListener('click', () => {
     if (ctx && ctx.state !== 'running') {
@@ -3654,7 +3684,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     overtones: { x: ['drone', 'dark', 'bright'],   y: ['register', 'low', 'high'],       p: ['harmonics', 'sparse', 'dense'], pt: 'jump', z: ['morph', 'bell'] },
     vector:  { x: ['timbre', 'soft', 'bright'],    y: ['body', 'short', 'long'],         p: ['border', 'soft', 'sharp'],    pt: 'snap', z: ['orbit', 'wider'] }
   };
-  const MOD_HOLD = 800, MOD_FADE = 3200, MOD_SLOT = 30, MOD_RANK = [1, 0.6, 0.38, 0.2];   // a line stays fully lit 0.8 s after its last change, then fades over 3.2 s; the lower in the stack, the dimmer
+  const MOD_HOLD = 800, MOD_FADE = 3200, MOD_SLOT = 30, MOD_RANK = [1, 0.8, 0.6, 0.42];   // a line stays fully lit 0.8 s after its last change, then fades over 3.2 s; the lower in the stack, the dimmer
   let modEl = null, modRaf = 0;
   function modStart() {
     if (modEl) return;
@@ -3670,7 +3700,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     const bar = (r, v) => { r.s.style.left = (v >= 0 ? 50 : 50 + v * 50) + '%'; r.s.style.width = Math.abs(v) * 50 + '%'; r.u.style.left = (50 + v * 50) + '%'; };
     const AR = { x: ['◂', '▸'], y: ['▾', '▴'], p: ['›‹', '‹›'] };   // finger left / right, down / up, together / apart
     const dir = (k, v, lo, hi) => Math.abs(v) < 0.1 ? '·' : v < 0 ? AR[k][0] + ' ' + lo : hi + ' ' + AR[k][1];
-    let pSkin = null, pHold = false, pLock = false, pHolding = false, pOn = false, tapUntil = 0, pZT0 = -1, zStep = -1, last = performance.now();
+    let pSkin = null, pHold = false, pLock = false, pHolding = false, pOn = false, tapUntil = 0, pZT0 = -1, zStep = -1, pZRel = false, last = performance.now();
     function frame(now) {
       modRaf = requestAnimationFrame(frame);
       const dt = Math.min(0.1, (now - last) / 1000), kk = 1 - Math.exp(-dt * 14); last = now;
@@ -3690,6 +3720,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       if (locked !== pLock) { pLock = locked; txt(E.lock, 'tb', 'lock'); txt(E.lock, 'te', locked ? 'on' : 'off'); act('lock', now, true); }
       // Z: a new press starts the countdown (one second of nothing), then it opens; it wakes its line at the start, at the opening and at full, and keeps it alive in between
       const ze = holding && ctx && seq && !(holdOn && activeId === null) ? ctx.currentTime - zT0 : -1;   // hold with no finger on the glass: no countdown (zT0 is held at 'now' there, the line would show a full wait bar)
+      const zRel = !!M.z && holdOn && activeId === null && ZH > 0.003;   // hold, finger lifted: Z fades back to zero, say so
+      if (zRel) act('z', now, !pZRel);
+      pZRel = zRel;
       if (M.z && ze >= 0) {
         if (zT0 !== pZT0) { pZT0 = zT0; zStep = -1; act('z', now, true); }
         if (ze < 1) act('z', now, false);
@@ -3706,10 +3739,11 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
         if (k === 'x' || k === 'y') { const m = M[k]; txt(r, 'tb', m[0]); txt(r, 'te', dir(k, r.v, m[1], m[2])); bar(r, r.v); }
         else if (k === 'p') { const m = M.p; txt(r, 'tb', m[0]); txt(r, 'te', now < tapUntil ? 'tap · ' + M.pt : M.pLive ? topoIv()[3].toLowerCase() : dir('p', r.v, m[1], m[2])); bar(r, r.v); }
         else if (k === 'z' && M.z) {
-          const wait = ze >= 0 && ze < 1, w = clamp(wait ? 1 - ze : ze < 0 ? 0 : ZH, 0, 1);
+          const wait = ze >= 0 && ze < 1, w = clamp(wait ? 1 - ze : ze < 0 ? (zRel ? ZH : 0) : ZH, 0, 1);
           if (wait !== r.cd) { r.cd = wait; r.s.classList.toggle('cd', wait); }
           txt(r, 'tb', M.z[0]); r.s.style.left = '0'; r.s.style.width = w * 100 + '%'; r.u.style.left = w * 100 + '%';
-          if (ze >= 0) txt(r, 'te', wait ? 'in ' + (1 - ze).toFixed(1) + 's' : ZH > 0.995 ? 'full' : M.z[1] + ' ' + Math.round(ZH * 100) + '%');
+          if (ze < 0 && zRel) txt(r, 'te', 'back to 0 ' + Math.round(ZH * 100) + '%');
+          else if (ze >= 0) txt(r, 'te', wait ? 'in ' + (1 - ze).toFixed(1) + 's' : ZH > 0.995 ? 'full' : M.z[1] + ' ' + Math.round(ZH * 100) + '%');
         }
       });
     }
