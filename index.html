@@ -1871,7 +1871,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       ZH = 0; zT0 = now; clearInterval(zTimer);
       zTimer = setInterval(() => {
         if (!seq || !ctx) return;
-        const u = clamp((ctx.currentTime - zT0 - 1) / 11, 0, 1); ZH = u * u * (3 - 2 * u);
+        if (holdOn && activeId === null) { zT0 = ctx.currentTime; ZH *= 0.8; if (ZH < 0.003) ZH = 0; }   // hold with no finger on the glass: Z does not open by itself, it counts only a real touch (and a new touch starts from zero)
+        else { const u = clamp((ctx.currentTime - zT0 - 1) / 11, 0, 1); ZH = u * u * (3 - 2 * u); }
         applyMacros();   // every world spends Z in applyMacros
       }, 100);
       seq.timer = setInterval(tick, 25);
