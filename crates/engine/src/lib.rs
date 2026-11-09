@@ -1,4 +1,5 @@
 //! Audio engine: command/telemetry protocol, `Engine`, and a probe world.
+pub mod amber;
 pub mod engine;
 pub mod macros;
 pub mod melody;
