@@ -264,3 +264,27 @@ fn telemetry_fields() {
     assert_eq!(st.index, 18);
     assert_eq!(st.note, m.steps[2].note);
 }
+
+#[test]
+fn steal_of_audible_channel_has_no_click() {
+    for seed in [3u32, 11, 24, 40] {
+        let mut w = AmberWorld::new(SR, seed);
+        w.on_step(&note(0, 40, 1.0));
+        let mut all = render(&mut w, 3000, 100);
+        let base_end = all.len();
+        w.on_step(&note(1, 45, 1.0));
+        all.extend(render(&mut w, 3000, 100)); // channel 1 sounding at length, channel 0 gone
+        w.on_ptap();
+        all.extend(render(&mut w, 150, 150)); // tap rising, old voice fading but audible
+        let steal = all.len();
+        w.on_step(&note(2, 50, 1.0)); // steals an audible, still active channel
+        all.extend(render(&mut w, 2000, 100));
+        let d = |i: usize| (all[i + 1] - all[i]).abs();
+        let base = (500..base_end - 1).map(d).fold(0.0f32, f32::max);
+        let junction = (steal - 3..steal + 3).map(d).fold(0.0f32, f32::max);
+        assert!(
+            junction <= 2.0 * base,
+            "seed {seed}: junction {junction} vs own level {base}"
+        );
+    }
+}

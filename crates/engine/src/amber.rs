@@ -36,6 +36,7 @@ const LFO_RES_DB: f32 = 3.0;
 
 /// Starting map from the legacy low-pass-gate envelope onto the vactrol gate. The parts of the patch that legacy
 /// put on a resonant filter (cutoff, resonance) can only drive the gate here, which has no resonance.
+#[derive(Clone, Copy)]
 struct LpgMap {
     /// Vactrol fall time constant, seconds.
     fall_s: f32,
@@ -81,8 +82,27 @@ struct Mods {
     res_db: f32,
 }
 
+/// Everything a channel needs to start a note.
+#[derive(Clone, Copy)]
+struct Setup {
+    wave: usize,
+    cv: f32,
+    fr: f32,
+    idx0: f32,
+    fm_sweep: f32,
+    dep: f32,
+    sweep: f32,
+    sym: f32,
+    fm_k: f32,
+    fold_k: f32,
+    lpg: LpgMap,
+    left: u32,
+}
+
 /// One note on one channel.
 struct Chan {
+    /// A note waiting for this channel to finish fading out (click-free steal).
+    pending: Option<Setup>,
     car: Vco,
     modu: Vco,
     shaper: Shaper<FOLD_TABLE>,
@@ -128,6 +148,7 @@ impl Chan {
             hp,
             vactrol: Vactrol::new(sr as f64, false),
             circuit: Circuit::new(Mode::Combo, sr as f64),
+            pending: None,
             active: false,
             gain: 0.0,
             target: 0.0,
@@ -151,7 +172,31 @@ impl Chan {
         }
     }
 
+    /// Resets the voice state and starts the note from silence (gain 0, ramping up).
+    fn begin(&mut self, u: &Setup) {
+        self.silence();
+        self.target = 1.0;
+        self.active = true;
+        self.wave = u.wave;
+        self.cv = u.cv;
+        self.fr = u.fr;
+        self.log2_fr = u.fr.log2();
+        self.idx0 = u.idx0;
+        self.fm_sweep = u.fm_sweep;
+        self.dep = u.dep;
+        self.sweep = u.sweep;
+        self.sym = u.sym;
+        self.fm_k = u.fm_k;
+        self.fold_k = u.fold_k;
+        self.e_fm = 1.0;
+        self.e_fold = 1.0;
+        self.lpg = u.lpg;
+        self.left = u.left;
+        self.hold = u.lpg.hold_s;
+    }
+
     fn silence(&mut self) {
+        self.pending = None;
         self.car.reset();
         self.modu.reset();
         self.shaper.reset();
@@ -175,9 +220,14 @@ impl Chan {
             self.gain = (self.gain - fade_step).max(self.target);
         }
         if self.target == 0.0 && self.gain == 0.0 {
-            self.active = false;
-            self.level = 0.0;
-            return 0.0;
+            if let Some(u) = self.pending.take() {
+                // the stolen voice has faded out: start the waiting note from silence
+                self.begin(&u);
+            } else {
+                self.active = false;
+                self.level = 0.0;
+                return 0.0;
+            }
         }
 
         let idx =
@@ -369,6 +419,29 @@ impl AmberWorld {
         let cut_eff = (cutoff * x.cut).clamp(84.0, 16000.0);
         let sr = self.sr;
 
+        let u = Setup {
+            wave: match p.wave {
+                Wave::Sine => SINE,
+                Wave::Tri => TRI,
+                Wave::Saw => SAW,
+            },
+            cv: midi_cv(midi),
+            fr,
+            idx0: (fm_idx * x.fm).min(FM_MAX),
+            fm_sweep: p.fm_sweep,
+            dep: (p.depth * x.fold).min(DEPTH_MAX),
+            sweep: p.sweep,
+            sym: p.sym,
+            fm_k: (-1.0 / (tau * 0.7 * sr)).exp(),
+            fold_k: (-1.0 / (tau * 0.9 * sr)).exp(),
+            lpg: LpgMap::new(tau, attack, cut_eff, p.res_db, vel),
+            left: 0,
+        };
+        let u = Setup {
+            left: (u.lpg.hold_s * sr).round() as u32,
+            ..u
+        };
+
         let pick = if !self.chans[0].active {
             0
         } else if !self.chans[1].active || self.chans[1].gain < self.chans[0].gain {
@@ -376,33 +449,18 @@ impl AmberWorld {
         } else {
             0
         };
-        self.chans[1 - pick].target = 0.0;
+        // the other voice fades out; a note still waiting there is superseded
+        let other = &mut self.chans[1 - pick];
+        other.target = 0.0;
+        other.pending = None;
         let c = &mut self.chans[pick];
-        let keep_gain = if c.active { c.gain } else { 0.0 };
-        c.silence();
-        c.gain = keep_gain;
-        c.target = 1.0;
-        c.active = true;
-        c.wave = match p.wave {
-            Wave::Sine => SINE,
-            Wave::Tri => TRI,
-            Wave::Saw => SAW,
-        };
-        c.cv = midi_cv(midi);
-        c.fr = fr;
-        c.log2_fr = fr.log2();
-        c.idx0 = (fm_idx * x.fm).min(FM_MAX);
-        c.fm_sweep = p.fm_sweep;
-        c.dep = (p.depth * x.fold).min(DEPTH_MAX);
-        c.sweep = p.sweep;
-        c.sym = p.sym;
-        c.fm_k = (-1.0 / (tau * 0.7 * sr)).exp();
-        c.fold_k = (-1.0 / (tau * 0.9 * sr)).exp();
-        c.e_fm = 1.0;
-        c.e_fold = 1.0;
-        c.lpg = LpgMap::new(tau, attack, cut_eff, p.res_db, vel);
-        c.left = (c.lpg.hold_s * sr).round() as u32;
-        c.hold = c.lpg.hold_s;
+        if c.active && c.gain > 0.0 {
+            // audible: fade it out over the crossfade time, the new note starts when it is silent
+            c.target = 0.0;
+            c.pending = Some(u);
+        } else {
+            c.begin(&u);
+        }
     }
 
     fn mods(&mut self) -> Mods {
@@ -443,6 +501,7 @@ impl World for AmberWorld {
             // a rest lets the voice fade out in the crossfade time
             for c in self.chans.iter_mut() {
                 c.target = 0.0;
+                c.pending = None;
             }
         }
     }
