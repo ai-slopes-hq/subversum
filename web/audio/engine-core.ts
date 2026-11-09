@@ -20,6 +20,10 @@ export class EngineCore {
   private ready = false;
   private queue: EncodedCommand[] = [];
   private blocks = 0;
+  private viewBuffer: ArrayBuffer | null = null;
+  private viewN = 0;
+  private viewL: Float32Array | null = null;
+  private viewR: Float32Array | null = null;
 
   constructor(private readonly ex: EngineExports, private readonly sampleRate: number, private readonly seed: number) {}
 
@@ -45,8 +49,17 @@ export class EngineCore {
     const n = outL.length;
     this.ex.engine_process(n);
     const mem = this.ex.memory.buffer;
-    outL.set(new Float32Array(mem, this.ex.engine_out_l(), n));
-    outR.set(new Float32Array(mem, this.ex.engine_out_r(), n));
+    const pl = this.ex.engine_out_l();
+    const pr = this.ex.engine_out_r();
+    if (!this.viewL || !this.viewR || this.viewBuffer !== mem || this.viewN !== n
+        || this.viewL.byteOffset !== pl || this.viewR.byteOffset !== pr) {
+      this.viewBuffer = mem;
+      this.viewN = n;
+      this.viewL = new Float32Array(mem, pl, n);
+      this.viewR = new Float32Array(mem, pr, n);
+    }
+    outL.set(this.viewL);
+    outR.set(this.viewR);
     if (++this.blocks % TELEMETRY_EVERY_BLOCKS !== 0) return null;
     const ptr = this.ex.engine_telemetry();
     const copy = mem.slice(ptr, ptr + TELEMETRY_SIZE);

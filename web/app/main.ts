@@ -31,13 +31,26 @@ const tracker = new GestureTracker((g) => {
   host?.send({ kind: 'gesture', ...g });
 });
 
+// Only the first finger drives the gesture; other pointers are ignored until it lifts.
+let activePointer: number | null = null;
+
 canvas.addEventListener('pointerdown', (e) => {
+  if (activePointer !== null) return;
+  activePointer = e.pointerId;
   canvas.setPointerCapture(e.pointerId);
   tracker.down(e.clientX, e.clientY, canvas.clientWidth, canvas.clientHeight);
 });
-canvas.addEventListener('pointermove', (e) => tracker.move(e.clientX, e.clientY, canvas.clientWidth, canvas.clientHeight));
-canvas.addEventListener('pointerup', () => tracker.up());
-canvas.addEventListener('pointercancel', () => tracker.up());
+canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== activePointer) return;
+  tracker.move(e.clientX, e.clientY, canvas.clientWidth, canvas.clientHeight);
+});
+const release = (e: PointerEvent): void => {
+  if (e.pointerId !== activePointer) return;
+  activePointer = null;
+  tracker.up();
+};
+canvas.addEventListener('pointerup', release);
+canvas.addEventListener('pointercancel', release);
 
 const idle: Telemetry = {
   version: 1, frame: 0, peakL: 0, peakR: 0, droppedSteps: 0, droppedCommands: 0, steps: [],
@@ -55,11 +68,14 @@ requestAnimationFrame(loop);
 
 startBtn.addEventListener('click', async () => {
   startBtn.disabled = true;
+  let ctx: AudioContext | null = null;
   try {
     // Created inside the user gesture so iOS Safari allows it to run.
-    const ctx = new AudioContext();
+    ctx = new AudioContext();
     await ctx.resume();
-    const seed = Number(params.get('seed')) || (Math.random() * 0xffffff) | 0;
+    const seedParam = params.get('seed');
+    const parsed = seedParam === null || seedParam === '' ? NaN : Number(seedParam);
+    const seed = Number.isFinite(parsed) ? parsed : (Math.random() * 0xffffff) | 0;
     const h = await AudioHost.create(ctx, `${import.meta.env.BASE_URL}engine.wasm`, seed);
     h.onTelemetry = (t) => {
       telemetry = t;
@@ -70,6 +86,8 @@ startBtn.addEventListener('click', async () => {
     host = h;
     startBtn.remove();
   } catch (err) {
+    // Do not leak the context across retries (iOS caps live contexts).
+    try { await ctx?.close(); } catch { /* already closed */ }
     msg.textContent = `start failed: ${err instanceof Error ? err.message : String(err)}`;
     startBtn.disabled = false;
   }
