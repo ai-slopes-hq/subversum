@@ -13,3 +13,11 @@ dependencies = [
 name = "versum-dsp"
 version = "0.1.0"
 source = "git+https://github.com/ai-slopes-hq/versum-dsp?rev=bf982023d6ee3ef0a49d7157bb9c8c1669656514#bf982023d6ee3ef0a49d7157bb9c8c1669656514"
+
+[[package]]
+name = "versum-wasm"
+version = "0.1.0"
+dependencies = [
+ "engine",
+ "versum-dsp",
+]
