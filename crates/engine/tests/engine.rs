@@ -1,4 +1,4 @@
-use engine::{Command, Engine, Gesture, MAX_BLOCK};
+use engine::{Command, Engine, Gesture, World, MAX_BLOCK};
 use versum_dsp::testkit::{count_allocs, CountingAlloc};
 
 #[global_allocator]
@@ -62,6 +62,7 @@ fn no_alloc_in_process() {
 #[test]
 fn step_lands_on_exact_sample() {
     let mut e = Engine::new(SR, 1);
+    e.push(Command::SwitchWorld(0));
     e.push(Command::Tempo(120.0));
     let (mut l, mut r) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
     let mut out = Vec::new();
@@ -196,7 +197,7 @@ struct CountWorld {
     fills: std::rc::Rc<std::cell::Cell<u32>>,
 }
 
-impl engine::World for CountWorld {
+impl World for CountWorld {
     fn on_gesture(&mut self, _: &Gesture) {}
     fn on_step(&mut self, _: &engine::StepEvent) {}
     fn render(&mut self, _: &mut [f32], _: &mut [f32]) {}
@@ -230,4 +231,180 @@ fn ptap_is_queued() {
     assert_eq!(e.telemetry().bpm, 77.0);
     assert_eq!(e.telemetry().pattern[15], 1.0);
     assert_eq!(e.telemetry().version, 2);
+}
+
+fn collect_steps(e: &mut Engine, n: usize, block: usize) -> Vec<(u64, engine::StepEvent)> {
+    // (frame at the end of the block that reported the step, event)
+    let (mut l, mut r) = (vec![0.0f32; block], vec![0.0f32; block]);
+    let mut out = Vec::new();
+    let mut done = 0;
+    while done < n {
+        let len = block.min(n - done);
+        e.process(&mut l[..len], &mut r[..len]);
+        let t = e.telemetry();
+        for s in &t.steps[..t.step_count as usize] {
+            out.push((t.frame as u64, *s));
+        }
+        e.ack_steps();
+        done += len;
+    }
+    out
+}
+
+#[test]
+fn steps_follow_melody() {
+    let seed = 12345;
+    let mut e = Engine::new(SR, seed);
+    let mut w = engine::amber::AmberWorld::new(SR, seed);
+    let bar = (SR as f64 * 60.0 / 120.0 * 4.0) as usize;
+    let steps = collect_steps(&mut e, 4 * bar, MAX_BLOCK);
+    assert!(steps.len() >= 64);
+    for (_, s) in &steps {
+        let m = World::next_step(&mut w, s.index);
+        assert_eq!(
+            (s.note, s.velocity),
+            (m.note, m.velocity),
+            "step {}",
+            s.index
+        );
+        assert_eq!(m.note, w.melody().steps[(s.index % 16) as usize].note);
+    }
+    assert_eq!(steps[0].1.velocity, 1.0);
+}
+
+#[test]
+fn step_boundaries_exact_at_bpm_110_122_135() {
+    for bpm in [110.0f32, 122.0, 135.0] {
+        let mut e = Engine::new(SR, 4);
+        e.push(Command::Tempo(bpm));
+        let period = SR as f64 * 60.0 / bpm as f64 / 4.0;
+        let steps = collect_steps(&mut e, 5 * 48000, MAX_BLOCK);
+        assert!(steps.len() > 20);
+        for (frame, s) in &steps {
+            let at = (s.index as f64 * period).ceil() as u64;
+            let blk_end = (at / 128 + 1) * 128;
+            assert_eq!(*frame, blk_end, "bpm {bpm} step {}", s.index);
+        }
+        // sample-exact with 1-sample blocks
+        let mut e = Engine::new(SR, 4);
+        e.push(Command::Tempo(bpm));
+        for (frame, s) in &collect_steps(&mut e, 48000, 1) {
+            assert_eq!(*frame, (s.index as f64 * period).ceil() as u64 + 1);
+        }
+    }
+}
+
+#[test]
+fn hold_and_tempo_keep_phase() {
+    let mut e = Engine::new(SR, 6);
+    let period = SR as f64 * 60.0 / 120.0 / 4.0;
+    let mut steps = collect_steps(&mut e, 10000, MAX_BLOCK);
+    e.push(Command::Hold(true));
+    let held = collect_steps(&mut e, 48000, MAX_BLOCK);
+    assert!(held.is_empty(), "no steps while held");
+    e.push(Command::Hold(false));
+    steps.extend(collect_steps(&mut e, 10000, MAX_BLOCK));
+    let idx: Vec<u32> = steps.iter().map(|s| s.1.index).collect();
+    assert_eq!(
+        idx,
+        (0..idx.len() as u32).collect::<Vec<_>>(),
+        "no duplicates or gaps"
+    );
+    // step 2 is due 10752 samples of running time after step 0 = 2*period
+    // the first 10000 samples plus 48000 held samples: step 2 lands right after resume
+    let s2 = steps.iter().find(|s| s.1.index == 2).unwrap().0;
+    let due = (2.0 * period).ceil() as u64 - 10000;
+    assert_eq!(s2, 10000 + 48000 + (due / 128 + 1) * 128);
+
+    // Tempo mid-bar keeps the pending step's deadline
+    let mut e = Engine::new(SR, 6);
+    let mut st = collect_steps(&mut e, 3000, MAX_BLOCK);
+    e.push(Command::Tempo(240.0));
+    st.extend(collect_steps(&mut e, 20000, MAX_BLOCK));
+    let s1 = st.iter().find(|s| s.1.index == 1).unwrap().0;
+    let rep = |at: u64| 3000 + ((at - 3000) / 128 + 1) * 128; // block-end frame (blocks restart at 3000)
+    assert_eq!(s1, rep(period.ceil() as u64), "pending step unmoved");
+    let s2 = st.iter().find(|s| s.1.index == 2).unwrap().0;
+    let due2 = (period + period / 2.0).ceil() as u64;
+    assert_eq!(s2, rep(due2), "next one uses new period");
+}
+
+#[test]
+fn seed_u32_reproducible() {
+    for seed in [0u32, 16777217, 4294967295] {
+        let run = || {
+            let mut e = Engine::new(SR, 1);
+            e.push(Command::Seed(seed));
+            e.push(g(0.6, 0.7));
+            render(&mut e, 30000, MAX_BLOCK)
+        };
+        let (a, b) = (run(), run());
+        assert_eq!(bits(&a.0), bits(&b.0));
+        assert_eq!(bits(&a.1), bits(&b.1));
+        assert!(a.0.iter().any(|&x| x != 0.0), "seed {seed} is audible");
+    }
+    // 16777217 differs from 16777216 (not squashed through f32)
+    let at = |s| {
+        let mut e = Engine::new(SR, 1);
+        e.push(Command::Seed(s));
+        render(&mut e, 30000, MAX_BLOCK).0
+    };
+    assert_ne!(bits(&at(16777216)), bits(&at(16777217)));
+}
+
+#[test]
+fn switch_world_during_note_is_clean() {
+    let mut e = Engine::new(SR, 8);
+    e.push(g(0.5, 0.6));
+    let (mut l, mut r) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
+    let mut last_frame = 0;
+    for i in 0..400 {
+        match i {
+            100 => e.push(Command::SwitchWorld(0)),
+            150 => e.push(Command::Seed(77)),
+            200 => e.push(Command::SwitchWorld(1)),
+            250 => e.push(Command::Seed(78)),
+            _ => {}
+        }
+        e.process(&mut l, &mut r);
+        for &s in l.iter().chain(r.iter()) {
+            assert!(s.is_finite() && s.abs() <= 1.0, "block {i}: {s}");
+        }
+        let t = e.telemetry();
+        assert!(t.peak_l <= 1.0 && t.peak_r <= 1.0);
+        assert_eq!(t.frame, last_frame + 128, "frame continues at block {i}");
+        last_frame = t.frame;
+    }
+}
+
+#[test]
+fn nonfinite_gesture_is_safe() {
+    for world in [0u32, 1] {
+        let mut e = Engine::new(SR, 2);
+        e.push(Command::SwitchWorld(world));
+        let bad = [f32::NAN, f32::INFINITY, f32::NEG_INFINITY];
+        let (mut l, mut r) = ([0.0f32; MAX_BLOCK], [0.0f32; MAX_BLOCK]);
+        for i in 0..300 {
+            let v = bad[i % 3];
+            e.push(Command::Gesture(Gesture {
+                x: v,
+                y: bad[(i + 1) % 3],
+                z: bad[(i + 2) % 3],
+                pinch: v,
+            }));
+            e.process(&mut l, &mut r);
+            for &s in l.iter().chain(r.iter()) {
+                assert!(s.is_finite() && s.abs() <= 1.0, "world {world}: {s}");
+            }
+        }
+    }
+}
+
+#[test]
+fn engine_starts_in_amber() {
+    let mut e = Engine::new(SR, 5);
+    render(&mut e, 128, MAX_BLOCK);
+    let t = e.telemetry();
+    assert!(t.bpm > 0.0, "amber fills telemetry");
+    assert!(t.pattern.iter().any(|&p| p > 0.0));
 }

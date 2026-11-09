@@ -86,6 +86,14 @@ impl Default for Telemetry {
 pub trait World {
     fn on_gesture(&mut self, g: &Gesture);
     fn on_step(&mut self, s: &StepEvent);
+    /// The step at sequence position `index` (velocity 0 is a rest); the engine plays it via `on_step`.
+    fn next_step(&mut self, index: u32) -> StepEvent {
+        StepEvent {
+            index,
+            note: 60,
+            velocity: 1.0,
+        }
+    }
     /// Adds this world's sound into `l`/`r` (the engine zeroes them first).
     fn render(&mut self, l: &mut [f32], r: &mut [f32]);
     /// Returns the world to its initial state, deterministically from `seed`.

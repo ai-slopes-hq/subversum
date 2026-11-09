@@ -352,16 +352,6 @@ impl AmberWorld {
         &self.melody
     }
 
-    /// The step at `index` (mod 16) of the melody; velocity 0 is a rest.
-    pub fn next_step(&mut self, index: u32) -> StepEvent {
-        let s = self.melody.steps[(index % PATTERN_LEN as u32) as usize];
-        StepEvent {
-            index,
-            note: s.note,
-            velocity: s.velocity,
-        }
-    }
-
     fn build_lfos(&mut self) {
         let sr = self.sr as f64;
         for (slot, spec) in self.lfos.iter_mut().zip(self.patch.lfos.iter()) {
@@ -491,6 +481,16 @@ impl AmberWorld {
 impl World for AmberWorld {
     fn on_gesture(&mut self, g: &Gesture) {
         self.gesture = *g;
+    }
+
+    /// The step at `index` (mod 16) of the melody; velocity 0 is a rest.
+    fn next_step(&mut self, index: u32) -> StepEvent {
+        let s = self.melody.steps[(index % PATTERN_LEN as u32) as usize];
+        StepEvent {
+            index,
+            note: s.note,
+            velocity: s.velocity,
+        }
     }
 
     fn on_step(&mut self, s: &StepEvent) {
