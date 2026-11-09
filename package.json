@@ -1,0 +1,18 @@
+{
+  "name": "subversum",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "wasm": "cargo build --release --target wasm32-unknown-unknown -p versum-wasm",
+    "test": "npm run wasm && vitest run",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/audioworklet": "0.0.101",
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vite": "8.3.7",
+    "vitest": "5.1.0"
+  }
+}

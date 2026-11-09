@@ -1,0 +1,10 @@
+[package]
+name = "engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", tag = "v0.1.0" }
+
+[dev-dependencies]
+versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", tag = "v0.1.0", features = ["testkit"] }
