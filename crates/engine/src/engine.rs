@@ -76,6 +76,7 @@ impl Engine {
         self.lock
     }
 
+    /// Deliberate reset: Seed/SwitchWorld discard unacknowledged steps without counting them in `dropped_steps`.
     fn reseed(&mut self, seed: u32) {
         self.world.reset(seed);
         for i in 0..2 {

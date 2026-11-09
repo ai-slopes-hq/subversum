@@ -72,3 +72,19 @@ pub trait World {
     /// Returns the world to its initial state, deterministically from `seed`.
     fn reset(&mut self, seed: u32);
 }
+
+// Layout guard: web/audio/protocol.ts mirrors these sizes and offsets. Change both together.
+const _: () = {
+    use core::mem::{align_of, offset_of, size_of};
+    assert!(size_of::<Telemetry>() == 220);
+    assert!(size_of::<StepEvent>() == 12);
+    assert!(align_of::<Telemetry>() == 4);
+    assert!(offset_of!(Telemetry, version) == 0);
+    assert!(offset_of!(Telemetry, frame) == 4);
+    assert!(offset_of!(Telemetry, peak_l) == 8);
+    assert!(offset_of!(Telemetry, peak_r) == 12);
+    assert!(offset_of!(Telemetry, step_count) == 16);
+    assert!(offset_of!(Telemetry, dropped_steps) == 20);
+    assert!(offset_of!(Telemetry, dropped_commands) == 24);
+    assert!(offset_of!(Telemetry, steps) == 28);
+};
