@@ -1,12 +1,15 @@
+use crate::amber::AmberWorld;
 use crate::peaks::PeakFollower;
 use crate::probe::ProbeWorld;
 use crate::protocol::*;
 use versum_dsp::dc::DcBlock;
 use versum_dsp::knee::Knee;
+use versum_dsp::stepclock::StepClock;
 use versum_dsp::Block;
 
 const DEFAULT_BPM: f32 = 120.0;
-const SCALE: [u32; 5] = [0, 3, 5, 7, 10];
+const WORLD_PROBE: u32 = 0;
+const WORLD_AMBER: u32 = 1;
 
 /// Realtime engine. All state is preallocated in `new`; `push`/`process`/`telemetry` never allocate.
 ///
@@ -15,41 +18,62 @@ const SCALE: [u32; 5] = [0, 3, 5, 7, 10];
 /// first sample at or after its due time, so blocking never moves it. A `Tempo` change affects
 /// the distance to steps scheduled after it; the already-pending step keeps its due time.
 pub struct Engine {
-    sr: f32,
     world: Box<dyn World>,
+    /// Id of `world`, and the preallocated inactive built-in world (swapped in by `SwitchWorld`).
+    world_id: u32,
+    spare: Option<(u32, Box<dyn World>)>,
     queue: [Command; CMD_QUEUE],
     queued: usize,
     knee: [Knee; 2],
     dc: [DcBlock; 2],
     peak: [PeakFollower; 2],
     tel: Telemetry,
-    bpm: f32,
     hold: bool,
     lock: bool,
-    /// Samples until the next step is due (<= 0 means due now).
-    to_next: f64,
+    clock: StepClock,
     step_index: u32,
 }
 
 impl Engine {
     pub fn new(sr: f32, seed: u32) -> Engine {
-        let mut e = Engine {
+        let mut e = Engine::build(
             sr,
-            world: Box::new(ProbeWorld::new(sr, seed)),
+            Box::new(AmberWorld::new(sr, seed)),
+            WORLD_AMBER,
+            Some((WORLD_PROBE, Box::new(ProbeWorld::new(sr, seed)))),
+        );
+        e.reseed(seed);
+        e
+    }
+
+    /// Engine with a single custom world; `SwitchWorld` just resets it.
+    pub fn with_world(sr: f32, world: Box<dyn World>, seed: u32) -> Engine {
+        let mut e = Engine::build(sr, world, u32::MAX, None);
+        e.reseed(seed);
+        e
+    }
+
+    fn build(
+        sr: f32,
+        world: Box<dyn World>,
+        world_id: u32,
+        spare: Option<(u32, Box<dyn World>)>,
+    ) -> Engine {
+        Engine {
+            world,
+            world_id,
+            spare,
             queue: [Command::Hold(false); CMD_QUEUE],
             queued: 0,
             knee: [Knee::new(1.0, 0.9, 0.1), Knee::new(1.0, 0.9, 0.1)],
             dc: [DcBlock::new(5.0, sr), DcBlock::new(5.0, sr)],
             peak: [PeakFollower::new(sr), PeakFollower::new(sr)],
             tel: Telemetry::default(),
-            bpm: DEFAULT_BPM,
             hold: false,
             lock: false,
-            to_next: 0.0,
+            clock: StepClock::new(sr as f64, DEFAULT_BPM as f64),
             step_index: 0,
-        };
-        e.reseed(seed);
-        e
+        }
     }
 
     /// Queues a command; if the queue is full the command is dropped and counted.
@@ -84,7 +108,10 @@ impl Engine {
             self.dc[i].reset();
             self.peak[i].reset();
         }
-        self.to_next = 0.0;
+        self.world.on_hold(self.hold);
+        self.clock.reset();
+        self.clock
+            .set_bpm(self.world.bpm().unwrap_or(DEFAULT_BPM) as f64);
         self.step_index = 0;
         self.tel.peak_l = 0.0;
         self.tel.peak_r = 0.0;
@@ -94,27 +121,38 @@ impl Engine {
     fn apply(&mut self, c: Command) {
         match c {
             Command::Gesture(g) => self.world.on_gesture(&g),
-            // Only one world exists so far: switching resets it (seed 0).
-            Command::SwitchWorld(_) => self.reseed(0),
+            // Switching resets the target world (seed 0); an unknown id just resets the current one.
+            Command::SwitchWorld(id) => {
+                if id != self.world_id {
+                    if let Some((sid, _)) = &self.spare {
+                        if *sid == id {
+                            if let Some((sid, w)) = self.spare.take() {
+                                let old = std::mem::replace(&mut self.world, w);
+                                self.spare = Some((self.world_id, old));
+                                self.world_id = sid;
+                            }
+                        }
+                    }
+                }
+                self.reseed(0);
+            }
             Command::Seed(s) => self.reseed(s),
             Command::Tempo(b) => {
-                if b.is_finite() {
-                    self.bpm = b.clamp(20.0, 300.0);
-                }
+                self.clock.set_bpm(b as f64);
             }
-            Command::Hold(h) => self.hold = h,
+            Command::Hold(h) => {
+                self.hold = h;
+                self.world.on_hold(h);
+            }
             Command::Lock(l) => self.lock = l,
+            Command::PTap => self.world.on_ptap(),
         }
     }
 
     fn fire_step(&mut self) {
         let i = self.step_index;
         self.step_index = i.wrapping_add(1);
-        let ev = StepEvent {
-            index: i,
-            note: 48 + SCALE[(i % 5) as usize] + 12 * ((i / 5) % 2),
-            velocity: if i.is_multiple_of(4) { 1.0 } else { 0.7 },
-        };
+        let ev = self.world.next_step(i);
         let t = &mut self.tel;
         if (t.step_count as usize) < STEP_QUEUE {
             t.steps[t.step_count as usize] = ev;
@@ -126,7 +164,7 @@ impl Engine {
             t.dropped_steps = t.dropped_steps.saturating_add(1);
         }
         self.world.on_step(&ev);
-        self.to_next += self.sr as f64 * 60.0 / self.bpm as f64 / 4.0;
+        self.clock.consume();
     }
 
     /// `l` and `r` must have equal length (<= `MAX_BLOCK`).
@@ -141,20 +179,20 @@ impl Engine {
 
         let mut pos = 0;
         while pos < n {
-            if !self.hold && self.to_next <= 0.0 {
+            if !self.hold && self.clock.next_in() <= 0.0 {
                 self.fire_step();
             }
             let chunk = if self.hold {
                 n - pos
             } else {
-                ((self.to_next.ceil() as usize).max(1)).min(n - pos)
+                ((self.clock.next_in().ceil() as usize).max(1)).min(n - pos)
             };
             let end = pos + chunk;
             l[pos..end].fill(0.0);
             r[pos..end].fill(0.0);
             self.world.render(&mut l[pos..end], &mut r[pos..end]);
             if !self.hold {
-                self.to_next -= chunk as f64;
+                self.clock.advance(chunk);
             }
             pos = end;
         }
@@ -170,5 +208,6 @@ impl Engine {
         self.tel.peak_l = self.peak[0].value();
         self.tel.peak_r = self.peak[1].value();
         self.tel.frame = self.tel.frame.wrapping_add(n as u32);
+        self.world.fill_telemetry(&mut self.tel);
     }
 }

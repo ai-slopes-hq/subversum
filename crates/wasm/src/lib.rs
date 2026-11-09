@@ -47,17 +47,23 @@ pub extern "C" fn engine_init(sample_rate: f32, seed: u32) {
     *slot = Some(Engine::new(sample_rate, seed));
 }
 
-/// kind: 0 Gesture(a=x,b=y,c=z,d=pinch), 1 SwitchWorld(a), 2 Seed(a), 3 Tempo(a),
-/// 4 Hold(a != 0), 5 Lock(a != 0). Unknown kinds are ignored.
+/// kind: 0 Gesture(a=x,b=y,c=z,d=pinch), 1 SwitchWorld(a), 2 Seed(a = low 16 bits, b = high 16 bits),
+/// 3 Tempo(a), 4 Hold(a != 0), 5 Lock(a != 0), 6 PTap. Unknown kinds are ignored.
 #[no_mangle]
 pub extern "C" fn engine_command(kind: u32, a: f32, b: f32, c: f32, d: f32) {
     let cmd = match kind {
-        0 => Command::Gesture(Gesture { x: a, y: b, z: c, pinch: d }),
+        0 => Command::Gesture(Gesture {
+            x: a,
+            y: b,
+            z: c,
+            pinch: d,
+        }),
         1 => Command::SwitchWorld(a as u32),
-        2 => Command::Seed(a as u32),
+        2 => Command::Seed((a as u32 & 0xffff) | ((b as u32 & 0xffff) << 16)),
         3 => Command::Tempo(a),
         4 => Command::Hold(a != 0.0),
         5 => Command::Lock(a != 0.0),
+        6 => Command::PTap,
         _ => return,
     };
     if let Some(e) = engine_slot() {

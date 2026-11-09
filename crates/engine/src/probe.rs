@@ -6,6 +6,7 @@ const TONE_AMP: f64 = 0.4;
 const BLIP_AMP: f64 = 0.3;
 const BLIP_HZ: f64 = 1000.0;
 const BLIP_MS: f32 = 10.0;
+const SCALE: [u32; 5] = [0, 3, 5, 7, 10];
 
 /// Probe world: a sine whose pitch follows `x` (110-880 Hz, exponential) and level follows `y`,
 /// plus a 10 ms linearly decaying 1 kHz blip on every step. Silent until a gesture sets `y > 0`.
@@ -47,6 +48,14 @@ impl World for ProbeWorld {
         }
     }
 
+    fn next_step(&mut self, i: u32) -> StepEvent {
+        StepEvent {
+            index: i,
+            note: 48 + SCALE[(i % 5) as usize] + 12 * ((i / 5) % 2),
+            velocity: if i.is_multiple_of(4) { 1.0 } else { 0.7 },
+        }
+    }
+
     fn on_step(&mut self, s: &StepEvent) {
         self.blip_n = 0;
         self.blip_vel = s.velocity;
@@ -54,13 +63,17 @@ impl World for ProbeWorld {
 
     fn render(&mut self, l: &mut [f32], r: &mut [f32]) {
         for (ls, rs) in l.iter_mut().zip(r.iter_mut()) {
-            let mut y = TONE_AMP * self.vol.next() as f64 * (std::f64::consts::TAU * self.phase).sin();
+            let mut y =
+                TONE_AMP * self.vol.next() as f64 * (std::f64::consts::TAU * self.phase).sin();
             self.phase += self.freq / self.sr;
             self.phase -= self.phase.floor();
             if self.blip_n < self.blip_len {
                 let env = 1.0 - self.blip_n as f64 / self.blip_len as f64;
                 let t = self.blip_n as f64 / self.sr;
-                y += BLIP_AMP * self.blip_vel as f64 * env * (std::f64::consts::TAU * BLIP_HZ * t).cos();
+                y += BLIP_AMP
+                    * self.blip_vel as f64
+                    * env
+                    * (std::f64::consts::TAU * BLIP_HZ * t).cos();
                 self.blip_n += 1;
             }
             *ls = y as f32;
