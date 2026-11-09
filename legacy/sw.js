@@ -1,6 +1,6 @@
 // Subversum: service worker. Оболочка кэшируется при установке, страница работает офлайн.
 // Навигация идёт сначала в сеть, чтобы обновления доезжали сразу; без сети отдаётся кэш.
-const CACHE = 'subversum-v2';
+const CACHE = 'subversum-v3';
 const SHELL = [
   './',
   'index.html',
@@ -29,6 +29,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
   if (url.pathname.startsWith('/_vercel/')) return; // аналитику Vercel не кэшируем
+  if (url.pathname.startsWith('/next/')) return; // новое приложение живёт в /next/ со своей оболочкой
 
   if (req.mode === 'navigate') {
     e.respondWith(
