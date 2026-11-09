@@ -1,4 +1,29 @@
 <!doctype html>
-<!-- PLACEHOLDER: Task 8 owns the final content of this file. -->
-<html><head><meta charset="utf-8"><title>subversum next</title></head>
-<body><script type="module">import { AudioHost } from "./audio/host.ts"; window.__AudioHost = AudioHost;</script></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>subversum next</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; overscroll-behavior: none; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  #start {
+    position: fixed; inset: 0; margin: auto; width: 9rem; height: 3.5rem;
+    font: 1.1rem/1 system-ui, sans-serif; letter-spacing: .1em; text-transform: lowercase;
+    color: #fff; background: #124; border: 1px solid #4af; border-radius: .5rem;
+  }
+  #tag, #msg {
+    position: fixed; font: .75rem/1.2 ui-monospace, monospace; color: #8ab; pointer-events: none;
+  }
+  #tag { top: calc(env(safe-area-inset-top) + .5rem); right: .75rem; }
+  #msg { left: .75rem; bottom: calc(env(safe-area-inset-bottom) + .5rem); color: #f88; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="start" type="button">start</button>
+<div id="tag"></div>
+<div id="msg"></div>
+<script type="module" src="./app/main.ts"></script>
+</body>
+</html>

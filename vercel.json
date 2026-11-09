@@ -1,0 +1,5 @@
+{
+  "installCommand": "bash scripts/vercel-install.sh",
+  "buildCommand": "export PATH=\"$HOME/.cargo/bin:$PATH\" && bash scripts/build.sh",
+  "outputDirectory": "dist"
+}
