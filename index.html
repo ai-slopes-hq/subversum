@@ -1181,7 +1181,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     return t0 + T + 0.06;
   };
   function ovDrone(sq) {
-    const b = sq.dub, t0 = ctx.currentTime + 0.02, base = 440 * Math.pow(2, (36 + sq.root - 69) / 12), NH = 24;
+    const b = sq.dub, t0 = ctx.currentTime + 0.02, base = 440 * Math.pow(2, (12 + sq.root - 69) / 12), NH = 24;   // C0..B0: two octaves below the pool, the drone is felt in the low end and the formant sings the upper harmonics
     OV.base = OV.f0 = OV.fc = base; OV.hn = []; OV.c = OV.cT = 12; OV.B = 0; OV.lastN = 0; OV.lastNs = null;
     const kill = ctx.createGain(); kill.gain.setValueAtTime(0, t0); kill.gain.linearRampToValueAtTime(1, t0 + 1.5); kill.connect(b.inp);
     const nodes = [kill], parts = [];
@@ -1487,7 +1487,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
      X the table position (a critically damped spring, about a second), Y a path: pure table, then bend (an asymmetric saturator with a DC lean), then FM at the ratios 0.5, 1, 2, 3 only.
      Z the beating: the voices pull apart from a near unison to about 1 to 1.7 Hz of beat (counted in Hz, not cents, so every note pulses the same). P pinch the fold (together clean, apart folded), P tap a burst of fold.
      A quick tap is one pass through the table: every press starts at the far end of the table and glides to its start frame. */
-  const WT = { N: 64, NH: 40, on: false, cfg: null, pos: 0, B: 0, I: 0, F: 0, depth: 0.06, beat: 0, ph1: 0, ph2: 0, kick: 0 };
+  const WT = { N: 64, NH: 64, on: false, cfg: null, pos: 0, B: 0, I: 0, F: 0, depth: 0.06, beat: 0, ph1: 0, ph2: 0, kick: 0 };
   const WT_FOLD = (() => { const c = new Float32Array(4097); for (let i = 0; i < c.length; i++) c[i] = Math.sin(Math.PI * 5 * (i / 2048 - 1)); return c; })();   // the same folder as amber: sin(pi K x), K = 5
   const WT_TANH = Math.tanh(1.5);
   const WT_BEND = (() => { const c = new Float32Array(2049); for (let i = 0; i < c.length; i++) c[i] = Math.tanh(1.5 * (i / 1024 - 1)) / WT_TANH; return c; })();
@@ -1498,7 +1498,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     return L;
   }
   function rollWT(root) {
-    const N = WT.N, NH = WT.NH, fam = pick(['tilt', 'formant', 'pulse', 'comb']), lo = Math.random() < 0.5 ? 24 : 36, f = 440 * Math.pow(2, (lo + root - 69) / 12);
+    const N = WT.N, NH = WT.NH, fam = pick(['tilt', 'formant', 'pulse', 'comb']), lo = Math.random() < 0.5 ? 12 : 24, f = 440 * Math.pow(2, (lo + root - 69) / 12);
     const cLo = Math.max(2, 250 / f), cHi = Math.min(NH - 6, Math.max(cLo * 2, 1200 / f)), fr = [], jit = [];
     for (let h = 0; h <= NH; h++) jit.push(1 + 0.3 * (Math.random() - 0.5));   // one roughness for the whole table, so neighbouring frames stay close (64 of them are scanned)
     for (let k = 0; k < N; k++) {
