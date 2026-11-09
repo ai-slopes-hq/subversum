@@ -33,10 +33,12 @@ const tracker = new GestureTracker((g) => {
 
 // Only the first finger drives the gesture; other pointers are ignored until it lifts.
 let activePointer: number | null = null;
+let downAt = 0;
 
 canvas.addEventListener('pointerdown', (e) => {
   if (activePointer !== null) return;
   activePointer = e.pointerId;
+  downAt = performance.now();
   canvas.setPointerCapture(e.pointerId);
   tracker.down(e.clientX, e.clientY, canvas.clientWidth, canvas.clientHeight);
 });
@@ -44,9 +46,12 @@ canvas.addEventListener('pointermove', (e) => {
   if (e.pointerId !== activePointer) return;
   tracker.move(e.clientX, e.clientY, canvas.clientWidth, canvas.clientHeight);
 });
+const TAP_MAX_S = 0.25;
 const release = (e: PointerEvent): void => {
   if (e.pointerId !== activePointer) return;
   activePointer = null;
+  // Short tap = P-tap; a longer press already acted as Z (hold) via the gesture stream.
+  if ((performance.now() - downAt) / 1000 < TAP_MAX_S) host?.send({ kind: 'ptap' });
   tracker.up();
 };
 canvas.addEventListener('pointerup', release);
@@ -76,13 +81,15 @@ startBtn.addEventListener('click', async () => {
     await ctx.resume();
     const seedParam = params.get('seed');
     const parsed = seedParam === null || seedParam === '' ? NaN : Number(seedParam);
-    const seed = Number.isFinite(parsed) ? parsed : (Math.random() * 0xffffff) | 0;
+    const seed = Number.isFinite(parsed) ? parsed : crypto.getRandomValues(new Uint32Array(1))[0];
     const h = await AudioHost.create(ctx, `${import.meta.env.BASE_URL}engine.wasm`, seed);
     h.onTelemetry = (t) => {
       telemetry = t;
       for (const s of t.steps) skin.note(s.index, s.velocity);
     };
     h.onError = () => { msg.textContent = 'audio processor failed (see console)'; };
+    h.send({ kind: 'world', id: 1 }); // amber
+    h.send({ kind: 'seed', seed });
     h.connect(ctx.destination);
     host = h;
     startBtn.remove();
