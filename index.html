@@ -3545,8 +3545,8 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
   Object.assign(window.subversum, { hold: setHold, held: () => holdOn, lock: setLock, locked: () => locked, fan: () => fanOpen, stripH });
 
   // one finger plays; a second finger never rolls a patch, moves the axes or stops the melody: it is the P axis (tap and pinch, see PX). The bottom strip belongs to the fan
-  let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0, edgeDown = false;
-  const EDGE = 20;   // a touch that starts this close to the left or right edge is play only: the system edge gesture (back) lives there, so it never switches the world
+  let activeId = null, pId = null, pDist0 = 100, pX = 0, pY = 0, edgeStart = false;
+  const EDGE = 44;   // the world changes only by a swipe that starts this close to the left or right edge and goes inward: a deliberate gesture, so a sideways move on the pad is never taken for it
   const P_WORLDS = { clouds: true, ridges: true, vector: true, amber: true, riso: true, mandala: true, scope: true, matrix: true, topo: true, shepard: true, overtones: true, wavetable: true };   // the worlds that have been given P actions so far; the others ignore the second finger and do not light it
   const setFP2 = (x, y) => { const W = innerWidth, H = innerHeight, sc = Math.max(W / 390, H / 844); pX = x; pY = y; FP2.vx = (x - W / 2) / sc; FP2.vy = (y - H / 2) / sc; };   // the second finger in the skin's coordinates, so a world can animate it like the first
   function pinch() {
@@ -3596,7 +3596,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     if (stripDown(e)) return;
     if (activeId !== null && activeId !== e.pointerId) { startP(e); return; }
     activeId = e.pointerId;
-    edgeDown = e.clientX < EDGE || e.clientX > innerWidth - EDGE;
+    edgeStart = e.clientX < EDGE || e.clientX > innerWidth - EDGE;
     attempted = false; mv.length = 0; mv.push([performance.now(), e.clientY]);
     try { surface.setPointerCapture(e.pointerId); } catch (err) {}
     sx = e.clientX; sy = e.clientY; swiped = false; dragging = false; tDown = performance.now();
@@ -3615,9 +3615,9 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
     }
     const dx = e.clientX - sx, dy = e.clientY - sy;
     const horizontal = Math.abs(dx) > 1.5 * Math.abs(dy);
-    const early = performance.now() - tDown < 300;
-    const SW0 = 36;   // a sideways move shows swipe feedback only past this; before it, it is plain X play
-    if (early && horizontal && Math.abs(dx) > SW0 && !locked && !holdOn && !edgeDown) {
+    const early = performance.now() - tDown < 500;   // an edge swipe may be a little slower than a flick
+    const SW0 = 12;   // the scene starts to follow the finger past this (only for a touch that began at the edge)
+    if (early && horizontal && Math.abs(dx) > SW0 && !locked && !holdOn && edgeStart) {
       // feedback while flicking: the scene follows the finger and dims, the dots appear (the axes keep following the finger, they are never frozen)
       dragging = true;
       const ex = dx - Math.sign(dx) * SW0;
@@ -3626,7 +3626,7 @@ html.lock-shake .stage, html.lock-shake .skinsvg { animation: lockshake .38s cub
       showDots();
     } else if (dragging) { dragging = false; root.style.setProperty('--sw', '0px'); root.style.setProperty('--swo', 1); }
     place(e.clientX, e.clientY, false);
-    if (early && Math.abs(dx) > 56 && horizontal && !holdOn && !edgeDown) {   // in hold a quick sideways move is just the position, not a world swipe
+    if (early && Math.abs(dx) > 56 && horizontal && !holdOn && edgeStart) {   // in hold a quick sideways move is just the position, not a world swipe
       if (!locked) { swiped = true; handoff(dx < 0 ? 1 : -1, e.clientX, e.clientY); }
       else if (!attempted) {   // locked: refuse once per touch; a repeat in the same direction within a second lifts the lock
         attempted = true;
