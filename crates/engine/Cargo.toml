@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", tag = "v0.3.0" }
+versum-dsp = { git = "https://github.com/v-for-versum/versum-dsp", tag = "v0.3.0" }
 
 [dev-dependencies]
-versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", tag = "v0.3.0", features = ["testkit"] }
+versum-dsp = { git = "https://github.com/v-for-versum/versum-dsp", tag = "v0.3.0", features = ["testkit"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }

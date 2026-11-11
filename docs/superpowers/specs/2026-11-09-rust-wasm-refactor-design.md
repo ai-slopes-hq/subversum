@@ -44,8 +44,8 @@ subversum/
 ```
 
 Репозиторий `versum-dsp` (github, публичный) подключается в `crates/engine/Cargo.toml`:
-`versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", tag = "v0.1.0" }`.
-Владелец — `ai-slopes-hq` (там же `subversum`); локальная копия — `/Users/noise/code/versum-dsp`. Любое изменение API блока — новый тег. В разработке допускается локальный `[patch]` на рабочую копию, в git он не коммитится.
+`versum-dsp = { git = "https://github.com/v-for-versum/versum-dsp", tag = "v0.1.0" }`.
+Владелец — `v-for-versum` (там же `subversum`); локальная копия — `/Users/noise/code/versum-dsp`. Любое изменение API блока — новый тег. В разработке допускается локальный `[patch]` на рабочую копию, в git он не коммитится.
 
 ## 3. Контракт звук ↔ графика
 

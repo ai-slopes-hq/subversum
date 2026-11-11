@@ -10,4 +10,4 @@ crate-type = ["cdylib", "rlib"]
 engine = { path = "../engine" }
 
 [dev-dependencies]
-versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", rev = "bf982023d6ee3ef0a49d7157bb9c8c1669656514", features = ["testkit"] }
+versum-dsp = { git = "https://github.com/v-for-versum/versum-dsp", rev = "bf982023d6ee3ef0a49d7157bb9c8c1669656514", features = ["testkit"] }

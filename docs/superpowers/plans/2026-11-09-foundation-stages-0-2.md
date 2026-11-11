@@ -19,7 +19,7 @@
 - Блок звука — 128 сэмплов (`MAX_BLOCK = 128`).
 - WASM: `cargo build --release --target wasm32-unknown-unknown`, без `wasm-bindgen`, интерфейс `extern "C"` и линейная память.
 - Транспорт: `postMessage` через порт AudioWorklet, телеметрия батчем раз в кадр (около 60 Гц); SharedArrayBuffer и COOP/COEP не используются.
-- Зависимость: на время разработки `versum-dsp = { git = "https://github.com/ai-slopes-hq/versum-dsp", rev = "<sha коммита из ветки feat/foundation>" }`; в финале, после merge ветки в `main` репозитория `versum-dsp` и тега, `rev` заменяется на `tag = "v0.1.0"`.
+- Зависимость: на время разработки `versum-dsp = { git = "https://github.com/v-for-versum/versum-dsp", rev = "<sha коммита из ветки feat/foundation>" }`; в финале, после merge ветки в `main` репозитория `versum-dsp` и тега, `rev` заменяется на `tag = "v0.1.0"`.
 - Деплой: `legacy/` копируется в корень `dist/` как есть, новое приложение лежит в `dist/next/`; в git только исходники; Rust и Vite собираются на Vercel.
 - PWA-кэш legacy: `subversum-v3`.
 - `?v=1` принадлежит legacy, новый движок использует `?v=2`.
@@ -106,7 +106,7 @@
 - [ ] **Step 4: Запустить** `cargo test --features testkit` → PASS.
 - [ ] **Step 5: Commit** `feat: DcBlock, OnePole, Ramp, Knee, pan_eq, EdgeDetector, Delay`.
 - [ ] **Step 6: Работа ведётся в ветке `feat/foundation`** репозитория `versum-dsp` (создать её до Task 1; `main` не трогать). Тег не ставится до приёмки.
-- [ ] **Step 7 (с подтверждения пользователя): выложить ветку** `git push -u origin feat/foundation` в `ai-slopes-hq/versum-dsp`. Затем в Task 4 зависимость в `crates/engine/Cargo.toml` пинуется на `rev` последнего коммита ветки; обновлять `rev` нужно при каждом новом коммите `versum-dsp`. До push допустим `[patch]` на `/Users/noise/code/versum-dsp` в незакоммиченном `.cargo/config.toml`.
+- [ ] **Step 7 (с подтверждения пользователя): выложить ветку** `git push -u origin feat/foundation` в `v-for-versum/versum-dsp`. Затем в Task 4 зависимость в `crates/engine/Cargo.toml` пинуется на `rev` последнего коммита ветки; обновлять `rev` нужно при каждом новом коммите `versum-dsp`. До push допустим `[patch]` на `/Users/noise/code/versum-dsp` в незакоммиченном `.cargo/config.toml`.
 
 ---
 

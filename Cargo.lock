@@ -102,12 +102,12 @@ checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 [[package]]
 name = "versum-dsp"
 version = "0.1.0"
-source = "git+https://github.com/ai-slopes-hq/versum-dsp?rev=bf982023d6ee3ef0a49d7157bb9c8c1669656514#bf982023d6ee3ef0a49d7157bb9c8c1669656514"
+source = "git+https://github.com/v-for-versum/versum-dsp?rev=bf982023d6ee3ef0a49d7157bb9c8c1669656514#bf982023d6ee3ef0a49d7157bb9c8c1669656514"
 
 [[package]]
 name = "versum-dsp"
 version = "0.3.0"
-source = "git+https://github.com/ai-slopes-hq/versum-dsp?tag=v0.3.0#6da4ba7e16172e1296ace9bef5562b1bf79ef78e"
+source = "git+https://github.com/v-for-versum/versum-dsp?tag=v0.3.0#6da4ba7e16172e1296ace9bef5562b1bf79ef78e"
 
 [[package]]
 name = "versum-wasm"
